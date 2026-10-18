@@ -1,0 +1,1 @@
+export { BibleSection } from "./BibleSection";

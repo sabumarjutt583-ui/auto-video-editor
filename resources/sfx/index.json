@@ -1,0 +1,214 @@
+[
+  {
+    "id": "whoosh_soft",
+    "file": "whoosh_soft.wav",
+    "category": "whoosh",
+    "tags": [
+      "soft",
+      "slide"
+    ],
+    "duration": 0.7,
+    "defaultGain": 0.8
+  },
+  {
+    "id": "whoosh_fast",
+    "file": "whoosh_fast.wav",
+    "category": "whoosh",
+    "tags": [
+      "fast",
+      "whip"
+    ],
+    "duration": 0.4,
+    "defaultGain": 0.8
+  },
+  {
+    "id": "whoosh_long",
+    "file": "whoosh_long.wav",
+    "category": "whoosh",
+    "tags": [
+      "long",
+      "zoom"
+    ],
+    "duration": 1,
+    "defaultGain": 0.75
+  },
+  {
+    "id": "hit_deep",
+    "file": "hit_deep.wav",
+    "category": "hit",
+    "tags": [
+      "deep",
+      "impact"
+    ],
+    "duration": 0.9,
+    "defaultGain": 0.9
+  },
+  {
+    "id": "hit_punch",
+    "file": "hit_punch.wav",
+    "category": "hit",
+    "tags": [
+      "punch",
+      "short"
+    ],
+    "duration": 0.5,
+    "defaultGain": 0.9
+  },
+  {
+    "id": "hit_boom",
+    "file": "hit_boom.wav",
+    "category": "hit",
+    "tags": [
+      "boom",
+      "big"
+    ],
+    "duration": 1.6,
+    "defaultGain": 0.9
+  },
+  {
+    "id": "pop_bubble",
+    "file": "pop_bubble.wav",
+    "category": "pop",
+    "tags": [
+      "soft",
+      "caption"
+    ],
+    "duration": 0.15,
+    "defaultGain": 0.7
+  },
+  {
+    "id": "pop_high",
+    "file": "pop_high.wav",
+    "category": "pop",
+    "tags": [
+      "bright",
+      "caption"
+    ],
+    "duration": 0.12,
+    "defaultGain": 0.7
+  },
+  {
+    "id": "click_soft",
+    "file": "click_soft.wav",
+    "category": "click",
+    "tags": [
+      "soft",
+      "ui"
+    ],
+    "duration": 0.06,
+    "defaultGain": 0.6
+  },
+  {
+    "id": "click_tick",
+    "file": "click_tick.wav",
+    "category": "click",
+    "tags": [
+      "tick",
+      "ui"
+    ],
+    "duration": 0.05,
+    "defaultGain": 0.6
+  },
+  {
+    "id": "riser_noise",
+    "file": "riser_noise.wav",
+    "category": "riser",
+    "tags": [
+      "noise",
+      "build"
+    ],
+    "duration": 1.8,
+    "defaultGain": 0.7
+  },
+  {
+    "id": "riser_tone",
+    "file": "riser_tone.wav",
+    "category": "riser",
+    "tags": [
+      "tone",
+      "build"
+    ],
+    "duration": 2.2,
+    "defaultGain": 0.65
+  },
+  {
+    "id": "ambience_calm",
+    "file": "ambience_calm.wav",
+    "category": "ambience",
+    "tags": [
+      "calm",
+      "peaceful",
+      "village"
+    ],
+    "duration": 8,
+    "defaultGain": 0.35
+  },
+  {
+    "id": "ambience_tense",
+    "file": "ambience_tense.wav",
+    "category": "ambience",
+    "tags": [
+      "tense",
+      "dark",
+      "danger"
+    ],
+    "duration": 8,
+    "defaultGain": 0.35
+  },
+  {
+    "id": "ambience_nature",
+    "file": "ambience_nature.wav",
+    "category": "ambience",
+    "tags": [
+      "nature",
+      "forest",
+      "wind"
+    ],
+    "duration": 8,
+    "defaultGain": 0.3
+  },
+  {
+    "id": "swell_warm",
+    "file": "swell_warm.wav",
+    "category": "soft_swell",
+    "tags": [
+      "warm",
+      "major"
+    ],
+    "duration": 2.8,
+    "defaultGain": 0.6
+  },
+  {
+    "id": "swell_sad",
+    "file": "swell_sad.wav",
+    "category": "soft_swell",
+    "tags": [
+      "sad",
+      "minor"
+    ],
+    "duration": 2.8,
+    "defaultGain": 0.6
+  },
+  {
+    "id": "transition_impact",
+    "file": "transition_impact.wav",
+    "category": "transition",
+    "tags": [
+      "whoosh",
+      "hit"
+    ],
+    "duration": 1.2,
+    "defaultGain": 0.85
+  },
+  {
+    "id": "transition_sweep",
+    "file": "transition_sweep.wav",
+    "category": "transition",
+    "tags": [
+      "sweep",
+      "bright"
+    ],
+    "duration": 0.9,
+    "defaultGain": 0.75
+  }
+]

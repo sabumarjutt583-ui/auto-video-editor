@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Auto Video Editor Admin",
+  "identifier": "com.autovideoeditor.admin",
+  "build": {
+    "beforeDevCommand": "npm run dev -- --mode admin",
+    "beforeBuildCommand": "npm run build:web:admin"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Auto Video Editor Admin",
+        "width": 1360,
+        "height": 860,
+        "minWidth": 1200,
+        "minHeight": 750,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; media-src 'self' blob: asset: http://asset.localhost https://cdn.freesound.org; font-src 'self' data: asset: http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; media-src 'self' blob: asset: http://asset.localhost https://cdn.freesound.org; font-src 'self' data: asset: http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost ws://localhost:1420 http://localhost:1420",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/projects/**",
+          "$APPDATA/library/**",
+          "$APPDATA/admin/**",
+          "$RESOURCE/resources/fonts/**",
+          "$RESOURCE/resources/sfx/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhGNDcxMTI4RDVBOEM5NTEKUldSUnlhalZLQkZIaitzYnpXYW1kKzliV25UcnZYTnA0TnhqQTZ5NlJiaWZRdy9WdzNCZWJLTEsK",
+      "endpoints": [
+        "https://invalid.example/not-used.json"
+      ]
+    }
+  }
+}

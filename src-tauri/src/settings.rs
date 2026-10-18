@@ -1,0 +1,327 @@
+//! Non-secret app settings, stored as JSON in the app data folder.
+//!
+//! API keys are NOT part of this file: they live only in the OS keychain (see keys.rs).
+
+use std::fs;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Manager};
+
+use crate::api::clean_model_name;
+use crate::commands::error::AppError;
+
+const FILE_NAME: &str = "settings.json";
+const CORRUPT_FILE_NAME: &str = "settings.corrupt.json";
+const MAX_PATH_LENGTH: usize = 1024;
+
+pub const DEFAULT_GEMINI_MODEL: &str = "gemini-3.8-flash";
+pub const DEFAULT_WHISPER_MODEL: &str = "whisper-large-v3-turbo";
+pub const DEFAULT_GROQ_TEXT_MODEL: &str = "llama-3.3-70b-versatile";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AspectRatio {
+    #[serde(rename = "16:9")]
+    Landscape,
+    #[serde(rename = "9:16")]
+    Portrait,
+    #[serde(rename = "1:1")]
+    Square,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Quality {
+    #[serde(rename = "720p")]
+    P720,
+    #[serde(rename = "1080p")]
+    P1080,
+    #[serde(rename = "4K")]
+    K4,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Settings {
+    pub gemini_model: String,
+    pub groq_whisper_model: String,
+    pub fallback_to_groq: bool,
+    pub groq_text_model: String,
+    /// Empty means "not chosen yet".
+    pub export_folder: String,
+    pub default_aspect_ratio: AspectRatio,
+    pub default_quality: Quality,
+    /// Always encode on the CPU, even when a graphics-card encoder works.
+    pub force_cpu_encoding: bool,
+    /// Where new sound and style packages are published (a folder address that holds manifest.json). Empty = no updates.
+    pub library_update_url: String,
+    /// Ids of the sounds the person marked as favorites.
+    pub sfx_favorites: Vec<String>,
+    /// Where the app looks for new app versions (the address of latest.json). Empty = the address built into the app.
+    pub app_update_url: String,
+    /// Look for a new app version when the app starts.
+    pub auto_check_app_updates: bool,
+    /// Write longer texts into the log files (for support). Off by default.
+    pub debug_logging: bool,
+    /// The first-run screens have been seen (or skipped).
+    pub onboarding_done: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            gemini_model: DEFAULT_GEMINI_MODEL.to_string(),
+            groq_whisper_model: DEFAULT_WHISPER_MODEL.to_string(),
+            fallback_to_groq: false,
+            groq_text_model: DEFAULT_GROQ_TEXT_MODEL.to_string(),
+            export_folder: String::new(),
+            default_aspect_ratio: AspectRatio::Landscape,
+            default_quality: Quality::P1080,
+            force_cpu_encoding: false,
+            library_update_url: option_env!("AVE_LIBRARY_URL").unwrap_or_default().to_string(),
+            sfx_favorites: Vec::new(),
+            app_update_url: String::new(),
+            auto_check_app_updates: true,
+            debug_logging: false,
+            onboarding_done: false,
+        }
+    }
+}
+
+impl Settings {
+    /// Checks and tidies values coming from the UI.
+    pub fn validated(self) -> Result<Self, AppError> {
+        let gemini_model = clean_model_name(&self.gemini_model, false).ok_or_else(|| {
+            invalid("The Gemini model name is not valid. Use only letters, numbers, dots, dashes and underscores.")
+        })?;
+        let groq_whisper_model = clean_model_name(&self.groq_whisper_model, true)
+            .ok_or_else(|| invalid("The Groq Whisper model name is not valid."))?;
+        let groq_text_model = clean_model_name(&self.groq_text_model, true)
+            .ok_or_else(|| invalid("The Groq text model name is not valid."))?;
+
+        let export_folder = self.export_folder.trim().to_string();
+        if export_folder.chars().count() > MAX_PATH_LENGTH || export_folder.contains('\0') {
+            return Err(invalid("The export folder path is not valid."));
+        }
+
+        let library_update_url = self.library_update_url.trim().trim_end_matches('/').to_string();
+        if !library_update_url.is_empty() && !crate::library::manifest::valid_base_url(&library_update_url) {
+            return Err(invalid("The update address must start with https:// and have no spaces."));
+        }
+        let app_update_url = self.app_update_url.trim().to_string();
+        if !app_update_url.is_empty() && !app_update_url.starts_with("https://") || app_update_url.len() > 500 || app_update_url.contains(char::is_whitespace) {
+            return Err(invalid("The app update address must start with https:// and have no spaces."));
+        }
+        let mut sfx_favorites: Vec<String> = Vec::new();
+        for id in self.sfx_favorites.iter().map(|id| id.trim()).filter(|id| !id.is_empty()) {
+            if id.len() > 80 || id.contains(char::is_control) {
+                return Err(invalid("A favorite sound id is not valid."));
+            }
+            if !sfx_favorites.iter().any(|f| f == id) && sfx_favorites.len() < 1000 {
+                sfx_favorites.push(id.to_string());
+            }
+        }
+
+        Ok(Self {
+            library_update_url,
+            app_update_url,
+            sfx_favorites,
+            gemini_model,
+            groq_whisper_model,
+            groq_text_model,
+            export_folder,
+            ..self
+        })
+    }
+}
+
+fn invalid(message: &str) -> AppError {
+    AppError::new(message, "A settings value failed validation.")
+}
+
+fn io_error(message: &str, error: std::io::Error) -> AppError {
+    AppError::new(message, error.to_string())
+}
+
+pub fn settings_path(app: &AppHandle) -> Result<PathBuf, AppError> {
+    let folder = app.path().app_data_dir().map_err(|error| {
+        AppError::new("The app data folder could not be found.", error.to_string())
+    })?;
+    Ok(folder.join(FILE_NAME))
+}
+
+/// Reads the settings file. A missing file gives the defaults. A file that cannot be
+/// understood is set aside as `settings.corrupt.json` and the defaults are used.
+pub fn load_from(path: &Path) -> Result<Settings, AppError> {
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Settings::default()),
+        Err(error) => return Err(io_error("The settings file could not be read.", error)),
+    };
+
+    match serde_json::from_str::<Settings>(&text) {
+        Ok(settings) => Ok(settings.validated().unwrap_or_default()),
+        Err(_) => {
+            if let Some(folder) = path.parent() {
+                let _ = fs::rename(path, folder.join(CORRUPT_FILE_NAME));
+            }
+            Ok(Settings::default())
+        }
+    }
+}
+
+/// Writes the settings file safely: to a temporary file first, then renamed into place.
+pub fn save_to(path: &Path, settings: &Settings) -> Result<(), AppError> {
+    let folder = path
+        .parent()
+        .ok_or_else(|| AppError::new("The settings file location is not valid.", path.display().to_string()))?;
+    fs::create_dir_all(folder)
+        .map_err(|error| io_error("The app data folder could not be created.", error))?;
+
+    let json = serde_json::to_string_pretty(settings)
+        .map_err(|error| AppError::new("The settings could not be prepared for saving.", error.to_string()))?;
+
+    let temporary = path.with_extension("json.tmp");
+    fs::write(&temporary, json).map_err(|error| io_error("The settings could not be saved.", error))?;
+    fs::rename(&temporary, path).map_err(|error| io_error("The settings could not be saved.", error))
+}
+
+pub fn load(app: &AppHandle) -> Result<Settings, AppError> {
+    load_from(&settings_path(app)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_folder(name: &str) -> PathBuf {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let folder = std::env::temp_dir().join(format!("ave-test-{name}-{}-{nanos}", std::process::id()));
+        fs::create_dir_all(&folder).unwrap();
+        folder
+    }
+
+    #[test]
+    fn defaults_match_the_spec() {
+        let settings = Settings::default();
+        assert_eq!(settings.gemini_model, "gemini-3.8-flash");
+        assert_eq!(settings.groq_whisper_model, "whisper-large-v3-turbo");
+        assert!(!settings.fallback_to_groq);
+        assert_eq!(settings.default_aspect_ratio, AspectRatio::Landscape);
+        assert_eq!(settings.default_quality, Quality::P1080);
+        assert_eq!(settings.export_folder, "");
+    }
+
+    #[test]
+    fn uses_the_json_shape_the_frontend_expects() {
+        let json = serde_json::to_value(Settings::default()).unwrap();
+        assert_eq!(json["defaultAspectRatio"], "16:9");
+        assert_eq!(json["defaultQuality"], "1080p");
+        assert_eq!(json["fallbackToGroq"], false);
+        assert!(json.get("geminiModel").is_some());
+    }
+
+    #[test]
+    fn aspect_ratios_and_qualities_round_trip() {
+        for (text, ratio) in [("16:9", AspectRatio::Landscape), ("9:16", AspectRatio::Portrait), ("1:1", AspectRatio::Square)] {
+            let json = format!("\"{text}\"");
+            assert_eq!(serde_json::from_str::<AspectRatio>(&json).unwrap(), ratio);
+            assert_eq!(serde_json::to_string(&ratio).unwrap(), json);
+        }
+        for (text, quality) in [("720p", Quality::P720), ("1080p", Quality::P1080), ("4K", Quality::K4)] {
+            let json = format!("\"{text}\"");
+            assert_eq!(serde_json::from_str::<Quality>(&json).unwrap(), quality);
+            assert_eq!(serde_json::to_string(&quality).unwrap(), json);
+        }
+        assert!(serde_json::from_str::<Quality>("\"8K\"").is_err());
+    }
+
+    #[test]
+    fn settings_never_have_a_field_that_could_hold_a_secret() {
+        let json = serde_json::to_string(&Settings::default()).unwrap().to_lowercase();
+        for word in ["key", "secret", "token", "password"] {
+            assert!(!json.contains(word), "settings JSON mentions '{word}'");
+        }
+    }
+
+    #[test]
+    fn a_partial_file_is_filled_up_with_defaults() {
+        let settings: Settings = serde_json::from_str(r#"{"exportFolder":"/videos"}"#).unwrap();
+        assert_eq!(settings.export_folder, "/videos");
+        assert_eq!(settings.gemini_model, DEFAULT_GEMINI_MODEL);
+    }
+
+    #[test]
+    fn validation_tidies_model_names_and_folder() {
+        let settings = Settings {
+            gemini_model: " models/gemini-3.8-flash ".into(),
+            export_folder: "  /videos/out ".into(),
+            ..Settings::default()
+        };
+        let settings = settings.validated().unwrap();
+        assert_eq!(settings.gemini_model, "gemini-3.8-flash");
+        assert_eq!(settings.export_folder, "/videos/out");
+    }
+
+    #[test]
+    fn validation_rejects_bad_model_names() {
+        let bad_gemini = Settings { gemini_model: "gemini flash".into(), ..Settings::default() };
+        assert!(bad_gemini.validated().is_err());
+        let bad_groq = Settings { groq_text_model: "".into(), ..Settings::default() };
+        assert!(bad_groq.validated().is_err());
+    }
+
+    #[test]
+    fn update_address_and_favorites_are_checked_and_tidied() {
+        let ok = Settings { library_update_url: " https://example.com/rel/ ".into(), sfx_favorites: vec![" a ".into(), "a".into(), "".into(), "b".into()], ..Settings::default() };
+        let ok = ok.validated().unwrap();
+        assert_eq!(ok.library_update_url, "https://example.com/rel");
+        assert_eq!(ok.sfx_favorites, vec!["a", "b"]);
+        let bad = Settings { library_update_url: "http://example.com".into(), ..Settings::default() };
+        assert!(bad.validated().is_err());
+        let bad_app = Settings { app_update_url: "http://example.com/latest.json".into(), ..Settings::default() };
+        assert!(bad_app.validated().is_err());
+        let good_app = Settings { app_update_url: " https://example.com/latest.json ".into(), ..Settings::default() };
+        assert_eq!(good_app.validated().unwrap().app_update_url, "https://example.com/latest.json");
+        let empty = Settings { library_update_url: String::new(), ..Settings::default() };
+        assert!(empty.validated().is_ok());
+    }
+
+    #[test]
+    fn a_missing_file_gives_the_defaults() {
+        let folder = temp_folder("missing");
+        let settings = load_from(&folder.join(FILE_NAME)).unwrap();
+        assert_eq!(settings, Settings::default());
+        fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    fn saved_settings_load_back_the_same() {
+        let folder = temp_folder("roundtrip");
+        let path = folder.join("nested").join(FILE_NAME);
+        let settings = Settings {
+            gemini_model: "gemini-3.6-flash".into(),
+            fallback_to_groq: true,
+            export_folder: "/videos".into(),
+            default_aspect_ratio: AspectRatio::Portrait,
+            default_quality: Quality::K4,
+            ..Settings::default()
+        };
+        save_to(&path, &settings).unwrap();
+        assert_eq!(load_from(&path).unwrap(), settings);
+        assert!(!path.with_extension("json.tmp").exists());
+        fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    fn a_corrupt_file_is_set_aside_and_defaults_are_used() {
+        let folder = temp_folder("corrupt");
+        let path = folder.join(FILE_NAME);
+        fs::write(&path, "{ this is not json").unwrap();
+        assert_eq!(load_from(&path).unwrap(), Settings::default());
+        assert!(!path.exists());
+        assert!(folder.join(CORRUPT_FILE_NAME).exists());
+        fs::remove_dir_all(folder).unwrap();
+    }
+}

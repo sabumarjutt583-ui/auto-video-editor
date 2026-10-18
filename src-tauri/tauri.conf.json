@@ -1,0 +1,91 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Auto Video Editor",
+  "version": "0.1.0",
+  "identifier": "com.autovideoeditor.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Auto Video Editor",
+        "width": 1360,
+        "height": 860,
+        "minWidth": 1200,
+        "minHeight": 750,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; media-src 'self' blob: asset: http://asset.localhost; font-src 'self' data: asset: http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost; media-src 'self' blob: asset: http://asset.localhost; font-src 'self' data: asset: http://asset.localhost; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost ws://localhost:1420 http://localhost:1420",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/projects/**",
+          "$RESOURCE/resources/fonts/**",
+          "$RESOURCE/resources/sfx/**",
+          "$APPDATA/library/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/ffmpeg",
+      "binaries/ffprobe"
+    ],
+    "resources": {
+      "../resources/styles/": "resources/styles/",
+      "../resources/sfx/": "resources/sfx/",
+      "../resources/fonts/": "resources/fonts/"
+    },
+    "createUpdaterArtifacts": true,
+    "publisher": "Auto Video Editor",
+    "copyright": "Copyright © 2026 Auto Video Editor",
+    "category": "Video",
+    "shortDescription": "Prompts and automatic video editing for faceless YouTube narration videos.",
+    "longDescription": "Auto Video Editor turns a voice-over and a script into image prompts, then builds the finished video: timeline, captions, music, sound effects and a final MP4 render. Everything is edited on your own computer.",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "compression": "lzma",
+        "displayLanguageSelector": false,
+        "languages": [
+          "English"
+        ]
+      },
+      "wix": {
+        "language": "en-US"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhGNDcxMTI4RDVBOEM5NTEKUldSUnlhalZLQkZIaitzYnpXYW1kKzliV25UcnZYTnA0TnhqQTZ5NlJiaWZRdy9WdzNCZWJLTEsK",
+      "endpoints": [
+        "https://github.com/OWNER/REPO/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

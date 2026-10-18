@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+/*
+ * Theme colors live in CSS variables. Dark is the default;
+ * the light theme overrides them when <html data-theme="light"> is set.
+ */
+:root {
+  color-scheme: dark;
+  --bg: #0c0c12;
+  --surface: #14141c;
+  --surface-2: #1c1c27;
+  --border: #292938;
+  --text: #ececf4;
+  --text-muted: #9797ae;
+  --accent: #8b5cf6;
+  --accent-hover: #7c3aed;
+  --accent-soft: rgb(139 92 246 / 0.16);
+  --accent-text: #c4b5fd;
+  --on-accent: #ffffff;
+  --success: #34d399;
+  --warning: #fb923c;
+  --danger: #f87171;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px rgb(0 0 0 / 0.28);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f4fa;
+  --surface: #ffffff;
+  --surface-2: #efeff7;
+  --border: #e0e0ec;
+  --text: #17171f;
+  --text-muted: #666680;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-soft: rgb(124 58 237 / 0.1);
+  --accent-text: #6d28d9;
+  --on-accent: #ffffff;
+  --success: #059669;
+  --warning: #c2410c;
+  --danger: #dc2626;
+  --shadow: 0 1px 2px rgb(20 20 40 / 0.06), 0 10px 28px rgb(20 20 40 / 0.08);
+}
+
+/* Expose the variables as Tailwind utilities: bg-surface, text-muted, border-line, ... */
+@theme inline {
+  --color-app: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-fg: var(--text);
+  --color-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-text);
+  --color-on-accent: var(--on-accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --shadow-card: var(--shadow);
+  --font-sans: ui-sans-serif, "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
+    "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

@@ -1,0 +1,27 @@
+export type AspectRatio = "16:9" | "9:16" | "1:1";
+export type Quality = "720p" | "1080p" | "4K";
+
+/** Non-secret settings, stored as JSON in the app data folder (mirrors settings.rs). */
+export interface AppSettings {
+  geminiModel: string;
+  groqWhisperModel: string;
+  fallbackToGroq: boolean;
+  groqTextModel: string;
+  /** Empty when no folder has been chosen yet. */
+  exportFolder: string;
+  defaultAspectRatio: AspectRatio;
+  defaultQuality: Quality;
+  /** Always encode on the CPU, even when a graphics-card encoder works. */
+  forceCpuEncoding: boolean;
+  /** Folder address that holds the sound and style packages (manifest.json). Empty = no updates. */
+  libraryUpdateUrl: string;
+  /** Ids of the sounds marked as favorites. */
+  sfxFavorites: string[];
+  /** Address of latest.json for app updates. Empty = the address built into the app. */
+  appUpdateUrl: string;
+  autoCheckAppUpdates: boolean;
+  /** Write longer texts into the log files (for support). */
+  debugLogging: boolean;
+  /** The first-run screens were seen or skipped. */
+  onboardingDone: boolean;
+}

@@ -1,0 +1,28 @@
+[package]
+name = "auto-video-editor"
+version = "0.1.0"
+description = "Auto Video Editor: prompt generator and automatic video editor for faceless YouTube creators"
+edition = "2021"
+rust-version = "1.77"
+
+[features]
+# The Admin Edition (sound library tools). Never enabled for the user installer.
+admin = []
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["process", "time", "sync", "macros", "io-util", "rt"] }
+keyring = "4"
+# native-tls = Windows Schannel / macOS Secure Transport, so no extra C toolchain is needed to build.
+reqwest = { version = "0.13", default-features = false, features = ["native-tls", "json", "http2", "system-proxy"] }
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy", "zip"] }
+
+[dev-dependencies]
+# Local mock server used by the API helper tests.
+tokio = { version = "1", features = ["rt", "macros", "net", "io-util"] }

@@ -1,0 +1,40 @@
+{
+  "name": "auto-video-editor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "test:ts": "node --test \"src/**/*.test.ts\"",
+    "setup:ffmpeg": "node scripts/fetch-ffmpeg.mjs",
+    "pretauri": "node scripts/fetch-ffmpeg.mjs --if-missing",
+    "tauri": "tauri",
+    "build:web:admin": "tsc -b && vite build --mode admin",
+    "dev:admin": "tauri dev --features admin --config src-tauri/tauri.admin.conf.json",
+    "build:admin": "tauri build --features admin --config src-tauri/tauri.admin.conf.json"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-dialog": "^2.8.3",
+    "lucide-react": "^1.59.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.4",
+    "wavesurfer.js": "^8.0.2",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/cli": "^2.12.3",
+    "@types/node": "^26.6.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}
