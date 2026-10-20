@@ -108,7 +108,7 @@ else
 fi
 
 echo "== opus"; fetch "https://downloads.xiph.org/releases/opus/opus-$OPUS.tar.gz" "$WORK/opus"
-cmake_build "$WORK/opus" -DOPUS_BUILD_PROGRAMS=OFF -DOPUS_BUILD_TESTING=OFF -DOPUS_INSTALL_PKG_CONFIG_MODULE=ON
+cmake_build "$WORK/opus" -DOPUS_STACK_PROTECTOR=OFF -DOPUS_FORTIFY_SOURCE=OFF -DOPUS_BUILD_PROGRAMS=OFF -DOPUS_BUILD_TESTING=OFF -DOPUS_INSTALL_PKG_CONFIG_MODULE=ON
 
 echo "== lame"; fetch "https://downloads.sourceforge.net/project/lame/lame/$LAME/lame-$LAME.tar.gz" "$WORK/lame"
 ( cd "$WORK/lame" && ./configure "${CONFIGURE_HOST[@]}" --prefix="$P" --disable-shared --enable-static --disable-frontend --disable-decoder --disable-gtktest --disable-dependency-tracking && make -j"$JOBS" && make install )
