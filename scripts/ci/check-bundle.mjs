@@ -42,11 +42,11 @@ function unpack(file, target) {
   if (name.endsWith(".exe") || name.endsWith(".msi")) {
     const tool = sevenZip();
     if (!tool) fail("7-Zip is needed to look inside the Windows installer, but it was not found.");
-    execFileSync(tool, ["x", "-y", `-o${target}`, file], { stdio: "ignore" });
+    execFileSync(tool, ["x", "-y", `-o${target}`, file], { stdio: ["ignore", "ignore", "pipe"] });
     // The NSIS installer holds the program files in an inner archive only on some versions; 7-Zip already lists them.
   } else if (name.endsWith(".appimage")) {
     execFileSync("chmod", ["+x", file]);
-    execFileSync(file, ["--appimage-extract"], { cwd: target, stdio: "ignore", env: { ...process.env, APPIMAGE_EXTRACT_AND_RUN: "1" } });
+    execFileSync(file, ["--appimage-extract"], { cwd: target, stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, APPIMAGE_EXTRACT_AND_RUN: "1" } });
   } else if (name.endsWith(".deb")) {
     execFileSync("dpkg-deb", ["-x", file, target]);
   } else if (name.endsWith(".tar.gz")) {
@@ -73,7 +73,12 @@ for (const file of process.argv.slice(2)) {
   const work = mkdtempSync(join(tmpdir(), "ave-bundle-"));
   const target = join(work, "x");
   mkdirSync(target);
-  unpack(file, target);
+  try {
+    unpack(file, target);
+  } catch (error) {
+    const text = error instanceof Error ? `${error.message}\n${String(error.stderr ?? "")}` : String(error);
+    fail(`Could not open ${basename(file)}: ${text.slice(0, 1500).replace(/\n/g, " | ")}`);
+  }
 
   const problems = [];
   const groups = new Map();
