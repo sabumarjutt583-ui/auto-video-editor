@@ -73,19 +73,20 @@ Use a short voice file (30 to 120 seconds) and its script. Korean, Japanese, Nep
 
 ## Results of the last full run
 
-Run date: 2026-10-18 (Linux sandbox, headless).
+Run date: 2026-10-20 (Linux sandbox, headless) and CI run 39469678995.
 
 | Check | Result |
 |---|---|
 | `npx tsc -b` | clean, no errors |
-| `npm run test:ts` | 143 passed, 0 failed |
-| `cargo build` (user) / `--features admin` | no warnings |
-| `cargo test` (user) | 220 passed, 0 failed |
-| `cargo test --features admin` | 233 passed, 0 failed |
-| User build has no admin/Freesound strings (dist + binary) | 0 matches |
-| Admin build: Admin page, package build, install in user build via "Check for library update" | works (sfx v2 and styles v2 installed) |
-| Onboarding (3 screens, Skip for now), logs written, App-update error with Details | works |
-| Performance: 20 min voice, 200 scenes, 1080p, 30 fps, captions, mixed transitions (release, CPU OpenH264, 2-core sandbox) | 1309 s wall, 1122 MB, output exactly 1200.000 s (ok), 3217 progress events, UI stays responsive (work is in Rust jobs) |
+| `npm run test:ts` | 219 passed, 0 failed |
+| `npm run test:scripts` | 8 passed, 0 failed |
+| `cargo test` (user) / `--features admin` | 234 / 250 passed, 0 failed, no warnings |
+| Workflow lint (actionlint) | clean |
+| CI: small FFmpeg builds (Windows, Linux, macOS arm64 + x86_64), LGPL check, part list check | pass |
+| CI: 5-second smoke test with every feature (captions in 6 scripts, ducking, SFX, loudnorm, silence detection) on Windows, Linux, macOS | pass |
+| CI: bundle check (no source, maps, env files, keys) on all installers | pass |
+| CI: publish job | stops on purpose: "already has a published release v0.1.1" (a new version is needed) |
+| Installer sizes | Windows exe 36.0 MB, msi 45.5 MB, dmg 47 MB, AppImage 122.7 MB, deb 43.8 MB (docs/SIZE_REPORT.md) |
 
 Bugs found and fixed in this run: log redaction swallowed the full stop after a key; the Admin build did not register the logs and app-update commands.
 
