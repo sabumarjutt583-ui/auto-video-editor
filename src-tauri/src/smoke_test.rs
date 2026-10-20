@@ -68,7 +68,7 @@ async fn smoke_test_every_feature_in_five_seconds() {
     ffmpeg(&["-f", "lavfi", "-i", "sine=frequency=300:duration=5.04", "-af", "volume='if(between(t,2,3),0,1)':eval=frame", &p("audio/voice.wav")]).await;
     ffmpeg(&["-f", "lavfi", "-i", "sine=frequency=220:duration=8", "-c:a", "libmp3lame", &p("audio/music.mp3")]).await;
     ffmpeg(&["-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:a", "libopus", &p("audio/tone.ogg")]).await;
-    ffmpeg(&["-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:a", "aac", &p("audio/tone.m4a")]).await;
+    ffmpeg(&["-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:a", "aac", "-f", "mp4", &p("audio/tone.m4a")]).await;
 
     // 2. Everything the app accepts must be readable and decode without errors.
     for file in ["media/a.png", "media/b.jpg", "media/c.webp", "media/clip.mp4", "audio/voice.wav", "audio/music.mp3", "audio/tone.ogg", "audio/tone.m4a"] {
