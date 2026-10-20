@@ -61,7 +61,7 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            runner: macos-14
+            runner: macos-15
             triple: aarch64-apple-darwin
           - arch: x86_64
             runner: macos-15-intel
@@ -260,7 +260,7 @@ jobs:
   build-macos:
     name: Build macOS
     needs: [preflight, ffmpeg-macos]
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
