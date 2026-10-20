@@ -1,4 +1,4 @@
-//! Locating and running the bundled FFmpeg / FFprobe sidecar binaries.
+//! Locating and running the bundled FFmpeg sidecar binary.
 
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -12,14 +12,12 @@ const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 #[derive(Debug, Clone, Copy)]
 pub enum Tool {
     Ffmpeg,
-    Ffprobe,
 }
 
 impl Tool {
     pub fn name(self) -> &'static str {
         match self {
             Tool::Ffmpeg => "ffmpeg",
-            Tool::Ffprobe => "ffprobe",
         }
     }
 
@@ -117,9 +115,9 @@ mod tests {
 
     #[test]
     fn parses_git_build_version() {
-        let out = "ffprobe version N-118000-g1a2b3c4d5e Copyright (c) 2007-2026 the FFmpeg developers";
+        let out = "ffmpeg version N-118000-g1a2b3c4d5e Copyright (c) 2007-2026 the FFmpeg developers";
         assert_eq!(
-            parse_version(Tool::Ffprobe, out).as_deref(),
+            parse_version(Tool::Ffmpeg, out).as_deref(),
             Some("N-118000-g1a2b3c4d5e")
         );
     }

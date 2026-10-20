@@ -31,7 +31,7 @@ Two main modules:
 ## Folder structure
 src/ (React): pages/, components/, store/, lib/ (api clients, parsers), types/
 src-tauri/src/: main.rs, commands/, api/ (HTTP helper with retry, typed errors, Groq and Gemini calls), settings.rs (non-secret settings JSON), audio.rs, timing.rs, render.rs, ffmpeg.rs, keys.rs, project/ (model, migrate, store)
-src-tauri/binaries/: ffmpeg, ffprobe sidecars
+src-tauri/binaries/: ffmpeg sidecar (no ffprobe: src-tauri/src/probe.rs reads `ffmpeg -i`)
 resources/styles/: one JSON style profile per style
 resources/sfx/: built-in sound effects library + index.json
 resources/fonts/: Noto Sans, Noto Sans CJK, Noto Sans Devanagari, Noto Sans Arabic

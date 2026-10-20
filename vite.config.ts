@@ -8,6 +8,8 @@ const devHost = process.env.TAURI_DEV_HOST;
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   clearScreen: false,
+  // The installer carries only minified code: no source maps.
+  build: { sourcemap: false },
   server: {
     port: 1420,
     strictPort: true,

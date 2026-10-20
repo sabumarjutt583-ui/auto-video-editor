@@ -7,7 +7,7 @@
 //
 // FFmpeg is taken from src-tauri/binaries (see scripts/fetch-ffmpeg.mjs), or from FFMPEG / PATH.
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,7 +28,6 @@ function findTool(name) {
 }
 
 const ffmpeg = findTool("ffmpeg");
-const ffprobe = findTool("ffprobe");
 
 const noise = "(2*random(0)-1)";
 const pi2 = "2*PI";
@@ -66,7 +65,10 @@ for (const [id, category, tags, seconds, expression, filters, defaultGain] of SO
     ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", `aevalsrc='${expression}':s=${RATE}:d=${seconds}`, "-af", chain, "-ac", "1", "-c:a", "pcm_s16le", join(outDir, file)],
     { stdio: ["ignore", "inherit", "inherit"] },
   );
-  const probed = execFileSync(ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", join(outDir, file)]).toString().trim();
+  // FFmpeg alone: decode to nowhere and read the length from the progress report.
+  const report = spawnSync(ffmpeg, ["-hide_banner", "-nostats", "-i", join(outDir, file), "-f", "null", "-progress", "pipe:1", "-"], { encoding: "utf8" }).stdout;
+  const micros = [...report.matchAll(/out_time_us=(\d+)/g)].pop();
+  const probed = micros ? (Number(micros[1]) / 1e6).toFixed(3) : "0";
   index.push({ id, file, category, tags, duration: Math.round(Number(probed) * 1000) / 1000, defaultGain });
   console.log(`made ${file} (${probed} s)`);
 }

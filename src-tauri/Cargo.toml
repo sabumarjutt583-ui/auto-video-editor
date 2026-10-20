@@ -9,6 +9,14 @@ rust-version = "1.77"
 # The Admin Edition (sound library tools). Never enabled for the user installer.
 admin = []
 
+# Small and fast release build. panic = "abort" means a bug stops the app at once (the panic hook writes the log first).
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

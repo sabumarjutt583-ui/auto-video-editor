@@ -11,7 +11,7 @@ import {
   SaveIndicator,
 } from "../components/settings";
 import { LibraryUrlCard } from "../components/library";
-import { AppUpdateCard, SupportCard } from "../components/support";
+import { AboutCard, AppUpdateCard, SupportCard } from "../components/support";
 import { Button } from "../components/ui";
 import { useKeyStore } from "../store/keyStore";
 import { useSettingsStore } from "../store/settingsStore";
@@ -69,6 +69,7 @@ export function SettingsPage() {
           <LibraryUrlCard settings={settings} onChange={update} />
           <AppUpdateCard settings={settings} onChange={update} />
           <SupportCard settings={settings} onChange={update} />
+          <AboutCard />
         </>
       ) : loadError ? (
         <div className="flex flex-col items-start gap-3">

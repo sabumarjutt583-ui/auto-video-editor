@@ -51,7 +51,8 @@ jobs:
       - name: Run the script tests
         run: node --test scripts/release.test.mjs
 
-  # 2. FFmpeg for macOS is built from source (LGPL), once per CPU type, and cached.
+  # 2. The small LGPL FFmpeg (only the parts the app uses) is built from source and cached.
+  #    Linux and Windows (cross-compiled) on Ubuntu, macOS once per CPU type on a Mac.
   ffmpeg-macos:
     name: FFmpeg for macOS (${{ matrix.arch }})
     needs: preflight
@@ -73,7 +74,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ffmpeg-out
-          key: ffmpeg-macos-${{ matrix.arch }}-${{ hashFiles('scripts/ci/build-ffmpeg-macos.sh') }}
+          key: ffmpeg-macos-${{ matrix.arch }}-${{ hashFiles('scripts/ci/build-ffmpeg-macos.sh', 'scripts/ci/ffmpeg-components.sh') }}
       - name: Build FFmpeg (about 20 minutes, only when not cached)
         if: steps.cache.outputs.cache-hit != 'true'
         run: bash scripts/ci/build-ffmpeg-macos.sh ffmpeg-out
@@ -81,8 +82,56 @@ jobs:
         run: |
           mkdir -p sidecars
           cp ffmpeg-out/ffmpeg "sidecars/ffmpeg-${{ matrix.triple }}"
-          cp ffmpeg-out/ffprobe "sidecars/ffprobe-${{ matrix.triple }}"
           bash scripts/ci/verify-ffmpeg.sh sidecars "${{ matrix.triple }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-${{ matrix.triple }}
+          path: sidecars/*
+          if-no-files-found: error
+          retention-days: 3
+
+  ffmpeg-cross:
+    name: FFmpeg for ${{ matrix.name }}
+    needs: preflight
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            target: linux
+            triple: x86_64-unknown-linux-gnu
+          - name: Windows
+            target: windows
+            triple: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache the FFmpeg build
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-out
+          key: ffmpeg-${{ matrix.target }}-${{ hashFiles('scripts/ci/build-ffmpeg-cross.sh', 'scripts/ci/ffmpeg-components.sh') }}
+      - name: Build tools
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential nasm cmake pkg-config autoconf automake libtool git \
+            gcc-mingw-w64-x86-64-posix g++-mingw-w64-x86-64-posix binutils-mingw-w64-x86-64
+      - name: Build FFmpeg (only when not cached)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: bash scripts/ci/build-ffmpeg-cross.sh ${{ matrix.target }} ffmpeg-out
+      - name: Name the file like a Tauri sidecar and check it
+        run: |
+          mkdir -p sidecars
+          ext=""; [ "${{ matrix.target }}" = windows ] && ext=".exe"
+          cp "ffmpeg-out/ffmpeg$ext" "sidecars/ffmpeg-${{ matrix.triple }}$ext"
+          if [ "${{ matrix.target }}" = windows ]; then
+            bash scripts/ci/verify-ffmpeg.sh sidecars "${{ matrix.triple }}" --no-run   # it is checked for real on the Windows build machine
+          else
+            bash scripts/ci/verify-ffmpeg.sh sidecars "${{ matrix.triple }}"
+          fi
+          echo "::notice::FFmpeg for ${{ matrix.name }}: $(du -h sidecars/* | cut -f1)"
       - uses: actions/upload-artifact@v4
         with:
           name: ffmpeg-${{ matrix.triple }}
@@ -93,7 +142,7 @@ jobs:
   # 3a. Windows and Linux.
   build-desktop:
     name: Build ${{ matrix.name }}
-    needs: preflight
+    needs: [preflight, ffmpeg-cross]
     strategy:
       fail-fast: false
       matrix:
@@ -101,9 +150,11 @@ jobs:
           - name: Windows
             os: windows-latest
             key: windows
+            triple: x86_64-pc-windows-msvc
           - name: Linux
             os: ubuntu-22.04
             key: linux
+            triple: x86_64-unknown-linux-gnu
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -124,19 +175,14 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Cache FFmpeg
-        uses: actions/cache@v4
+      - name: Get the FFmpeg sidecar
+        uses: actions/download-artifact@v4
         with:
+          name: ffmpeg-${{ matrix.triple }}
           path: src-tauri/binaries
-          key: ffmpeg-${{ matrix.key }}-${{ hashFiles('scripts/fetch-ffmpeg.mjs') }}
-      - name: Download FFmpeg and FFprobe (LGPL)
+      - name: Check that FFmpeg runs and has every part the app needs
         shell: bash
-        run: node scripts/fetch-ffmpeg.mjs --if-missing
-      - name: Check that FFmpeg and FFprobe run
-        shell: bash
-        run: |
-          triple="$(rustc -vV | sed -n 's/^host: //p')"
-          bash scripts/ci/verify-ffmpeg.sh src-tauri/binaries "$triple"
+        run: bash scripts/ci/verify-ffmpeg.sh src-tauri/binaries "${{ matrix.triple }}"
 
       - run: npm ci
       - name: Use the real releases repository in the updater address
@@ -149,12 +195,30 @@ jobs:
           if grep -rIl -e "Style thumbnails" -e "Style Test" -e "admin-page" dist; then echo "::error::Admin code is in the user bundle."; exit 1; fi
           rm -rf dist
 
+      - name: Smoke test with the real FFmpeg (5-second project with every feature)
+        shell: bash
+        working-directory: src-tauri
+        env:
+          AVE_REQUIRE_SIDECAR: "1"
+        run: cargo test smoke_test -- --nocapture
+
       - name: Build the installers
         uses: tauri-apps/tauri-action@v0
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
+      - name: Look inside the installers (no source code, maps, env files or keys) and print the sizes
+        shell: bash
+        run: |
+          shopt -s nullglob
+          if [ "${{ matrix.key }}" = windows ]; then
+            node scripts/ci/check-bundle.mjs src-tauri/target/release/bundle/nsis/*.exe src-tauri/target/release/bundle/msi/*.msi
+          else
+            node scripts/ci/check-bundle.mjs src-tauri/target/release/bundle/appimage/*.AppImage src-tauri/target/release/bundle/deb/*.deb
+          fi
+
+      # Files for the publish job (internal, deleted after a day).
       - uses: actions/upload-artifact@v4
         with:
           name: bundles-${{ matrix.key }}
@@ -166,7 +230,26 @@ jobs:
             src-tauri/target/release/bundle/appimage/*.AppImage.sig
             src-tauri/target/release/bundle/deb/*.deb
           if-no-files-found: error
+          retention-days: 1
+
+      # For testing by hand: ONE file per platform (GitHub zips it for the download and needs a login).
+      - name: Name the test file
+        shell: bash
+        run: |
+          mkdir -p test-file
+          shopt -s nullglob
+          if [ "${{ matrix.key }}" = windows ]; then
+            cp src-tauri/target/release/bundle/nsis/*-setup.exe test-file/AutoEditor-windows-x64-setup.exe
+          else
+            cp src-tauri/target/release/bundle/appimage/*.AppImage test-file/AutoEditor-linux-x64.AppImage
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.key == 'windows' && 'AutoEditor-windows-x64-setup.exe' || 'AutoEditor-linux-x64.AppImage' }}
+          path: test-file/*
+          if-no-files-found: error
           retention-days: 3
+          compression-level: 0
 
   # 3b. macOS, one universal app (Intel + Apple Silicon).
   build-macos:
@@ -195,11 +278,9 @@ jobs:
       - name: Make the universal sidecars and check them
         run: |
           cd src-tauri/binaries
-          chmod +x ffmpeg-* ffprobe-*
-          for tool in ffmpeg ffprobe; do
-            lipo -create "$tool-aarch64-apple-darwin" "$tool-x86_64-apple-darwin" -output "$tool-universal-apple-darwin"
-          done
-          chmod +x ffmpeg-universal-apple-darwin ffprobe-universal-apple-darwin
+          chmod +x ffmpeg-*
+          lipo -create ffmpeg-aarch64-apple-darwin ffmpeg-x86_64-apple-darwin -output ffmpeg-universal-apple-darwin
+          chmod +x ffmpeg-universal-apple-darwin
           cd ../..
           bash scripts/ci/verify-ffmpeg.sh src-tauri/binaries aarch64-apple-darwin
           bash scripts/ci/verify-ffmpeg.sh src-tauri/binaries universal-apple-darwin
@@ -210,6 +291,14 @@ jobs:
       - name: Use the real releases repository in the updater address
         run: node scripts/ci/prepare.mjs "$RUNNER_TEMP/notes.md"
 
+      - name: Smoke test with the real FFmpeg (5-second project with every feature)
+        working-directory: src-tauri
+        env:
+          AVE_REQUIRE_SIDECAR: "1"
+          # This Mac is arm64: test with the arm64 build.
+          AVE_TEST_FFMPEG: ${{ github.workspace }}/src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+        run: cargo test smoke_test -- --nocapture
+
       - name: Build the universal app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -217,6 +306,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: --target universal-apple-darwin
+
+      - name: Look inside the app (no source code, maps, env files or keys) and print the sizes
+        run: |
+          node scripts/ci/check-bundle.mjs src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
+          ls -l src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          echo "::notice::macOS installer (.dmg): $(du -h src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg | cut -f1)"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -226,7 +321,20 @@ jobs:
             src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
             src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz.sig
           if-no-files-found: error
+          retention-days: 1
+
+      # For testing by hand: ONE file (GitHub zips it for the download and needs a login).
+      - name: Name the test file
+        run: |
+          mkdir -p test-file
+          cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg test-file/AutoEditor-macos-universal.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AutoEditor-macos-universal.dmg
+          path: test-file/*
+          if-no-files-found: error
           retention-days: 3
+          compression-level: 0
 
   # 4. Only when ALL builds worked: one public release with every file. latest.json is uploaded last.
   publish:

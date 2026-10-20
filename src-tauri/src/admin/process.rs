@@ -3,7 +3,6 @@
 use std::path::Path;
 
 use crate::commands::error::AppError;
-use crate::ffmpeg::{command, Tool};
 use crate::ffmpeg_job::{run, RunOptions};
 use crate::jobs::Job;
 
@@ -48,15 +47,11 @@ pub fn args(input: &Path, output: &Path, trim: Trim, length: f64) -> Vec<String>
 
 /// The length of an audio file in seconds.
 pub async fn probe_seconds(path: &Path) -> Result<f64, AppError> {
-    let mut cmd = command(Tool::Ffprobe).map_err(|e| AppError::new("The video engine (FFmpeg) is missing or could not start.", e))?;
-    cmd.args(["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1"]).arg(path);
-    let out = cmd.output().await.map_err(|e| AppError::new("The video engine (FFmpeg) could not start.", e.to_string()))?;
-    String::from_utf8_lossy(&out.stdout)
-        .trim()
-        .parse::<f64>()
-        .ok()
-        .filter(|d| d.is_finite() && *d > 0.0)
-        .ok_or_else(|| AppError::new("This sound file could not be read.", format!("{}: {}", path.display(), String::from_utf8_lossy(&out.stderr).trim())))
+    let text = crate::probe::probe_text(path, "This sound file could not be read.").await?;
+    crate::probe::parse_info(&text)
+        .duration
+        .filter(|d| *d > 0.0)
+        .ok_or_else(|| AppError::new("This sound file could not be read.", format!("{}: no length found", path.display())))
 }
 
 /// Writes the finished WAV and returns its length in seconds.
@@ -72,6 +67,7 @@ pub async fn make_sound(job: &Job, input: &Path, output: &Path, trim: Trim) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ffmpeg::{command, Tool};
     use crate::ffmpeg_job::sidecars_for_tests;
     use crate::jobs::{test_job, JobRegistry};
     use std::path::PathBuf;

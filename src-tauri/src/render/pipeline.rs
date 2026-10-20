@@ -270,10 +270,11 @@ mod tests {
     }
 
     async fn count_frames(path: &Path) -> i64 {
-        let mut cmd = command(Tool::Ffprobe).unwrap();
-        cmd.args(["-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0"]).arg(path);
+        // Copies the packets to nowhere and reads the frame counter from the progress report.
+        let mut cmd = command(Tool::Ffmpeg).unwrap();
+        cmd.args(["-hide_banner", "-v", "error", "-nostats", "-i"]).arg(path).args(["-map", "0:v:0", "-c", "copy", "-f", "null", "-progress", "pipe:1", "-"]);
         let out = cmd.output().await.unwrap();
-        String::from_utf8_lossy(&out.stdout).trim().parse().unwrap()
+        String::from_utf8_lossy(&out.stdout).lines().filter_map(|l| l.strip_prefix("frame=")).filter_map(|v| v.trim().parse().ok()).last().unwrap()
     }
 
     fn request(json: serde_json::Value) -> RenderRequest {

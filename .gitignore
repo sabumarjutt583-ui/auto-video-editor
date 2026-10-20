@@ -16,3 +16,17 @@ dist-packages
 *.key
 .tauri-keys/
 .tauri/
+
+# Secrets and local settings: never commit. (.env.admin only holds the non-secret flag VITE_ADMIN=true.)
+.env*
+!.env.admin
+*.key
+!*.key.pub
+*.pem
+*.p12
+
+# Build output
+dist/
+src-tauri/target/
+src-tauri/gen/
+*.map

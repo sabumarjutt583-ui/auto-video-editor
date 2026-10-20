@@ -1,6 +1,5 @@
-// Downloads LGPL builds of FFmpeg + FFprobe and installs them as Tauri sidecars:
+// Local developer shortcut: downloads a ready-made LGPL FFmpeg (full BtbN build) and installs it as the Tauri sidecar:
 //   src-tauri/binaries/ffmpeg-<target-triple>[.exe]
-//   src-tauri/binaries/ffprobe-<target-triple>[.exe]
 //
 // Source: BtbN/FFmpeg-Builds (stable n8.1 branch, LGPL, static). The download is
 // verified against the SHA-256 list published next to the release assets.
@@ -113,7 +112,7 @@ function findFile(directory, fileName) {
 async function main() {
   const triple = hostTriple();
   const build = BUILDS[triple];
-  const targets = ["ffmpeg", "ffprobe"].map((name) => ({
+  const targets = ["ffmpeg"].map((name) => ({
     name,
     destination: join(binariesDir, `${name}-${triple}${build?.exe ?? ""}`),
   }));

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Builds a static LGPL FFmpeg + FFprobe for macOS from source (nobody publishes ready-made LGPL macOS builds
-# with libass + libopenh264 + libwebp). Run on a Mac of the target architecture:
+# Builds the small, static, LGPL-only FFmpeg for macOS from source (nobody publishes ready-made LGPL macOS builds
+# with libass + libopenh264 + libwebp). The parts that are switched on are listed in ffmpeg-components.sh. Run on a Mac of the target architecture:
 #   build-ffmpeg-macos.sh <out-dir>
-# Result: <out-dir>/ffmpeg and <out-dir>/ffprobe. Only system libraries are linked dynamically.
+# Result: <out-dir>/ffmpeg. Only system libraries are linked dynamically.
 # The workflow caches <out-dir>, so this long build runs only when this file changes.
 set -Eeuo pipefail
 
@@ -14,6 +14,8 @@ on_error() {
 }
 trap 'on_error $LINENO' ERR
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$HERE/ffmpeg-components.sh"
 OUT="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 WORK="$(mktemp -d)"
 PREFIX="$WORK/prefix"
@@ -21,7 +23,7 @@ mkdir -p "$OUT" "$PREFIX"
 ARCH="$(uname -m)"   # arm64 or x86_64
 JOBS="$(sysctl -n hw.ncpu)"
 
-FREETYPE=2.13.3; FRIBIDI=1.0.16; HARFBUZZ=10.2.0; LIBASS=0.17.3; WEBP=1.5.0; OPENH264=2.5.0; FFMPEG=8.1
+FREETYPE=2.13.3; FRIBIDI=1.0.16; HARFBUZZ=10.2.0; LIBASS=0.17.3; WEBP=1.5.0; OPENH264=2.5.0; OPUS=1.5.2; LAME=3.100; FFMPEG=8.1
 
 # Only our own static libraries may be found (never the dynamic ones of Homebrew).
 export PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig"
@@ -56,20 +58,27 @@ echo "== libwebp"; fetch "https://storage.googleapis.com/downloads.webmproject.o
 echo "== openh264"; fetch "https://github.com/cisco/openh264/archive/refs/tags/v$OPENH264.tar.gz" "$WORK/openh264"
 ( cd "$WORK/openh264" && make -j"$JOBS" OS=darwin ARCH="$ARCH" PREFIX="$PREFIX" libraries && make OS=darwin ARCH="$ARCH" PREFIX="$PREFIX" install-static )
 
+echo "== opus"; fetch "https://downloads.xiph.org/releases/opus/opus-$OPUS.tar.gz" "$WORK/opus"
+( cd "$WORK/opus" && cmake -S . -B build -DCMAKE_INSTALL_PREFIX="$PREFIX" -DBUILD_SHARED_LIBS=OFF -DOPUS_BUILD_PROGRAMS=OFF -DOPUS_BUILD_TESTING=OFF -DOPUS_INSTALL_PKG_CONFIG_MODULE=ON -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_BUILD_TYPE=Release && cmake --build build -j"$JOBS" && cmake --install build )
+
+echo "== lame"; fetch "https://downloads.sourceforge.net/project/lame/lame/$LAME/lame-$LAME.tar.gz" "$WORK/lame"
+( cd "$WORK/lame" && ./configure --prefix="$PREFIX" --disable-shared --enable-static --disable-frontend --disable-decoder --disable-gtktest --disable-dependency-tracking && make -j"$JOBS" && make install )
+
 echo "== ffmpeg"; fetch "https://ffmpeg.org/releases/ffmpeg-$FFMPEG.tar.xz" "$WORK/ffmpeg"
+# shellcheck disable=SC2046  # the component flags are meant to be split into words
 ( cd "$WORK/ffmpeg" && ./configure --prefix="$PREFIX/ff" --pkg-config-flags="--static" \
     --extra-cflags="-I$PREFIX/include" --extra-ldflags="-L$PREFIX/lib" --extra-libs="-lc++" \
-    --disable-autodetect --enable-zlib --enable-bzlib --enable-iconv --disable-gpl --disable-nonfree --disable-debug --disable-doc --disable-ffplay --enable-ffmpeg --enable-ffprobe \
-    --enable-static --disable-shared --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz \
-    --enable-libwebp --enable-libopenh264 --enable-videotoolbox --enable-audiotoolbox \
+    "${FFMPEG_COMMON_FLAGS[@]}" $(ffmpeg_component_flags h264_videotoolbox) \
+    --enable-zlib --enable-iconv --enable-libass --enable-libwebp --enable-libopenh264 --enable-libopus --enable-libmp3lame \
+    --enable-videotoolbox \
     && make -j"$JOBS" && make install )
 
 cp "$PREFIX/ff/bin/ffmpeg" "$OUT/ffmpeg"
-cp "$PREFIX/ff/bin/ffprobe" "$OUT/ffprobe"
-strip -x "$OUT/ffmpeg" "$OUT/ffprobe"
+strip -x "$OUT/ffmpeg"
+ls -l "$OUT/ffmpeg"
 
 # Only Apple's own libraries may be loaded at run time (nothing from Homebrew or from this build folder).
-for f in "$OUT/ffmpeg" "$OUT/ffprobe"; do
+for f in "$OUT/ffmpeg"; do
   bad="$(otool -L "$f" | tail -n +2 | awk '{print $1}' | grep -Ev '^(/usr/lib/|/System/Library/)' || true)"
   if [ -n "$bad" ]; then
     annotate "$f needs libraries that are not part of macOS, so it would not run on other Macs: $bad"

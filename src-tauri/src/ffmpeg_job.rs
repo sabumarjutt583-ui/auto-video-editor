@@ -111,7 +111,7 @@ fn engine_error(details: String) -> AppError {
     AppError::new("The video engine (FFmpeg) is missing or could not start.", details)
 }
 
-/// Makes the bundled FFmpeg/FFprobe usable in tests by pointing `AVE_SIDECAR_DIR` at links to
+/// Makes the bundled FFmpeg usable in tests by pointing `AVE_SIDECAR_DIR` at links to
 /// the binaries in `src-tauri/binaries`. Returns false (so the test can skip) when they are missing.
 #[cfg(test)]
 pub fn sidecars_for_tests() -> bool {
@@ -124,8 +124,12 @@ pub fn sidecars_for_tests() -> bool {
                 p.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.starts_with(prefix))
             })
         };
-        let (Some(ffmpeg), Some(ffprobe)) = (find("ffmpeg-"), find("ffprobe-")) else {
-            eprintln!("skipped: FFmpeg sidecars are not in src-tauri/binaries");
+        // AVE_TEST_FFMPEG points at one exact file (used by CI when several builds are present).
+        let chosen = std::env::var_os("AVE_TEST_FFMPEG").map(std::path::PathBuf::from).filter(|p| p.is_file());
+        let Some(ffmpeg) = chosen.or_else(|| find("ffmpeg-")) else {
+            // CI sets AVE_REQUIRE_SIDECAR so that a missing FFmpeg fails the build instead of skipping the test.
+            assert!(std::env::var_os("AVE_REQUIRE_SIDECAR").is_none(), "the FFmpeg sidecar is missing from src-tauri/binaries");
+            eprintln!("skipped: the FFmpeg sidecar is not in src-tauri/binaries");
             return false;
         };
         let dir = std::env::temp_dir().join(format!("ave-sidecars-{}", std::process::id()));
@@ -139,7 +143,7 @@ pub fn sidecars_for_tests() -> bool {
             let result = std::fs::copy(from, &target).map(|_| ());
             result.is_ok()
         };
-        if link(&ffmpeg, "ffmpeg") && link(&ffprobe, "ffprobe") {
+        if link(&ffmpeg, "ffmpeg") {
             std::env::set_var("AVE_SIDECAR_DIR", &dir);
             true
         } else {

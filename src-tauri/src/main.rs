@@ -15,9 +15,12 @@ mod keys;
 mod library;
 mod logging;
 mod media;
+mod probe;
 mod project;
 mod render;
 mod settings;
+#[cfg(test)]
+mod smoke_test;
 mod sfx;
 mod styles;
 mod thumbnails;

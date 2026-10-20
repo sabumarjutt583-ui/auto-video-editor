@@ -48,8 +48,7 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "binaries/ffmpeg",
-      "binaries/ffprobe"
+      "binaries/ffmpeg"
     ],
     "resources": {
       "../resources/styles/": "resources/styles/",
@@ -57,6 +56,7 @@
       "../resources/fonts/": "resources/fonts/"
     },
     "createUpdaterArtifacts": true,
+    "licenseFile": "../LICENSE-EULA.txt",
     "publisher": "Auto Video Editor",
     "copyright": "Copyright © 2026 Auto Video Editor",
     "category": "Video",

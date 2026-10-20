@@ -214,9 +214,11 @@ mod tests {
         assert_eq!(report.imported, vec!["t".to_string()]);
         let out = work.join("thumbnails").join("t.webp");
         assert!(out.is_file());
-        let probe = std::process::Command::new("ffprobe").args(["-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0"]).arg(&out).output();
+        let probe = std::process::Command::new(&path).args(["-hide_banner", "-i"]).arg(&out).output();
         if let Ok(probe) = probe {
-            assert_eq!(String::from_utf8_lossy(&probe.stdout).trim(), "480,360");
+            let info = crate::probe::parse_info(&String::from_utf8_lossy(&probe.stderr));
+            let video = info.first(crate::probe::StreamKind::Video).expect("a picture");
+            assert_eq!((video.width, video.height), (480, 360));
         }
         assert!(std::fs::read_to_string(work.join("t.json")).unwrap().contains("thumbnails/t.webp"));
         let mut warnings = Vec::new();

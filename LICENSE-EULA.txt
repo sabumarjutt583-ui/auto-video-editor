@@ -1,0 +1,41 @@
+AUTO VIDEO EDITOR - END USER LICENSE AGREEMENT
+
+Please read this agreement. By installing or using Auto Video Editor ("the Software") you accept it.
+If you do not accept it, do not install or use the Software.
+
+1. FREE TO USE
+   You may install and use the Software for free, for personal and commercial video projects,
+   on your own computers. The videos and files you make with the Software belong to you.
+
+2. WHAT YOU MAY NOT DO
+   You may not:
+   - copy or share the Software, except for the official download links of the publisher;
+   - modify, adapt or translate the Software;
+   - reverse engineer, decompile or disassemble the Software, or try to get its source code,
+     except where the law says you may do this even though this agreement says you may not;
+   - sell, rent, lease or resell the Software, or include it in a product you sell;
+   - remove copyright notices or the publisher's name from the Software.
+
+3. THIRD-PARTY PARTS
+   The Software contains open-source parts, for example FFmpeg (LGPL), OpenH264, libass,
+   FreeType, HarfBuzz and the Noto fonts. These parts keep their own licenses. Nothing in this
+   agreement limits your rights under those licenses.
+
+4. YOUR OWN KEYS AND ACCOUNTS
+   The Software can call online services (for example Groq and Google Gemini). You use your own
+   keys and accounts and you follow the rules of those services. Keys are stored only in your
+   computer's secure key store. They are never sent to the publisher.
+
+5. NO WARRANTY
+   The Software is given "as is", without any promise that it is free of errors or that it fits
+   a special purpose. Please keep backups of your projects.
+
+6. LIMIT OF LIABILITY
+   As far as the law allows, the publisher is not responsible for any loss or damage that comes
+   from using the Software.
+
+7. UPDATES AND ENDING
+   The Software may offer updates. This agreement ends automatically if you break it. Then you
+   must stop using the Software and delete your copies.
+
+Copyright (c) 2026 Auto Video Editor. All rights reserved.
