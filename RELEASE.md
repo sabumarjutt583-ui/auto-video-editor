@@ -19,7 +19,7 @@ There are three things you can publish:
 
 Do these once. Replace `myname` with your GitHub name.
 
-1. **Create the public releases repository.** On GitHub: New repository, name it for example `autoeditor-releases`, choose **Public**, tick "Add a README". It must contain **no source code**, only that README. The releases will appear in it.
+1. **Create the public releases repository.** On GitHub: New repository, name it for example `autoeditor-releases`, choose **Public**, tick "Add a README". It must contain **no source code**, only `README.md`. The text for that README is in `website/RELEASES_README.md` (copy it into the repository's `README.md`, after replacing `<RELEASES_REPO>`). The releases will appear in it.
 2. **Create the token that may publish to it.** GitHub → your profile → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token.
    - Repository access: **Only select repositories** → `autoeditor-releases` (only this one).
    - Permissions → Repository permissions → **Contents: Read and write**.
@@ -62,16 +62,17 @@ The command:
 4. adds the section to `CHANGELOG.md`, commits `Release vX.Y.Z` and creates the tag `vX.Y.Z`,
 5. pushes the commit and the tag.
 
-The tag starts the workflow. Open the **Actions** tab of the source repository and watch **Release**. It takes about **10 to 20 minutes** (the very first run is longer, about 40 minutes, because FFmpeg for the Mac is built once and then kept in the cache).
+The tag starts the workflow. Open the **Actions** tab of the source repository and watch **Release**. It takes about **10 to 20 minutes** (the very first run is longer, about 40 to 60 minutes, because FFmpeg is built from source once and then kept in the cache; it is built again only when `scripts/ci/build-ffmpeg-*.sh` or `scripts/ci/ffmpeg-components.sh` change).
 
 What the workflow does:
 
 | Job | What it does |
 | --- | --- |
 | Check settings | Tests the variable, the secrets, that the releases repo is public and that tag and version agree |
-| FFmpeg for macOS | Builds a static LGPL FFmpeg for Apple Silicon and for Intel (cached) |
-| Build Windows / Linux | Downloads the LGPL FFmpeg, builds the `.exe`, `.msi`, `.AppImage` and `.deb`, and signs the update files |
-| Build macOS | Makes one universal app (Intel + Apple Silicon): `.dmg` and the update bundle |
+| FFmpeg for Linux / Windows | Builds the small LGPL FFmpeg from source (Windows is cross-compiled on Linux) and checks that every part the app needs is inside (cached) |
+| FFmpeg for macOS | The same for Apple Silicon and for Intel, on Macs (cached) |
+| Build Windows / Linux | Runs the **smoke test** (a 5-second project that uses every feature, with the real FFmpeg), builds the `.exe`, `.msi`, `.AppImage` and `.deb`, signs the update files and **looks inside the installers** (see section 9) |
+| Build macOS | Smoke test, then one universal app (Intel + Apple Silicon): `.dmg` and the update bundle, also looked into |
 | Publish the release | **Only if all builds worked:** creates a hidden draft in the releases repo, uploads every installer and the five fixed-name copies, uploads `latest.json` **last**, then publishes it as the latest release |
 
 If any build fails, nothing is published. A manual run is also possible: Actions → Release → **Run workflow** (it releases the version that is in the files).
@@ -114,10 +115,17 @@ Paid certificates remove the warnings later: a Windows code-signing certificate 
 - **One platform failed**: open the failed job and read the red step. Nothing was published. Fix the problem (or just re-run the failed job: "Re-run failed jobs"), and the publish job runs after all three have worked. Typical causes: a network problem while downloading FFmpeg (re-run), or a Rust/TypeScript error (fix, commit, make a new tag).
 - **"The tag is vX but the files say version Y"**: the tag and the version files disagree. Use `npm run release` instead of tagging by hand.
 - **"already has a published release vX"**: that version was already published. Use a new version number.
-- **macOS FFmpeg step fails**: it is built from source by `scripts/ci/build-ffmpeg-macos.sh`. The log shows which library failed. Fix the script (the versions are at the top) and push; the result is cached by the script's content.
+- **An FFmpeg build step fails**: FFmpeg is built from source by `scripts/ci/build-ffmpeg-cross.sh` (Linux, Windows) and `scripts/ci/build-ffmpeg-macos.sh`. The failed step shows the line and the end of FFmpeg's `config.log` as a red message. The library versions are at the top of the scripts. The result is cached by the content of the scripts, so a fix is built again, and nothing else is.
+- **"The FFmpeg for ... lacks these parts: ..."**: a part listed in `scripts/ci/ffmpeg-components.sh` is not in the build. Either the name is wrong or the part needs a library that is missing. Fix it there; the same list is used to build and to check.
+- **The smoke test fails**: it runs a real 5-second render with the FFmpeg that goes into the installer (`src-tauri/src/smoke_test.rs`). The message names the step. If a new feature of the app needs a new FFmpeg part, add it to `ffmpeg-components.sh`.
+- **"contains files that must not be shipped"**: the bundle check found source code, a source map, an environment file or a key inside an installer. The message lists the files. Remove them from `bundle.resources` in `src-tauri/tauri.conf.json`.
 - **The update banner does not appear in an installed app**: (1) the new version must be higher than the installed one; (2) the app checks at most once a day, so press **Settings → Updates → Check for updates**; (3) check that `https://github.com/<RELEASES_REPO>/releases/latest/download/latest.json` opens in a browser; (4) the app that is installed must have been built by this workflow (a development build has the placeholder address and skips the check); (5) if the signing key was changed, apps made with the old key cannot accept updates.
 - **"The update could not be trusted (its signature does not match)"**: the release was signed with a different key than the app contains. Use the original key.
 - **Delete a wrong release**: delete the release and its tag in the releases repository, then release again with a new version number.
+
+### Test files from the Actions tab (for your own testing only)
+
+Every run also leaves **one file per system** under "Artifacts" at the bottom of the run page: `AutoEditor-windows-x64-setup.exe`, `AutoEditor-macos-universal.dmg` and `AutoEditor-linux-x64.AppImage`. They are kept for 3 days. These are **only for you to test before the release is published**: GitHub puts each one in a zip for the download and you must be logged in to GitHub to get it. Never give these to users - users use the five fixed links of section 3. (The release itself contains the installers as separate, un-zipped files.)
 
 ## 6. Building by hand (not needed normally)
 
@@ -125,14 +133,14 @@ On a computer of the system you want (Windows, for example), with Node, Rust and
 
 ```bash
 npm install
-npm run setup:ffmpeg
+npm run setup:ffmpeg      # downloads a ready-made LGPL FFmpeg (bigger than the one in the installer, fine for development)
 # private key text or path, and its password
 export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/auto-editor-updater.key)"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="..."
 npm run tauri build
 ```
 
-The installers are in `src-tauri/target/release/bundle/`. The installer includes FFmpeg/FFprobe, the fonts, the built-in styles and the base sound effects, so a clean PC needs nothing else. Projects are stored outside the app folder, so an update never touches them. A hand-built app has the `<RELEASES_REPO>` placeholder as its update address (unless you replaced it), so it does not look for updates.
+The installers are in `src-tauri/target/release/bundle/`. The installer includes FFmpeg (there is no FFprobe: the app reads files with FFmpeg itself), the fonts, the built-in styles and the base sound effects, so a clean PC needs nothing else. Projects are stored outside the app folder, so an update never touches them. A hand-built app has the `<RELEASES_REPO>` placeholder as its update address (unless you replaced it), so it does not look for updates.
 
 Version numbers: `node scripts/set-version.mjs 0.2.0` changes all files at once (the release command does this for you).
 
@@ -169,3 +177,19 @@ On a Windows PC that has no Node, Rust, Python or FFmpeg:
 2. New project → voice → timing (Groq key, or an SRT) → scenes → prompts (Gemini key) → import media → render. A finished MP4 appears in the project's `exports` folder.
 3. Settings → Updates → **Check for updates** shows "You have the latest version" (or the banner at the top, if you published a newer one).
 4. Settings → Help and logs → **Export logs** creates a text file with no API keys in it.
+
+## 9. What is inside the installer, and what is not
+
+**Inside (everything works offline, except Groq and Gemini):** the app, a small LGPL build of FFmpeg, all fonts (Latin/Cyrillic, Korean, Japanese, Chinese, Devanagari, Arabic/Urdu - Regular and Bold only), all 51 styles, the base sound-effects library and the licence text (`LICENSE-EULA.txt`, shown on the Windows installer's licence page and in Settings > About).
+
+**Not inside:** your source code (the app is compiled Rust plus minified JavaScript; there are no source maps), `.env` files, keys, tests or docs. The workflow checks this on every build with `scripts/ci/check-bundle.mjs`: it opens each installer and **fails the build** when it finds `*.ts`, `*.tsx`, `*.rs`, `*.map`, `.env*`, `*.key`, `*.pem` or a `src` folder. Keys that users type in (Groq, Gemini) are only stored in their own computer's key store.
+
+**The small FFmpeg.** `scripts/ci/ffmpeg-components.sh` lists the only FFmpeg parts that are switched on (`--disable-everything` first): the encoders, decoders, file formats and filters that the app uses, plus the formats people may import (mp4/mov, mkv/webm, mp3, wav, ogg, flac, aac, png, jpeg, webp). The same list is used to build FFmpeg and to check it. It is **LGPL only** (no `--enable-gpl`, no `--enable-nonfree`; the build fails the check otherwise). Because x264 would need the GPL, the software H.264 encoder is **OpenH264** (BSD). The graphics-card encoders are included: NVENC (NVIDIA, Windows and Linux), Quick Sync (Intel, Windows), AMF (AMD, Windows) and VideoToolbox (Mac); the app tests them at start and uses the CPU encoder when one does not work. Parts that are GPL in FFmpeg (for example `boxblur`, `eq`, `noise`) are not used by the app and are not included. AV1 pictures can be read only by hardware; a software AV1 decoder (dav1d) is not included.
+
+**The panic setting.** The release build uses `panic = "abort"`: on a programming error the app stops at once (the log file is written first) instead of trying to go on in a possibly wrong state. This makes the program smaller and faster.
+
+**The `.map` / sizes.** `docs/SIZE_REPORT.md` has the table of sizes before and after.
+
+## 10. The public releases repository and "Source code (zip)"
+
+GitHub always adds two links to every release, "Source code (zip)" and "Source code (tar.gz)". They contain **the files of the repository**. Because the public releases repository contains **only `README.md`**, those two links give only the README - there is no source code in them. Never push code to that repository, and never make the **source** repository public. The release workflow never creates releases in the source repository.

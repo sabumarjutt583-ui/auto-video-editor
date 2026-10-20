@@ -15,7 +15,8 @@ npm run test:ts                              # pure logic tests (Node test runne
 cd src-tauri
 cargo build                                  # no warnings (user build)
 cargo build --features admin                 # no warnings (admin build)
-cargo test                                   # Rust tests (needs the sidecars for the FFmpeg ones: npm run setup:ffmpeg)
+cargo test                                   # Rust tests (needs the sidecar for the FFmpeg ones: npm run setup:ffmpeg)
+cargo test smoke_test -- --nocapture         # 5-second project with every feature (CI runs it with the installer FFmpeg)
 cargo test --features admin                  # adds the Admin Edition tests
 cargo test --release performance_20_minutes -- --ignored --nocapture   # 20 min, 200 scenes, 1080p (slow)
 ```
@@ -29,6 +30,15 @@ rm -rf dist && npx vite build
 grep -rlE "Freesound|admin_overview|admin_search|Admin Edition|Build library package" dist   # must print nothing
 strings -a src-tauri/target/debug/auto-video-editor | grep -ciE "freesound|admin_overview|admin_search|autovideoeditor.admin"  # must print 0 (after a normal `cargo build`)
 npx vite build --mode admin && grep -rl "Build library package" dist      # prints the admin chunk
+```
+
+### Checks of the final release setup
+
+```bash
+bash scripts/ci/verify-ffmpeg.sh src-tauri/binaries <target-triple>          # every FFmpeg part from ffmpeg-components.sh is present, LGPL only
+node scripts/ci/check-bundle.mjs <installer>                                 # no *.ts *.tsx *.rs *.map .env* *.key src/ inside; prints sizes
+npm run test:scripts                                                         # release helper tests
+git log --all -p -G"PRIVATE KEY|gsk_|AIza|ghp_|github_pat_"                  # no secret was ever committed (prints nothing)
 ```
 
 ## 3. Acceptance tests by phase (by hand)

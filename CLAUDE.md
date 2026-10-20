@@ -13,7 +13,7 @@ Two main modules:
 - State: Zustand
 - UI helpers: wavesurfer.js (waveform), dnd-kit (drag), lucide-react (icons)
 - Backend: Rust (Tauri commands), tokio, serde, reqwest, keyring, tauri-plugin-dialog (native file/folder pickers, approved in Phase 2)
-- Video/audio engine: FFmpeg + FFprobe bundled as Tauri sidecar binaries (LGPL build)
+- Video/audio engine: a small custom FFmpeg (LGPL, only the parts the app uses) bundled as a Tauri sidecar. NO FFprobe: files are read with `ffmpeg -i` (src-tauri/src/probe.rs)
 - NO Python anywhere. NO Electron.
 
 ## External APIs (user brings own keys, entered in Settings)
@@ -86,6 +86,8 @@ resources/fonts/: Noto Sans, Noto Sans CJK, Noto Sans Devanagari, Noto Sans Arab
 
 ## Releases (automatic builds)
 - `npm run release -- <patch|minor|major>` (scripts/release.mjs, pure helpers in scripts/lib/release.mjs + scripts/release.test.mjs via `npm run test:scripts`): bumps package.json, package-lock.json, tauri.conf.json, Cargo.toml, Cargo.lock, writes CHANGELOG.md, commits "Release vX.Y.Z", tags, pushes.
-- `.github/workflows/release.yml` (tag `v*.*.*` or manual): preflight (RELEASES_REPO variable, RELEASES_TOKEN + signing secrets, repo public) -> FFmpeg macOS built from source (scripts/ci/build-ffmpeg-macos.sh, cached) / LGPL FFmpeg for Windows+Linux (scripts/fetch-ffmpeg.mjs) -> tauri-action builds -> publish job creates ONE draft in the PUBLIC RELEASES_REPO, uploads installers + five fixed-name copies, latest.json LAST, then publishes. Never publishes to the source repo. Helper scripts: scripts/ci/*.
+- `.github/workflows/release.yml` (tag `v*.*.*` or manual): preflight (RELEASES_REPO variable, RELEASES_TOKEN + signing secrets, repo public) -> small LGPL FFmpeg built from source and cached (Linux + Windows cross-compiled: scripts/ci/build-ffmpeg-cross.sh; macOS: build-ffmpeg-macos.sh; part list in scripts/ci/ffmpeg-components.sh, checked by verify-ffmpeg.sh) -> smoke test (src-tauri/src/smoke_test.rs, 5-second render with every feature) -> tauri-action builds -> scripts/ci/check-bundle.mjs fails on source/maps/env/keys inside installers -> publish job creates ONE draft in the PUBLIC RELEASES_REPO, uploads installers + five fixed-name copies, latest.json LAST, then publishes. Never publishes to the source repo. Helper scripts: scripts/ci/*.
 - Updater: pubkey in tauri.conf.json (private key only in GitHub Secrets, never committed), endpoint `https://github.com/<RELEASES_REPO>/releases/latest/download/latest.json` (placeholder replaced by the workflow). A build that still has the placeholder skips the check. UI: store/appUpdateStore.ts, lib/appUpdate/schedule.ts (5 s delay, once per day, `lastAppUpdateCheck` setting), components/support/AppUpdate{Banner,Card}.tsx, Rust commands/app_update.rs, tauri-plugin-process for relaunch.
+- New FFmpeg feature in the app? Add the encoder/decoder/muxer/filter to scripts/ci/ffmpeg-components.sh (never GPL parts: boxblur, eq, noise ...). scripts/fetch-ffmpeg.mjs only downloads a big ready-made FFmpeg for local development.
+- EULA: LICENSE-EULA.txt (NSIS licence page via bundle.licenseFile, Settings > About). Release profile: lto, codegen-units 1, panic abort, strip. Public releases repo holds only README.md (text in website/RELEASES_README.md). Sizes: docs/SIZE_REPORT.md.
 - Website snippet: website/download-buttons.html. Docs: RELEASE.md, USER_GUIDE.md ("Install and update"), CHANGELOG.md.
