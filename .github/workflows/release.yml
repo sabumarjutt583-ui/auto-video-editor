@@ -200,7 +200,12 @@ jobs:
         working-directory: src-tauri
         env:
           AVE_REQUIRE_SIDECAR: "1"
-        run: cargo test smoke_test -- --nocapture
+        run: |
+          set -o pipefail
+          cargo test smoke_test -- --nocapture 2>&1 | tee smoke.log && exit 0
+          msg="$(grep -v '^\s*[0-9]*:' smoke.log | grep -E -i 'panicked|failed|error|assert|ffmpeg|left|right' | head -c 3200 | awk '{printf "%s%%0A", $0}')"
+          echo "::error::Smoke test failed: $msg"
+          exit 1
 
       - name: Build the installers
         uses: tauri-apps/tauri-action@v0
@@ -297,7 +302,12 @@ jobs:
           AVE_REQUIRE_SIDECAR: "1"
           # This Mac is arm64: test with the arm64 build.
           AVE_TEST_FFMPEG: ${{ github.workspace }}/src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-        run: cargo test smoke_test -- --nocapture
+        run: |
+          set -o pipefail
+          cargo test smoke_test -- --nocapture 2>&1 | tee smoke.log && exit 0
+          msg="$(grep -v '^\s*[0-9]*:' smoke.log | grep -E -i 'panicked|failed|error|assert|ffmpeg|left|right' | head -c 3200 | awk '{printf "%s%%0A", $0}')"
+          echo "::error::Smoke test failed: $msg"
+          exit 1
 
       - name: Build the universal app
         uses: tauri-apps/tauri-action@v0
