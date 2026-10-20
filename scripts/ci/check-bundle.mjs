@@ -17,6 +17,17 @@ const FORBIDDEN_FILE = [
 ];
 const FORBIDDEN_DIR = [[/^src$/i, "src folder"], [/^node_modules$/i, "node_modules folder"], [/^\.git$/i, "git folder"], [/^tests?$/i, "tests folder"], [/^docs?$/i, "docs folder"]];
 
+// Third-party system files inside Linux packages: usr/share/* and usr/lib/* except the app's own folder.
+// Only the folder-name rules skip them; the file rules (.ts .rs .map .env .key) apply everywhere.
+function isSystemPath(rel) {
+  const parts = rel.split("/");
+  const at = parts.indexOf("usr");
+  if (at < 0) return false;
+  const area = parts[at + 1];
+  const own = /auto[ _-]?video[ _-]?editor/i.test(parts[at + 2] ?? "");
+  return (area === "share" || area === "lib") && !own;
+}
+
 function notice(text) {
   console.log(process.env.GITHUB_ACTIONS ? `::notice::${text}` : text);
 }
@@ -86,7 +97,8 @@ for (const file of process.argv.slice(2).map((f) => resolve(f))) {
   walk(target, (full, isDir) => {
     const rel = relative(target, full).split("\\").join("/");
     if (isDir) {
-      const hit = FORBIDDEN_DIR.find(([re]) => re.test(basename(full)));
+      // Linux packages carry system libraries (GTK, WebKit ...) with their own doc/test/src folders: those are not ours.
+      const hit = isSystemPath(rel) ? null : FORBIDDEN_DIR.find(([re]) => re.test(basename(full)));
       if (hit) problems.push(`${rel}/  (${hit[1]})`);
       return;
     }
