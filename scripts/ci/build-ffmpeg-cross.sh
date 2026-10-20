@@ -31,7 +31,7 @@ source "$HERE/ffmpeg-components.sh"
 ZLIB=1.3.1; FREETYPE=2.13.3; FRIBIDI=1.0.16; HARFBUZZ=10.2.0; LIBASS=0.17.3; WEBP=1.5.0; OPENH264=2.5.0
 OPUS=1.5.2; LAME=3.100; VPL=2.14.0; NVCODEC=n12.2.72.0; FFMPEG=8.1
 
-export PKG_CONFIG_LIBDIR="$P/lib/pkgconfig"
+export PKG_CONFIG_LIBDIR="$P/lib/pkgconfig:$P/share/pkgconfig"
 unset PKG_CONFIG_PATH
 
 case "$TARGET" in
