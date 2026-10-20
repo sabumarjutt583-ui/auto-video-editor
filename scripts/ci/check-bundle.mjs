@@ -5,7 +5,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join, relative } from "node:path";
+import { basename, join, relative, resolve } from "node:path";
 
 const FORBIDDEN_FILE = [
   [/\.tsx?$/i, "TypeScript source"],
@@ -68,7 +68,7 @@ function walk(dir, visit) {
 const megabytes = (bytes) => (bytes / 1e6).toFixed(1);
 
 let failed = false;
-for (const file of process.argv.slice(2)) {
+for (const file of process.argv.slice(2).map((f) => resolve(f))) {
   if (!existsSync(file)) fail(`${file} does not exist.`);
   const work = mkdtempSync(join(tmpdir(), "ave-bundle-"));
   const target = join(work, "x");
