@@ -1,5 +1,20 @@
 {
   "id": "emotional_drama",
   "name": "Emotional Drama",
-  "category": "Cinematic & Film"
+  "category": "Cinematic & Film",
+  "version": "1.0.0",
+  "core_identity": "An intimate family drama still where the feeling lives in a face or a pair of hands. It is warm, tender and quietly heartbreaking, like the memory of someone loved and missed. Soft amber light, close framing and visible emotion make it recognizable.",
+  "medium": "Film still from an intimate family drama, shot on cinema lenses with a warm, gently faded grade.",
+  "lighting": "Soft window light falling across faces, low golden-hour sun through curtains, and warm lamp light at night. Gentle backlight rims the hair, and shadows stay soft and low in contrast, never harsh. Even indoor scenes feel like late afternoon.",
+  "color_palette": "Warm amber, soft beige, muted brown and faded pastel peach and dusty rose. Saturation is low to moderate and the blacks are slightly lifted and warm, with no cold teal and no neon.",
+  "camera": "Close-ups and extreme close-ups on faces, eyes and hands, with the occasional medium shot to show an empty room. 50 mm to 100 mm lens look with very shallow depth of field and creamy background blur. Eye-level, mostly static framing.",
+  "composition": "Faces and hands fill the frame, while empty chairs, doorways and windows sit softly out of focus behind to suggest absence. Subject off-centre with room to look into, and foreground objects such as a cup or a photograph softly blurred.",
+  "texture": "Fine soft film grain, gentle halation around bright windows, and a slight diffusion that softens highlights. Real wrinkles and age spots on skin, knitted wool, cracked leather, worn wood and chipped ceramic.",
+  "characters": "Real, ordinary people, often elderly or middle-aged, with deeply lined faces, aged hands with visible veins and spots, and tired or glistening eyes. Tears well up but are rarely mid-sob, so expressions are restrained and heavy with feeling. Clothes are worn cardigans, faded shirts and old scarves with visible mending.",
+  "mood": "longing, regret, love, loneliness, tender",
+  "negative": "cartoon, anime, illustration, painting, 3D render, CGI look, plastic skin, airbrushed skin, cold teal grade, neon colors, harsh hard light, oversaturated colors, melodramatic screaming, exaggerated crying, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Very slow push-ins that linger on a face or a hand, almost still. Tiny movements carry the shot: a hand trembling, a tear slowly falling, a curtain stirring, steam rising from a cup. No fast moves, no shake and no morphing of faces.",
+  "style_lock": "intimate family drama film still, warm amber light, soft window light, gentle backlit hair, soft beige and faded pastel palette, lifted warm blacks, shallow depth of field, tight close-up on face and hands, tears in tired eyes, aged hands, worn knitted clothes, fine film grain, soft diffusion",
+  "thumbnail": "",
+  "example_prompt": "Close shot of an elderly man at a kitchen table at night, both hands wrapped around a cup of tea, his tired eyes glistening as he looks at the empty chair opposite him. A warm lamp lights his face; the dark window behind him is soft and out of focus. intimate family drama film still, warm amber light, soft window light, gentle backlit hair, soft beige and faded pastel palette, lifted warm blacks, shallow depth of field, tight close-up on face and hands, tears in tired eyes, aged hands, worn knitted clothes, fine film grain, soft diffusion"
 }

@@ -1,5 +1,20 @@
 {
   "id": "storybook_illustration",
   "name": "Storybook Illustration",
-  "category": "Comic & Story"
+  "category": "Comic & Story",
+  "version": "1.0.0",
+  "core_identity": "A warm, classic illustration from a beloved storybook, rich in atmosphere and little details for all ages. It feels nostalgic, cosy and a bit magical, more detailed than a simple picture book. Glowing windows, golden evenings and gouache brush texture with coloured pencil make it recognizable.",
+  "medium": "Classic illustrated storybook art in gouache and coloured pencil on textured paper.",
+  "lighting": "Warm, magical light: glowing windows, lanterns, firelight and golden evening sun, with soft pools of light and gentle blue shadows. Light is rendered with layered gouache and soft pencil glows. Night scenes keep warm light sources and deep blue-green surroundings.",
+  "color_palette": "A rich warm palette: forest greens, cosy reds, golden yellows, warm browns and deep twilight blues, with cream highlights. Colours are layered and slightly muted, with warm dominance and moderate contrast.",
+  "camera": "The illustrator's view is a gentle, slightly elevated storybook vantage, with wide scenes that show a whole room or village and closer medium views with a warm focus. Edges of the picture may fade softly into paper. No lens effects.",
+  "composition": "Detailed scenes with layered depth: cosy foreground props, the character in the middle and a rich background of shelves, windows and trees. A winding path or a glowing window leads the eye, and little extra details reward looking.",
+  "texture": "Gouache brush texture with visible strokes, coloured pencil details for fur, wood grain and fabric, soft pencil outlines and paper grain showing through. Light spatters and fine line decoration add charm.",
+  "characters": "Charming, slightly stylised people with kind faces, rounded features, small expressive eyes, rosy cheeks and soft smile lines. Clothing is detailed with patterns, buttons, patches and knitted textures. Elderly characters have white hair or beards, round spectacles and warm, wise expressions.",
+  "mood": "warm, nostalgic, cozy, magical, tender",
+  "negative": "photorealism, 3D render, CGI look, anime, comic book, harsh black outlines, scary dark mood, neon colors, flat vector, gritty texture, minimalist, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow storybook pans across the scene, page-like parallax between foreground and background layers, and falling leaves or snowflakes. Lamp and window light glows softly and pulses a little. Characters make tiny moves such as a nod or a blink. No fast moves and no morphing of faces.",
+  "style_lock": "classic storybook illustration, gouache brush texture, coloured pencil details, paper grain, warm magical light, glowing windows, golden evening glow, rich forest green and cosy red palette, charming kind faces, detailed clothing patterns, atmospheric layered depth, soft pencil outlines",
+  "thumbnail": "",
+  "example_prompt": "An elderly man with white hair and round spectacles sits alone at a kitchen table at night, holding a cup of tea with a kind, tired smile, an empty chair opposite him. A glowing lantern and a golden window light the patterned tablecloth and his knitted cardigan. classic storybook illustration, gouache brush texture, coloured pencil details, paper grain, warm magical light, glowing windows, golden evening glow, rich forest green and cosy red palette, charming kind faces, detailed clothing patterns, atmospheric layered depth, soft pencil outlines"
 }

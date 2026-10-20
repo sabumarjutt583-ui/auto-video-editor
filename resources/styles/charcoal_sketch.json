@@ -1,5 +1,20 @@
 {
   "id": "charcoal_sketch",
   "name": "Charcoal Sketch",
-  "category": "Drawing & Sketch"
+  "category": "Drawing & Sketch",
+  "version": "1.0.0",
+  "core_identity": "A raw, dramatic charcoal drawing, darker and bolder than pencil, where emotion matters more than detail. It feels rough, human and intense, as if made in a few passionate minutes. Smudged velvet blacks, eraser highlights and drifting charcoal dust make it recognizable.",
+  "medium": "Charcoal drawing on textured paper, with smudged tones and eraser-lifted highlights.",
+  "lighting": "Strong contrast with deep velvety shadows and a few bright highlights lifted out with an eraser. A single dramatic light source carves the face and hands from darkness, and edges melt into the dark. Mid-tones are blended with a finger.",
+  "color_palette": "Monochrome from deep velvety black through smoky greys to paper white. No colour and no sharp pure ink black, only soft charcoal black.",
+  "camera": "The artist's view is a close, intense eye-level vantage on faces, hands and single objects, with some wide room views reduced to large shapes. The focal area is darker and more complete, and the rest is rubbed out into loose smudges. No lens effects.",
+  "composition": "Bold large shapes, heavy dark masses and a few strong lines, with the figure emerging from a dark background. Empty paper left around the light, and strong diagonal strokes that give energy. Few details, a strong focal point.",
+  "texture": "Smudged charcoal, finger blending, eraser highlights, rough broad strokes, charcoal dust and crumbs, and visible paper grain catching the pigment. Some lines are sharp and scratchy, others soft and velvety.",
+  "characters": "Expressive, gestural figures where emotion matters more than detail: heavy brows, dark eye sockets, deep lines in the face and large rough hands. Faces are built from a few dark masses and eraser highlights, and clothing is a loose dark shape. Proportions are natural but simplified.",
+  "mood": "raw, dramatic, emotional, somber, intense",
+  "negative": "color, colour, fine pen lines, clean digital look, smooth airbrush shading, photorealism, painting, watercolor, 3D render, CGI look, anime, cartoon, comic book, tiny precise detail, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow drift across the drawing, with dust-like particles floating through the light. Charcoal smudges seem to breathe slightly, and the darkness pulses gently. Figures stay still. No fast moves, no flashing and no morphing of faces.",
+  "style_lock": "charcoal drawing on textured paper, deep velvety blacks, smudged charcoal, finger blending, eraser highlights, rough gestural strokes, charcoal dust, strong contrast, dark masses, paper grain, monochrome smoky greys, emotion over detail",
+  "thumbnail": "",
+  "example_prompt": "A charcoal drawing of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. His face and hands are lifted from the dark with eraser highlights, and the room is a smudged black mass. charcoal drawing on textured paper, deep velvety blacks, smudged charcoal, finger blending, eraser highlights, rough gestural strokes, charcoal dust, strong contrast, dark masses, paper grain, monochrome smoky greys, emotion over detail"
 }

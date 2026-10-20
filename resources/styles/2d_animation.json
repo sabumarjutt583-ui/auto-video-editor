@@ -1,5 +1,20 @@
 {
   "id": "2d_animation",
   "name": "2D Animation",
-  "category": "Animation & Cartoon"
+  "category": "Animation & Cartoon",
+  "version": "1.0.0",
+  "core_identity": "A clean modern 2D animated series frame that is flat-shaded and story-driven. It is more grounded and calmer than a zany cartoon, with believable people and readable emotion. Consistent outlines, one shadow tone and slightly muted colours make it recognizable.",
+  "medium": "Modern 2D animated series frame, drawn digitally with flat colour fills.",
+  "lighting": "Simple flat shading with one shadow tone shape on each form and a single clear light direction. Occasional soft gradient glow around lamps, screens and sunsets. Backgrounds use gentle atmospheric gradients and no hard cast shadows.",
+  "color_palette": "A balanced modern palette that is slightly muted: dusty teal, warm tan, soft coral and sage green, with dark navy for night scenes. Colours are limited per scene and harmonious, with moderate contrast and no neon.",
+  "camera": "Flat, theatrical staging with eye-level wide shots, medium shots and occasional close-ups. Simple depth through layered foreground, mid-ground and background planes, with painted soft blur only in far backgrounds. Slight angle changes are used only when emotion needs them.",
+  "composition": "Clear silhouettes and uncluttered rooms, with characters placed on thirds and furniture shapes simplified. Windows and doors frame the figure, and background art is detailed but quieter in value than the characters.",
+  "texture": "Clean vector-like fills with consistent medium-thin outlines, minimal texture, and subtle paper-grain or noise on backgrounds only. Simple pattern shapes for clothes and wallpaper.",
+  "characters": "Semi-realistic proportions with simplified faces: small dot or almond eyes, simple nose lines and clear brow and mouth shapes for readable expressions. Skin is flat colour with one shadow tone, hair is a solid shape with a few detail lines, and clothing has simple folds. Elderly characters show age through lines, stooped posture and white hair.",
+  "mood": "grounded, calm, thoughtful, human, quietly warm",
+  "negative": "photorealistic, 3D render, CGI look, anime, manga, comic book halftone, painting, watercolor, rubbery limbs, exaggerated cartoon faces, heavy gradients, glossy shading, neon colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Smooth 2D character animation with natural timing, small acting moves such as blinking, breathing and head turns, and parallax between background layers during slow lateral pans or pushes. Lamp light may pulse gently. No 3D camera spins, no rubbery squash and stretch and no shaking.",
+  "style_lock": "modern 2D animated series frame, flat colour fills, one shadow tone, clean consistent outlines, slightly muted balanced palette, simple soft gradient glow, semi-realistic proportions, simplified readable faces, layered flat backgrounds, grounded story-driven look, subtle paper grain on backgrounds, muted dusty teal and warm tan",
+  "thumbnail": "",
+  "example_prompt": "An elderly man sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A soft yellow glow from a ceiling lamp falls on his stooped shoulders, white hair and the navy window behind him. modern 2D animated series frame, flat colour fills, one shadow tone, clean consistent outlines, slightly muted balanced palette, simple soft gradient glow, semi-realistic proportions, simplified readable faces, layered flat backgrounds, grounded story-driven look, subtle paper grain on backgrounds, muted dusty teal and warm tan"
 }

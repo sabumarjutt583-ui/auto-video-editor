@@ -41,6 +41,31 @@ export function isComplete(style: StyleProfile): boolean {
   return missingFields(style).length === 0;
 }
 
+/** Built-in styles in the order the picker shows them inside a category: most popular first. */
+export const STYLE_ORDER: readonly string[] = [
+  "cinematic_realism", "emotional_drama", "documentary_style", "horror_dark_mystery", "historical_cinematic", "noir", "vintage_film", "retro",
+  "photorealistic", "black_and_white_photography", "hyper_realistic_3d_render",
+  "anime", "animated_film_3d", "2d_cartoon", "2d_animation", "claymation", "stop_motion",
+  "comic_book", "manga", "childrens_storybook", "storybook_illustration", "graphic_novel", "paper_cutout",
+  "oil_painting", "watercolor", "acrylic_painting", "japanese_ukiyo_e",
+  "pencil_sketch", "charcoal_sketch", "ink_drawing", "doodle",
+  "flat_illustration", "minimalist", "vector_illustration", "isometric_3d", "low_poly",
+  "fantasy_concept_art", "dark_fantasy", "sci_fi_concept_art", "cyberpunk", "steampunk",
+  "dreamlike", "surreal", "soft_pastel",
+  "product_photography", "luxury_commercial", "fashion_editorial", "architectural_visualization",
+  "educational_3d", "scientific_visualization", "medical_3d",
+];
+
+function rank(style: StyleProfile): number {
+  const index = STYLE_ORDER.indexOf(style.id);
+  return index === -1 ? STYLE_ORDER.length : index;
+}
+
+/** Listed styles first (by STYLE_ORDER), then all others (custom styles) by name. */
+export function byPopularity(a: StyleProfile, b: StyleProfile): number {
+  return rank(a) - rank(b) || a.name.localeCompare(b.name);
+}
+
 export interface StyleGroup {
   category: string;
   styles: StyleProfile[];
@@ -63,7 +88,7 @@ export function groupStyles(styles: readonly StyleProfile[], query = ""): StyleG
   return [...known, ...extra]
     .map((category) => ({
       category,
-      styles: filtered.filter((s) => s.category === category).sort((a, b) => a.name.localeCompare(b.name)),
+      styles: filtered.filter((s) => s.category === category).sort(byPopularity),
     }))
     .filter((group) => group.styles.length > 0);
 }
@@ -111,5 +136,5 @@ export function blankStyle(): StyleProfile {
 /** A copy of any style as a new custom style, ready to be edited. */
 export function duplicateStyle(style: StyleProfile, existingIds: readonly string[]): StyleProfile {
   const name = `${style.name} (copy)`;
-  return { ...style, id: newCustomId(name, existingIds), name, builtin: false };
+  return { ...style, id: newCustomId(name, existingIds), name, builtin: false, thumbnail: "" };
 }

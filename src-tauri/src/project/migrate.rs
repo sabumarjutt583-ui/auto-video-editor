@@ -10,7 +10,7 @@ use super::model::SCHEMA_VERSION;
 type Step = fn(&mut Map<String, Value>);
 
 /// `STEPS[n]` upgrades a version-n file to version n+1.
-const STEPS: &[Step] = &[v0_to_v1, v1_to_v2];
+const STEPS: &[Step] = &[v0_to_v1, v1_to_v2, v2_to_v3];
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum MigrateError {
@@ -37,6 +37,13 @@ fn v1_to_v2(project: &mut Map<String, Value>) {
                 }
             }
         }
+    }
+}
+
+/// Version 3 renamed the style `pixar_inspired_3d` to `animated_film_3d` (no brand names in the app).
+fn v2_to_v3(project: &mut Map<String, Value>) {
+    if project.get("styleId").and_then(Value::as_str) == Some("pixar_inspired_3d") {
+        project.insert("styleId".into(), Value::from("animated_film_3d"));
     }
 }
 
@@ -95,6 +102,14 @@ mod tests {
         assert_eq!(value["locationBible"][0], json!({ "id": "l1", "name": "Farm", "description": "a red barn" }));
         let project: Project = serde_json::from_value(value).unwrap();
         assert_eq!(project.character_bible[0].appearance, "a tall woman");
+    }
+
+    #[test]
+    fn the_renamed_3d_style_is_mapped_to_its_new_id() {
+        let (value, from) = migrate(json!({ "schemaVersion": 2, "styleId": "pixar_inspired_3d" })).unwrap();
+        assert_eq!((from, value["styleId"].as_str()), (2, Some("animated_film_3d")));
+        let (other, _) = migrate(json!({ "schemaVersion": 2, "styleId": "anime" })).unwrap();
+        assert_eq!(other["styleId"], "anime");
     }
 
     #[test]

@@ -12,6 +12,8 @@ interface StyleDetailsProps {
   onDuplicate: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** Hide Duplicate, Edit and Delete (the gallery only lets you look). */
+  readOnly?: boolean;
 }
 
 function Block({ label, text }: { label: string; text: string }) {
@@ -24,7 +26,7 @@ function Block({ label, text }: { label: string; text: string }) {
 }
 
 /** The main parts of a style, and what is still missing when it is a placeholder. */
-export function StyleDetails({ style, inUse, onDuplicate, onEdit, onDelete }: StyleDetailsProps) {
+export function StyleDetails({ style, inUse, onDuplicate, onEdit, onDelete, readOnly = false }: StyleDetailsProps) {
   const [more, setMore] = useState(false);
   const missing = missingFields(style);
   const complete = missing.length === 0;
@@ -40,6 +42,7 @@ export function StyleDetails({ style, inUse, onDuplicate, onEdit, onDelete }: St
           {inUse && <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-medium text-success">Used in this project</span>}
           {!complete && <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning">Incomplete</span>}
         </div>
+        {!readOnly && (
         <div className="flex gap-2">
           <Button icon={Copy} onClick={onDuplicate}>
             Duplicate
@@ -55,6 +58,7 @@ export function StyleDetails({ style, inUse, onDuplicate, onEdit, onDelete }: St
             </>
           )}
         </div>
+        )}
       </div>
 
       {!complete && (

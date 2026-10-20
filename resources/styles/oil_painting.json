@@ -1,5 +1,20 @@
 {
   "id": "oil_painting",
   "name": "Oil Painting",
-  "category": "Painting"
+  "category": "Painting",
+  "version": "1.0.0",
+  "core_identity": "A rich, deep oil painting in the classical realist tradition, with the weight and calm of a museum piece. It feels timeless, dignified and warm, lit like an old master interior. Thick brush strokes, glowing highlights and dark earthy shadows make it recognizable.",
+  "medium": "Traditional oil painting on linen canvas, classical realist approach with a light varnish.",
+  "lighting": "Chiaroscuro lighting from one warm directional source at the side, such as a window or a candle, with deep soft shadows and glowing highlights on faces and hands. Light falls off slowly into rich darkness. A warm glow sits on skin and a subtle sheen on varnished darks.",
+  "color_palette": "Deep earthy tones: burnt umber, raw sienna, ochre, olive green and deep red, with warm flesh tones and glowing creamy highlights. Shadows are transparent browns, never pure black. Saturation is moderate and harmonious, with warm colour dominance.",
+  "camera": "The painter's view is a steady, slightly low eye-level vantage like a portrait or genre painting, with medium and half-length framing and a few wide interiors. Edges of forms soften into shadow, and the main subject is the sharpest area. Composition is held still and balanced.",
+  "composition": "Classical triangular arrangement with the figure lit against a dark background, a table or window as a secondary structure, and carefully placed still-life props. Strong value structure, with the brightest light on the face and hands.",
+  "texture": "Visible brush strokes, impasto in the highlights, thin glazes in the shadows, canvas weave showing through in thin areas, and a subtle varnish sheen. Fabric folds and wood are built with confident layered strokes, and edges are painterly rather than sharp.",
+  "characters": "Realistic anatomy with painterly edges, dignified expressive faces and careful hands. Skin is built from warm and cool layers with glowing highlights, wrinkles are rendered with soft strokes, and the eyes hold a quiet intensity. Clothing is heavy fabric with deep folds in earthy colours.",
+  "mood": "rich, dignified, timeless, contemplative, solemn",
+  "negative": "digital smoothness, flat vector colors, photograph, photorealism, anime, cartoon, comic book, watercolor, 3D render, CGI look, neon colors, thin transparent washes, plastic skin, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow push-in toward the face or hands, and a very slow drift across the canvas. Candlelight flickers gently, shifting the highlights and shadows, and dust motes drift in the beam. Figures hold nearly still with a slow breath. No fast moves and no morphing of faces.",
+  "style_lock": "classical oil painting on canvas, chiaroscuro lighting, warm directional side light, deep earthy palette, burnt umber shadows, glowing warm highlights, visible brush strokes, impasto highlights, canvas weave, subtle varnish sheen, painterly edges, dignified expressive face",
+  "thumbnail": "",
+  "example_prompt": "An elderly man sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A single candle at his side lights his lined face and hands in thick glowing strokes, and the room falls into deep umber shadow. classical oil painting on canvas, chiaroscuro lighting, warm directional side light, deep earthy palette, burnt umber shadows, glowing warm highlights, visible brush strokes, impasto highlights, canvas weave, subtle varnish sheen, painterly edges, dignified expressive face"
 }

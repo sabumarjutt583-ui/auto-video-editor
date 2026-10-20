@@ -1,5 +1,20 @@
 {
   "id": "dark_fantasy",
   "name": "Dark Fantasy",
-  "category": "Fantasy & Sci-Fi"
+  "category": "Fantasy & Sci-Fi",
+  "version": "1.0.0",
+  "core_identity": "A grim, ancient, mythic world rendered as a realistic painterly matte painting, where beauty is dangerous. It feels like a lost kingdom at the end of an age. Fog, ruined stone, stormy skies and shafts of eerie light make it recognizable.",
+  "medium": "Painterly digital matte painting with realistic rendering and visible brushwork in the distance.",
+  "lighting": "Dramatic god rays breaking through fog and storm clouds, firelight from torches and braziers, and eerie cold glows from magic or moonlight. Strong contrast, deep shadows, rim lights on armour and hazy atmospheric depth.",
+  "color_palette": "Deep charcoal and slate greys, cold teal mist, and accents of blood red and tarnished gold. Saturation is low except for the small red or gold highlights, and the blacks are rich.",
+  "camera": "Wide cinematic views of towering ruins and landscapes, low heroic angles and 35 mm to 85 mm portrait framing. Strong atmospheric perspective, with distant layers fading into mist. Moderate depth of field.",
+  "composition": "Small figures dwarfed by huge ruins, cliffs or trees, arranged in layers of foreground rubble, middle-ground figures and a misty far backdrop. A central light shaft or glow leads the eye. Silhouettes stand against stormy skies.",
+  "texture": "Weathered plate armour with dents and rust, cracked ancient stone, twisted gnarled trees, thick mist, ash and embers, tattered cloth and wet mud. Brushy painted detail with realistic material rendering.",
+  "characters": "Battle-worn adults with scars, grime and hard faces, in cloaks, hoods, heavy fabrics, chain mail and dark leather with worn straps. Proportions are realistic, expressions are serious or hollow, and the eyes catch cold light. Hair is matted or windblown, with no cartoon exaggeration.",
+  "mood": "grim, ancient, mythic, ominous, bleak",
+  "negative": "cute, cartoon, anime, chibi, bright cheerful colors, flat vector, modern objects, sci-fi technology, gore, oversaturated colors, 3D render, plastic look, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow epic camera moves: a long crane rise over ruins, a slow push through fog, or a slow orbit around a lone figure. Embers and ash float upward, mist rolls across the ground, and cloaks and banners ripple in a heavy wind. Figures move slowly and with weight. No quick cuts and no shake.",
+  "style_lock": "dark fantasy matte painting, realistic painterly rendering, god rays through fog, firelight and eerie glows, stormy skies, deep charcoal palette, blood red accents, cold teal mist, tarnished gold, weathered armor, ancient stone ruins, floating embers and ash, battle-worn cloaked figure",
+  "thumbnail": "",
+  "example_prompt": "Inside a ruined stone hall at night: an old cloaked man sits alone at a cracked wooden table, holding a tin cup of steaming tea, an empty chair opposite him. A single brazier glows, and cold mist drifts through a broken window. dark fantasy matte painting, realistic painterly rendering, god rays through fog, firelight and eerie glows, stormy skies, deep charcoal palette, blood red accents, cold teal mist, tarnished gold, weathered armor, ancient stone ruins, floating embers and ash, battle-worn cloaked figure"
 }

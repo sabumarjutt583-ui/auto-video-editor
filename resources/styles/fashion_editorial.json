@@ -1,5 +1,20 @@
 {
   "id": "fashion_editorial",
   "name": "Fashion Editorial",
-  "category": "Commercial"
+  "category": "Commercial",
+  "version": "1.0.0",
+  "core_identity": "A high-fashion magazine photograph that feels stylish, confident and artistic. Every pose, fabric and shadow is chosen and controlled, like a page from a glossy fashion magazine. Sculpted light, curated colour and model-like poses make it recognizable.",
+  "medium": "High-fashion magazine photograph shot in a studio or on a dramatic location with a medium-format camera.",
+  "lighting": "Controlled studio or dramatic location lighting: large beauty light on faces, hard or soft sculpting side light, and bold shadows with clean edges. Rim light separates the figure from the background, and fabrics are lit to show folds and sheen. Contrast is stylish and deliberate.",
+  "color_palette": "Curated, bold or monochrome fashion palettes, such as all-black with one red accent, tonal beige and cream, or saturated cobalt and emerald. Skin tones are clean and polished, with limited colours and strong intent.",
+  "camera": "A medium-format 80 mm to 120 mm lens look, with a sharp subject and a creamy, smooth background, full-length, three-quarter and tight beauty crops, and low heroic angles. Occasional wide-angle drama. Sharp focus on eyes and fabric.",
+  "composition": "Strong poses, elegant lines, diagonals from arms and fabric, and clean uncluttered backgrounds such as a seamless paper, a plain wall or a dramatic architecture. Plenty of negative space and a very clear focal point.",
+  "texture": "Polished high-resolution detail: fabric weave, silk sheen, leather grain, fine hair strands and retouched but natural-looking skin. Clean, crisp, with a very fine grain at most.",
+  "characters": "Model-like posing with long lines, styled hair and makeup, strong cheekbones and confident, composed expressions or a distant gaze. Designer clothing with sculptural cuts, rich fabrics and bold accessories, with no brand logos. Mature models are shown with silver hair, elegant tailoring and dignified poise.",
+  "mood": "stylish, confident, artistic, sophisticated, bold",
+  "negative": "brand logos, casual snapshot, messy background, harsh flat flash, plastic skin, over-retouched skin, cartoon, anime, illustration, painting, 3D render, CGI look, low resolution, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow-motion fabric movement, with hair and silk flowing, and confident subtle poses such as a head turn or a slow step. Camera makes a slow push-in or a slow orbit, and light sweeps across the fabric. No fast cuts, no shake and no sudden zooms.",
+  "style_lock": "high-fashion magazine photograph, controlled studio lighting, beauty light on face, sculpted side shadows, rim light, curated bold or monochrome palette, medium-format lens look, strong elegant pose, styled hair and makeup, designer clothing, clean seamless background, crisp fabric detail",
+  "thumbnail": "",
+  "example_prompt": "A fashion editorial photograph: an elegant elderly man with silver hair in a tailored charcoal jacket sits alone at a sleek dark table, holding a porcelain cup of tea, an empty chair opposite him. A large soft light sculpts his cheekbones against a clean deep grey wall. high-fashion magazine photograph, controlled studio lighting, beauty light on face, sculpted side shadows, rim light, curated bold or monochrome palette, medium-format lens look, strong elegant pose, styled hair and makeup, designer clothing, clean seamless background, crisp fabric detail"
 }

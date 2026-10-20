@@ -1,5 +1,20 @@
 {
   "id": "vector_illustration",
   "name": "Vector Illustration",
-  "category": "Flat & Graphic"
+  "category": "Flat & Graphic",
+  "version": "1.0.0",
+  "core_identity": "Crisp, polished vector art with sharp edges and perfect curves, more detailed than flat illustration. It feels bright, precise and professional, ready to scale to any size. Clean solid fills, smooth gradients and uniform outlines make it recognizable.",
+  "medium": "Crisp digital vector artwork made with smooth bezier shapes, solid fills and clean gradients.",
+  "lighting": "Simple stylised lighting with smooth linear and radial gradients on shapes, clean highlight shapes and soft shadow shapes with sharp edges. One clear light direction. Glows are smooth radial gradients, never noisy.",
+  "color_palette": "Bright, polished colours with clean solid fills and smooth gradients: vivid blue, teal, orange, magenta and sunny yellow, with white highlights and deep navy shadows. Saturation is high and contrast is clear.",
+  "camera": "A clean, front-facing or gently three-quarter view, with simple depth from overlapping shapes and scaled objects. Everything is perfectly sharp with no blur. Wide scenes are tidy and medium views are clear.",
+  "composition": "Well-organised scenes with a clear focal figure, balanced shapes and decorative details such as plants, patterns and icons around. Strong silhouettes, perfect symmetry where it suits, and tidy spacing.",
+  "texture": "No texture at all: perfectly clean fills, perfect curves, uniform outlines of even weight where used, and crisp shape edges. Gradients are smooth with no grain and no noise.",
+  "characters": "Stylised people with clear facial features, smooth rounded shapes and polished proportions. Eyes are clean shapes with highlight dots, noses and mouths are simple curves, and hair is made of smooth overlapping shapes. Clothing has clean fold shapes and shadow shapes, and expressions are clear and friendly.",
+  "mood": "polished, bright, precise, professional, friendly",
+  "negative": "photorealism, 3D render, CGI look, painting, watercolor, sketchy lines, rough texture, film grain, noise, pixelated edges, blurry gradients, charcoal, anime, comic book, muted dull colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Smooth transform animations: shapes morph, scale and slide with clean easing, and elements draw on along their outlines. Clean zooms and pans move across the art. Light gradients shift gently. No shake, no noisy effects and no realistic motion blur.",
+  "style_lock": "crisp vector illustration, clean solid fills, smooth gradients, perfect curves, uniform outlines, bright polished colours, sharp shape edges, no texture, clear facial features, smooth rounded shapes, clean highlight and shadow shapes, scalable graphic look",
+  "thumbnail": "",
+  "example_prompt": "A vector illustration of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. Smooth orange lamp gradients glow on his friendly face, and a deep navy window with a crisp moon shape sits behind. crisp vector illustration, clean solid fills, smooth gradients, perfect curves, uniform outlines, bright polished colours, sharp shape edges, no texture, clear facial features, smooth rounded shapes, clean highlight and shadow shapes, scalable graphic look"
 }

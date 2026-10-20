@@ -14,7 +14,10 @@
     "tauri": "tauri",
     "build:web:admin": "tsc -b && vite build --mode admin",
     "dev:admin": "tauri dev --features admin --config src-tauri/tauri.admin.conf.json",
-    "build:admin": "tauri build --features admin --config src-tauri/tauri.admin.conf.json"
+    "build:admin": "tauri build --features admin --config src-tauri/tauri.admin.conf.json",
+    "styles:check": "node scripts/styles-check.mjs",
+    "styles:list": "node scripts/styles-list.mjs",
+    "styles:thumbnails": "node scripts/thumbnail-prompts.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

@@ -1,5 +1,20 @@
 {
   "id": "retro",
   "name": "Retro",
-  "category": "Artistic Mood"
+  "category": "Cinematic & Film",
+  "version": "1.0.0",
+  "core_identity": "A bold, fun 1980s poster-style image full of sunset glow and graphic energy. It feels nostalgic, energetic and a little cheesy in the best way, like the cover of a pop record. Hot pink, orange and teal with a mild print grain make it recognizable.",
+  "medium": "Retro 1980s poster-like digital artwork, mixing airbrushed illustration and photographic elements.",
+  "lighting": "Bright, slightly flat lighting with big sunset glows, soft airbrushed gradients and bright rim light on figures. Backlights glow in pink and orange, and shadows are simple, filled with purple or deep blue. Neon tube light accents add a fun edge.",
+  "color_palette": "Sunset orange, hot pink, teal, purple and warm yellow, with a slight fade and creamy highlights. Colours are saturated and graphic, with purple-blue shadows, and the overall mix is warm, bright and playful.",
+  "camera": "A confident frontal or slightly low poster view, 35 mm to 50 mm lens feel, with a medium or wide centred framing and gentle softness in the far background. Dramatic sun discs and horizon lines behind the subject. Everything is bold and readable.",
+  "composition": "Poster layout with a strong central subject, a large setting sun or grid horizon behind, bold geometric shapes such as stripes and triangles, and period props like cassette tapes, boomboxes and palm trees. Symmetrical and graphic, with simple clean backgrounds.",
+  "texture": "Mild film-like grain, slight print texture and ink halftone, smooth airbrushed gradients, glossy highlights on chrome and neon, and a gentle fade at the edges. No scanline effects.",
+  "characters": "Real-looking people with 1980s clothing and hairstyles unless the story says otherwise: big permed or feathered hair, bold shoulder pads, windbreakers, leg warmers, bright sneakers and high-waisted jeans. Faces are well lit with bright rim light, cheerful or cool expressions and slightly glossy skin. Older characters wear knit vests, wide glasses and cardigans.",
+  "mood": "nostalgic, bold, fun, energetic, sunny",
+  "negative": "faded 1970s film look, sepia tone, dull muted colors, modern minimalism, photorealistic gloom, scanlines, VHS noise, cartoon, anime, 3D render, CGI look, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Smooth retro zooms, slow pans and gentle push-ins across the poster-like scene. Sun glows pulse softly, and light streaks and sparkles sweep over surfaces. Hair and clothes move slightly. No scanlines, no glitch effects, no shake and no fast cuts.",
+  "style_lock": "1980s retro poster artwork, sunset orange and hot pink palette, teal and purple accents, airbrushed gradients, big setting sun glow, bold geometric shapes, bright rim light, mild print grain, slightly faded saturated colours, 1980s clothing and hair, graphic nostalgic look, slight fade at the edges",
+  "thumbnail": "",
+  "example_prompt": "A retro poster scene of an elderly man in a knit vest and wide glasses sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A big pink and orange sunset glow fills the window, and a teal wall frames him. 1980s retro poster artwork, sunset orange and hot pink palette, teal and purple accents, airbrushed gradients, big setting sun glow, bold geometric shapes, bright rim light, mild print grain, slightly faded saturated colours, 1980s clothing and hair, graphic nostalgic look, slight fade at the edges"
 }

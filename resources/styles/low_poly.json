@@ -1,5 +1,20 @@
 {
   "id": "low_poly",
   "name": "Low Poly",
-  "category": "Flat & Graphic"
+  "category": "Flat & Graphic",
+  "version": "1.0.0",
+  "core_identity": "A stylish low-polygon 3D scene built from a small number of flat triangles, like a faceted crystal model. It feels geometric, modern and clean, with each facet catching light differently. Visible triangle edges and colour gradients across facets make it recognizable.",
+  "medium": "Low-polygon 3D render with flat-shaded triangle facets and no textures.",
+  "lighting": "A simple directional light that makes each flat facet a slightly different brightness, with soft ambient fill and simple soft shadows. Highlights appear on facets facing the light, and glows are shown as brighter facets. No realistic reflections.",
+  "color_palette": "Gradient pastel or vivid colours that shift gently from facet to facet: coral to pink, teal to blue, and yellow to orange, with a few darker facets for depth. Colours are clean and harmonious, with moderate saturation.",
+  "camera": "A clean 3D view with a 35 mm to 50 mm lens feel, slightly elevated three-quarter angles, and a soft background gradient. Everything is sharp, with a mild depth falloff at far distances. Wide scenes show whole geometric rooms or landscapes.",
+  "composition": "Simple geometric scenes with a clear central object, a limited number of large shapes, and a floor plane or terrain of triangles. Props are reduced to a few facets, and the background is a smooth colour gradient.",
+  "texture": "No texture: flat-shaded triangles with visible edges between facets, sharp crystalline silhouettes, and a faint specular sparkle on some edges. Surfaces look like folded paper or cut gemstone.",
+  "characters": "Geometric faceted figures built from a small number of triangles, with simplified body shapes, minimal faces made from a couple of facets or tiny dark shapes, and angular hair. Hands are blocky wedge shapes, and clothing is distinguished by colour changes between facet groups. Expressions are minimal and shown by head angle.",
+  "mood": "stylish, geometric, clean, modern, calm",
+  "negative": "photorealism, smooth surfaces, high-poly detail, realistic textures, painting, watercolor, hand-drawn lines, anime, cartoon outlines, film grain, heavy noise, muddy colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow orbiting camera moves around the faceted scene, with facets catching and releasing light as the angle changes. Pieces drift or rotate slowly, and the background gradient shifts softly. Figures make small angular movements. No shake and no realistic motion blur.",
+  "style_lock": "low-polygon 3D render, flat-shaded triangle facets, visible facet edges, directional light on each facet, pastel gradient colour per facet, no textures, crystalline silhouettes, geometric faceted figure, minimal face, smooth background gradient, stylish geometric look, sparkle on edges",
+  "thumbnail": "",
+  "example_prompt": "A low-poly scene of an elderly man built from coral and slate triangles, sitting alone at a faceted kitchen table at night, holding a cup of tea, an empty chair opposite him. A yellow faceted lamp lights the table, and a navy window gradient sits behind. low-polygon 3D render, flat-shaded triangle facets, visible facet edges, directional light on each facet, pastel gradient colour per facet, no textures, crystalline silhouettes, geometric faceted figure, minimal face, smooth background gradient, stylish geometric look, sparkle on edges"
 }

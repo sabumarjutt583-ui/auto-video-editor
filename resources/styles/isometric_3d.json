@@ -1,5 +1,20 @@
 {
   "id": "isometric_3d",
   "name": "Isometric 3D",
-  "category": "Flat & Graphic"
+  "category": "Flat & Graphic",
+  "version": "1.0.0",
+  "core_identity": "A neat miniature world on a floating tile, rendered at a true isometric angle. It feels organised, charming and toy-like, like a tiny room you could pick up. Orthographic framing, clean pastel colours and soft studio light make it recognizable.",
+  "medium": "Isometric 3D diorama render of a miniature scene on a floating square tile.",
+  "lighting": "Soft, even studio light from the upper left with gentle ambient occlusion in corners and under objects. Shadows are soft and short, and glowing lamps add small warm light pools. No dramatic contrast.",
+  "color_palette": "Bright, clean pastel or vivid tones: mint, peach, sky blue, butter yellow and coral, against a plain light background. Colours are smooth and matte, with each object in a clear colour group and moderate saturation.",
+  "camera": "True isometric angle of about 30 degrees, orthographic, with no perspective distortion, so parallel lines stay parallel. The whole diorama is shown from above at a three-quarter angle, with sharp focus everywhere.",
+  "composition": "A single cut-away room or small landscape sitting on a floating square tile, with neatly arranged furniture and tiny props, and empty plain space around the tile. Walls cut away to show the interior, and the layout is tidy and symmetrical.",
+  "texture": "Smooth matte plastic-like surfaces with soft bevelled edges, tiny details such as books, plants and mugs, and subtle ambient occlusion. No harsh texture and no grain.",
+  "characters": "Small, cute, rounded figures with big heads, tiny bodies, simple dot eyes and small smiles. Hair is a smooth rounded shape, hands are small rounded mitts, and clothing is a couple of clean colour parts. Elderly figures have white hair and a slight stoop.",
+  "mood": "tidy, charming, playful, cozy, calm",
+  "negative": "perspective distortion, photorealism, dramatic shadows, gritty textures, hand-drawn lines, painting, watercolor, anime, cartoon outlines, horror, dark gloomy colors, film grain, wide-angle lens, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Subtle animated details inside the diorama, such as a lamp flickering, steam rising from a cup or a plant swaying, plus a slow smooth rotation of the whole tile. Figures make small movements. Camera stays isometric. No shake and no perspective changes.",
+  "style_lock": "isometric 3D diorama render, true isometric angle, orthographic view, floating square tile, cut-away room, soft even studio light, gentle ambient occlusion, clean pastel colours, smooth matte surfaces, tiny props, small rounded cute figure, plain light background",
+  "thumbnail": "",
+  "example_prompt": "An isometric diorama of a cut-away kitchen on a floating tile at night: a small rounded elderly man with white hair sits alone at a mint table, holding a tiny cup of tea, an empty chair opposite him. A warm peach lamp glows softly, and a blue window shows stars. isometric 3D diorama render, true isometric angle, orthographic view, floating square tile, cut-away room, soft even studio light, gentle ambient occlusion, clean pastel colours, smooth matte surfaces, tiny props, small rounded cute figure, plain light background"
 }

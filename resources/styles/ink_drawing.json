@@ -1,5 +1,20 @@
 {
   "id": "ink_drawing",
   "name": "Ink Drawing",
-  "category": "Drawing & Sketch"
+  "category": "Drawing & Sketch",
+  "version": "1.0.0",
+  "core_identity": "A crisp, detailed pen-and-ink illustration where every tone is built from lines and dots. It feels precise, graphic and almost engraved, with no soft shading. Clean black lines on white, stippling and cross-hatching make it recognizable.",
+  "medium": "Pen and black ink illustration on white paper, with fine liner and dip-pen line work.",
+  "lighting": "Light and shadow are made only from line density: open white areas for light, dense cross-hatching and solid black spots for shadow. A clear single light direction, with sharp-edged cast shadows drawn in parallel hatching.",
+  "color_palette": "Black ink on white paper only. Optionally a single muted ink wash in grey-blue or sepia may be added to a few areas, but there are no other colours.",
+  "camera": "The artist's view is a clear, slightly elevated vantage that shows the whole scene with precise perspective, with medium views and close portraits. Everything is drawn in equal sharpness with no blur. Backgrounds are drawn with the same care as the figure.",
+  "composition": "Balanced, carefully planned compositions with strong outlines, clear overlaps and decorative detail in the background, such as wallpaper, floorboards and shelves. Generous white space around the subject, and a clear focal point.",
+  "texture": "Precise line work with varied line weight, stippling dots, cross-hatching and contour hatching for tone, and solid black fills used sparingly. No soft gradients, no smudges and no paper grain, only crisp ink on clean paper.",
+  "characters": "Detailed line portraits with clear contours, drawn with fine hatching for wrinkles and shadow, careful eyes and defined hair strands. Proportions are realistic or lightly stylised, hands are drawn with clean contours, and clothing folds are drawn with hatching. Expressions are clear and calm.",
+  "mood": "crisp, precise, graphic, detailed, classic",
+  "negative": "color, colour, soft shading, smudges, painterly texture, airbrush gradients, photorealism, watercolor, charcoal, pencil sketch, 3D render, CGI look, anime, cartoon, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow pan across the details of the drawing, with a gentle push-in toward the focal area. Lines may appear to be drawn on gradually, and steam or smoke may curl in line form. Figures stay still. No fast moves, no flashing and no morphing of faces.",
+  "style_lock": "pen and black ink illustration, crisp precise line work, varied line weight, stippling, cross-hatching for tone, solid black accents, clean white paper, no soft gradients, detailed line portrait, clear contours, engraved graphic look, detailed background patterns",
+  "thumbnail": "",
+  "example_prompt": "A pen and ink illustration of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. Cross-hatching shades his face and the window, and fine stippling textures the wall behind. pen and black ink illustration, crisp precise line work, varied line weight, stippling, cross-hatching for tone, solid black accents, clean white paper, no soft gradients, detailed line portrait, clear contours, engraved graphic look, detailed background patterns"
 }

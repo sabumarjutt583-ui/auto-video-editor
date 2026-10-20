@@ -1,5 +1,20 @@
 {
   "id": "historical_cinematic",
   "name": "Historical Cinematic",
-  "category": "Cinematic & Film"
+  "category": "Cinematic & Film",
+  "version": "1.0.0",
+  "core_identity": "A grand historical epic still where everything, from cloth to tools, belongs to the period. It feels authentic, weighty and lived in, as if cameras had been present centuries ago. Earth tones, natural fire and daylight, and dust hanging in light rays make it recognizable.",
+  "medium": "Film still from a historical epic, shot on large-format cinema lenses with an earthy, warm grade.",
+  "lighting": "Natural sunlight through arches and doors, candlelight, torchlight, oil lamps and open fires, never modern electric light unless the era fits. Light is warm and directional, with visible shafts through dust and smoke and deep amber falloff in the shadows.",
+  "color_palette": "Earthy browns, ochre, deep red and dusty gold, with weathered stone grey and muted olive. Saturation is moderate and warm, the blacks are rich, and there are no neon or synthetic colours.",
+  "camera": "Wide 24 mm to 40 mm lenses for landscapes, crowds and architecture, and 50 mm to 85 mm for faces. Deep focus on grand scenes and shallow focus on portraits. Low angles make people and buildings feel monumental, with an occasional high crane vantage.",
+  "composition": "Layered depth: foreground props such as a spear, a clay pot or a rope, subjects in the middle, and monumental architecture or landscape behind. Strong leading lines of roads, colonnades and rows of people. Balanced yet asymmetrical, with space for sky.",
+  "texture": "Hand-woven wool and linen, rough leather, hammered metal, weathered stone, rough timber, clay and straw, with dust and smoke drifting in light rays. Natural film grain, and sweat and dirt on skin.",
+  "characters": "Real-looking people in period-accurate clothing, hair, headwear and tools for the setting, with weathered, sunburnt faces, calloused hands and dirt under the nails. Faces are strong and serious, shaped by hard lives. Expressions are grave, proud or weary, never modern.",
+  "mood": "grand, authentic, solemn, epic, timeless",
+  "negative": "modern objects, phones, cars, plastic, modern clothing, wristwatch, electric lights, zippers, cartoon, anime, illustration, 3D render, CGI look, oversaturated colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow sweeping crane or dolly moves that reveal the scale of a place, or a slow tracking move alongside walking people. Wind moves cloaks, banners, hair, grass and smoke, while flames flicker and dust drifts. Subjects move with weight and purpose. No handheld shake, no fast zoom and no modern gadgets or vehicles.",
+  "style_lock": "historical epic film still, period-accurate costume and props, natural sunlight and torchlight, earthy brown and ochre palette, deep red and dusty gold accents, dust in light rays, weathered stone and timber, hand-woven fabrics, weathered faces, low heroic angle, layered depth, fine film grain",
+  "thumbnail": "",
+  "example_prompt": "Interior of a stone house in an ancient village at night: an elderly man in a rough wool tunic sits alone at a heavy wooden table, holding a clay cup of herbal tea. An oil lamp lights his weathered face, and an empty stool stands opposite him. historical epic film still, period-accurate costume and props, natural sunlight and torchlight, earthy brown and ochre palette, deep red and dusty gold accents, dust in light rays, weathered stone and timber, hand-woven fabrics, weathered faces, low heroic angle, layered depth, fine film grain"
 }

@@ -1,5 +1,20 @@
 {
   "id": "fantasy_concept_art",
   "name": "Fantasy Concept Art",
-  "category": "Fantasy & Sci-Fi"
+  "category": "Fantasy & Sci-Fi",
+  "version": "1.0.0",
+  "core_identity": "An epic digital concept painting of a magical world that feels grand, hopeful and adventurous. It is brighter and warmer than dark fantasy, full of wonder and huge scale. Golden light, lush landscapes and floating islands make it recognizable.",
+  "medium": "Epic digital fantasy concept painting with detailed painterly rendering.",
+  "lighting": "Golden sunlight with long god rays, magical glows from crystals and lanterns, and soft atmospheric haze. Warm key light with cool blue-purple shadows, bright rim light on figures, and glowing particles. Contrast is strong but hopeful.",
+  "color_palette": "Lush greens, sky blues and gold, with magical purple and teal accents and warm cream highlights. Colours are rich and saturated but harmonious, with bright skies and luminous distance.",
+  "camera": "Sweeping wide cinematic views with strong atmospheric perspective, low heroic angles and high aerial vantages, using 24 mm to 70 mm lens feel. The distance fades into luminous haze. Portrait shots use a shallow depth of field.",
+  "composition": "Huge landscapes, castles, floating islands and ancient forests with small adventurers for scale. Layered foreground, middle ground and far backdrop, a winding path or river as a leading line, and a glowing focal point.",
+  "texture": "Detailed painterly rendering of mossy stone, towering trees, flowing water, clouds and glowing magic, with fine brush detail in the focal area and softer brushwork in the distance. Fabric, leather and metal on costumes are carefully rendered.",
+  "characters": "Adventurers with realistic proportions and heroic bearing, in robes, cloaks, leather armour and detailed costumes with embroidery, belts and pouches. Faces are kind, determined or full of wonder, with natural skin and windblown hair. Older characters have long beards or grey braids and wise eyes.",
+  "mood": "magical, grand, adventurous, hopeful, wondrous",
+  "negative": "dark gloomy mood, grimdark, gore, modern objects, sci-fi technology, photograph, flat vector, anime, cartoon, chibi, 3D render, CGI look, muddy colors, low resolution, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Sweeping aerial camera moves that glide over landscapes, slow pushes toward castles and floating islands, and slow orbits around a hero. Birds fly across the sky, magic particles drift upward, clouds move and cloaks ripple in the wind. No shake and no quick cuts.",
+  "style_lock": "epic fantasy concept painting, golden sunlight, long god rays, magical glows, lush green and sky blue palette, gold and purple accents, huge landscape scale, floating islands and castles, atmospheric perspective, detailed costumes, adventurer in cloak, painterly detail, hopeful mood",
+  "thumbnail": "",
+  "example_prompt": "A fantasy painting of an elderly wizard in a patched cloak sitting alone at a wooden table inside a glowing tower room at night, holding a cup of tea, an empty chair opposite him. Golden lantern light and purple magic sparks fill the room, and floating islands shine in the window. epic fantasy concept painting, golden sunlight, long god rays, magical glows, lush green and sky blue palette, gold and purple accents, huge landscape scale, floating islands and castles, atmospheric perspective, detailed costumes, adventurer in cloak, painterly detail, hopeful mood"
 }

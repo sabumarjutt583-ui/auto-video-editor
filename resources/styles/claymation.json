@@ -1,5 +1,20 @@
 {
   "id": "claymation",
   "name": "Claymation",
-  "category": "Animation & Cartoon"
+  "category": "Animation & Cartoon",
+  "version": "1.0.0",
+  "core_identity": "A photograph of a tiny handmade world sculpted from modelling clay, full of fingerprints and cosy charm. It feels tactile, homemade and warm, like a bedtime story. Soft chunky clay figures, matte surfaces and miniature-scale blur make it recognizable.",
+  "medium": "Photograph of a handmade plasticine clay miniature set with sculpted clay figures.",
+  "lighting": "Small-set studio lighting with one soft warm key light, a gentle fill and a small practical lamp. Shadows are soft and short, with highlights glinting on the matte clay. Miniature scale gives a shallow depth of field and a slightly glowing, cosy feel.",
+  "color_palette": "Warm, slightly saturated clay colours: mustard yellow, terracotta orange, forest green, brick red and sky blue, with creamy off-whites. Colours are solid and opaque and look slightly chalky, with no neon.",
+  "camera": "Macro-style lens at a miniature scale, at the eye level of the figures, with a very shallow depth of field that softly blurs set pieces behind. Medium and close shots, slightly wide-angle for rooms. Camera is still and tripod-steady.",
+  "composition": "Tabletop diorama layout with a foreground prop, the figure in the middle, and a simple handmade backdrop. Rounded chunky shapes, a tidy but playful arrangement, and visible edges of cardboard, felt and moulded clay.",
+  "texture": "Visible fingerprints and tool marks on clay, thumb dents, tiny seams, matte surfaces, small crumbs of clay, and felt, cotton and paper props. Surfaces are lumpy and slightly uneven, never smooth or glossy.",
+  "characters": "Rounded clay figures with big simple eyes, often a white ball with a black dot, chunky hands with thick fingers, and wide mouths. Faces are lumpy and expressive with moulded brows, noses and cheeks. Hair is a lump or rolled strands of clay, and clothes are clay layers or little felt scraps with thumbprints.",
+  "mood": "cozy, handmade, tactile, gentle, quirky",
+  "negative": "photorealistic, smooth CGI look, 3D render, glossy plastic, 2D drawing, anime, painting, puppet with fabric clothes, real human skin, neon colors, sharp perfect surfaces, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Stop-frame feel at about 12 frames per second, slightly jittery, with the clay subtly shifting and boiling between frames. Slow tripod-steady pushes or slides, and small stepped movements of the figures, such as a blink or a nod. No smooth fluid motion and no fast camera moves.",
+  "style_lock": "clay animation photograph, handmade plasticine miniature set, visible fingerprints and tool marks, matte lumpy clay surfaces, soft warm key light, miniature shallow depth of field, warm chalky clay colours, rounded chunky figures, big simple eyes, felt and cardboard props, thumb dents and seams, stop-frame handmade charm",
+  "thumbnail": "",
+  "example_prompt": "A little clay old man with a round lumpy head and big dot eyes sits alone at a tiny clay kitchen table at night, holding a small clay cup of tea, an empty clay chair opposite him. A small warm lamp lights the fingerprints on his cardigan. clay animation photograph, handmade plasticine miniature set, visible fingerprints and tool marks, matte lumpy clay surfaces, soft warm key light, miniature shallow depth of field, warm chalky clay colours, rounded chunky figures, big simple eyes, felt and cardboard props, thumb dents and seams, stop-frame handmade charm"
 }

@@ -2,7 +2,7 @@ import type { EditorData } from "./editor";
 import type { AspectRatio, Quality } from "./settings";
 
 /** Bump together with SCHEMA_VERSION in src-tauri/src/project/model.rs. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export type TimingSource = "srt" | "json" | "groq";
 export type MediaType = "image" | "video";

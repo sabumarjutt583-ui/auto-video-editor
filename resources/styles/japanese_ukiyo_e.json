@@ -1,5 +1,20 @@
 {
   "id": "japanese_ukiyo_e",
   "name": "Japanese Ukiyo-e",
-  "category": "Painting"
+  "category": "Painting",
+  "version": "1.0.0",
+  "core_identity": "A traditional Japanese woodblock print, flat, elegant and graphic, like a page from an old album. It feels historic, calm and decorative, with stylised nature and graceful figures. Bold flowing outlines, indigo and muted red on aged cream paper make it recognizable.",
+  "medium": "Traditional Japanese woodblock print on aged handmade paper, printed in flat colour blocks.",
+  "lighting": "No cast-shadow lighting: form is shown by flat colour areas and outlines. Time of day is shown with colour gradation bands, such as a pink-to-indigo sky, and night by dark indigo with pale moon discs. Shadows are suggested by a few flat darker tones.",
+  "color_palette": "Indigo blue, muted vermilion red, ochre yellow and soft moss green on aged cream paper, with black outlines and grey tones. Colours are flat, slightly faded and limited, with a gradient band only in skies and water.",
+  "camera": "The artist's view is a flat, elevated view with no true perspective, using layered planes, a high horizon and overlapping shapes. Close-up foreground elements such as branches or boats frame the scene. No focus blur.",
+  "composition": "Asymmetrical balance with bold diagonals, large empty areas of cream or flat colour, and stylised clouds, waves and mist bands that divide the picture. The figure sits in a framed section, with decorative patterns in garments and walls.",
+  "texture": "Visible woodblock grain in the flat colour areas, slight misregistration where colours overlap the outlines, aged paper fibres and soft fading at the edges. Outlines have a carved, slightly uneven character.",
+  "characters": "Traditional stylised faces with a long oval shape, thin curved eyes, a tiny mouth and a small hooked nose, drawn with fine black lines. Garments are flowing, with bold patterns and strong fold lines, and hair is solid black with a few fine strand lines. Poses are graceful and restrained, with calm expressions.",
+  "mood": "elegant, calm, historic, graceful, decorative",
+  "negative": "3D shading, photorealism, modern objects, anime style, seals with letters, calligraphy characters, soft airbrush gradients, oil painting, watercolor bleeding, thick impasto, neon colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow horizontal scroll-like pan across the print. Waves, clouds and wind lines move gently in patterned rhythms, and leaves or snow drift down. Figures stay almost still, with cloth moving slightly. No fast moves and no 3D camera effects.",
+  "style_lock": "traditional Japanese woodblock print, flat colour blocks, bold flowing outlines, indigo blue and muted red, ochre and soft green, aged cream paper, woodblock grain, slight misregistration, stylised clouds and waves, graceful stylised figure, high flat horizon, carved uneven outlines",
+  "thumbnail": "",
+  "example_prompt": "A woodblock print of an elderly man in a patterned indigo robe sitting alone at a low wooden table at night, holding a small cup of tea, an empty cushion opposite him. A pale moon disc and stylised cloud bands fill the paper window behind him. traditional Japanese woodblock print, flat colour blocks, bold flowing outlines, indigo blue and muted red, ochre and soft green, aged cream paper, woodblock grain, slight misregistration, stylised clouds and waves, graceful stylised figure, high flat horizon, carved uneven outlines"
 }

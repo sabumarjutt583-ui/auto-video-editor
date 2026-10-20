@@ -30,7 +30,9 @@
           "$APPDATA/projects/**",
           "$RESOURCE/resources/fonts/**",
           "$RESOURCE/resources/sfx/**",
-          "$APPDATA/library/**"
+          "$APPDATA/library/**",
+          "$APPDATA/styles/**",
+          "$RESOURCE/resources/styles/**"
         ]
       }
     }

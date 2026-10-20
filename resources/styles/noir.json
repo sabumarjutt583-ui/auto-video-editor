@@ -1,5 +1,20 @@
 {
   "id": "noir",
   "name": "Noir",
-  "category": "Cinematic & Film"
+  "category": "Cinematic & Film",
+  "version": "1.0.0",
+  "core_identity": "A classic black-and-white crime film still set in a rain-soaked city at night. It feels mysterious, morally grey and tense, as if every person is hiding something. Hard contrast, slatted shadows and drifting smoke make it recognizable.",
+  "medium": "Classic black-and-white crime film still, shot on monochrome film stock with high contrast.",
+  "lighting": "Hard, directional light with extreme contrast and pitch-black shadows: venetian blind stripes across faces and walls, a single streetlamp, a desk lamp or a doorway spill. Strong silhouettes and rim light, and wet streets reflecting lamps in streaks. Light cuts clear shapes through smoke.",
+  "color_palette": "Pure black and white only, with deep inky blacks, bright specular whites and a limited range of mid greys. No colour at all.",
+  "camera": "Wide 25 mm to 35 mm lenses for deep focus in streets and rooms, and 50 mm for faces. Low and Dutch-tilted angles, with tight close-ups on eyes and cigarettes. Deep focus with sharp foreground and background.",
+  "composition": "Diagonal lines, tilted horizons, deep foreground shadows and frames within frames such as doorways and stair rails. Figures appear as silhouettes at the end of an alley, with faces half in shadow. Smoke, rain and steam fill the air.",
+  "texture": "Visible silver film grain, wet cobbles and asphalt with a sheen, smoke curling in light, rain streaks, rumpled fabric and polished wood, all in glossy high-contrast monochrome.",
+  "characters": "Adults with sharp, angular features styled for the 1940s: trench coats, fedoras, suits, loose ties, cigarettes, victory-roll hair and glossy dark lipstick. Faces are lit by a single side light or a stripe of light, with the other half in shadow. Expressions are guarded and cool.",
+  "mood": "mysterious, tense, cynical, moody, shadowy",
+  "negative": "color, colour, sepia tint, bright cheerful lighting, flat lighting, soft low contrast, daylight, cartoon, anime, illustration, painting, 3D render, CGI look, modern clothing, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow dolly or track moving through shadows and along wet streets, with a gradual push-in on a face. Cigarette smoke curls, rain falls steadily and light stripes shift slightly across a face. Subjects move deliberately and little. No fast cuts and no shaking.",
+  "style_lock": "classic film noir still, black and white only, extreme contrast, hard directional light, venetian blind shadows, single streetlamp, deep inky blacks, wet reflective streets, drifting smoke, Dutch angle, face half in shadow, trench coat and fedora, 1940s crime mood, visible silver grain",
+  "thumbnail": "",
+  "example_prompt": "Dutch angle: an elderly man in a worn suit sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. Stripes of light from the blinds cut across his face and the table, and cigarette smoke hangs in the dark air behind him. classic film noir still, black and white only, extreme contrast, hard directional light, venetian blind shadows, single streetlamp, deep inky blacks, wet reflective streets, drifting smoke, Dutch angle, face half in shadow, trench coat and fedora, 1940s crime mood, visible silver grain"
 }

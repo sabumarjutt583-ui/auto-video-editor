@@ -1,15 +1,20 @@
 import { Palette, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { toAppError } from "../../lib/errors";
+import { addRecent, toggleId } from "../../lib/styleGallery";
 import { blankStyle, duplicateStyle, isComplete, newCustomId } from "../../lib/styleModel";
+import { setCustomStyleThumbnail } from "../../lib/styles";
 import { useProjectStore } from "../../store/projectStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { useStyleStore } from "../../store/styleStore";
-import type { Project, StyleProfile } from "../../types";
+import type { AppError, Project, StyleProfile } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
 import { Button, Card } from "../ui";
 import { StyleDetails } from "./StyleDetails";
 import { StyleForm } from "./StyleForm";
-import { StylePicker } from "./StylePicker";
+import { StyleCurrentCard } from "./StyleCurrentCard";
+import { StyleGallery } from "./StyleGallery";
 
 type FormState = { mode: "create" | "edit" | "duplicate"; style: StyleProfile } | null;
 
@@ -20,6 +25,12 @@ export function StyleSection({ project }: { project: Project }) {
   const [viewing, setViewing] = useState<string | null>(project.styleId);
   const [form, setForm] = useState<FormState>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [pictureError, setPictureError] = useState<AppError | null>(null);
+  const settings = useSettingsStore((state) => state.settings);
+  const updateSettings = useSettingsStore((state) => state.update);
+  const favorites = settings?.styleFavorites ?? [];
+  const recent = settings?.recentStyles ?? [];
 
   useEffect(() => {
     if (!loaded) void load();
@@ -34,16 +45,36 @@ export function StyleSection({ project }: { project: Project }) {
     setConfirmDelete(false);
     const style = styles.find((item) => item.id === id);
     // Only a finished style can be used. An unfinished one can still be looked at.
-    if (style && isComplete(style)) update({ styleId: id });
+    if (style && isComplete(style)) {
+      update({ styleId: id });
+      updateSettings({ recentStyles: addRecent(recent, id) });
+    }
   }
 
-  async function saveForm(style: StyleProfile) {
+  function chooseFromGallery(id: string) {
+    choose(id);
+    setGalleryOpen(false);
+  }
+
+  async function saveForm(style: StyleProfile, picture: string | null) {
     const toSave = form?.mode === "edit" ? style : { ...style, id: newCustomId(style.name, ids) };
-    const saved = await save(toSave);
+    let saved = await save(toSave);
+    if (picture) {
+      // The style itself is saved; a picture that cannot be converted is reported but does not undo the save.
+      try {
+        saved = await setCustomStyleThumbnail(saved.id, picture);
+        await load();
+      } catch (caught) {
+        setPictureError(toAppError(caught, "The style was saved, but its picture could not be used."));
+      }
+    }
     setForm(null);
     setConfirmDelete(false);
     // choose() only knows the list from before saving, so the saved style is handled here.
-    if (isComplete(saved)) update({ styleId: saved.id });
+    if (isComplete(saved)) {
+      update({ styleId: saved.id });
+      updateSettings({ recentStyles: addRecent(recent, saved.id) });
+    }
     setViewing(saved.id);
   }
 
@@ -64,14 +95,32 @@ export function StyleSection({ project }: { project: Project }) {
         </p>
       )}
 
-      <div className="flex flex-wrap items-start gap-3">
-        <div className="min-w-64 flex-1">
-          <StylePicker styles={styles} value={viewing} onChange={choose} />
+      {pictureError && <ErrorNotice error={pictureError} />}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-72 flex-1">
+          <StyleCurrentCard style={usedStyle} onChange={() => setGalleryOpen(true)} />
         </div>
         <Button icon={Plus} onClick={() => setForm({ mode: "create", style: blankStyle() })}>
           Create custom style
         </Button>
       </div>
+
+      {galleryOpen && (
+        <StyleGallery
+          styles={styles}
+          selectedId={project.styleId}
+          favorites={favorites}
+          recent={recent}
+          onSelect={chooseFromGallery}
+          onToggleFavorite={(id) => updateSettings({ styleFavorites: toggleId(favorites, id) })}
+          onCreate={() => {
+            setGalleryOpen(false);
+            setForm({ mode: "create", style: blankStyle() });
+          }}
+          onClose={() => setGalleryOpen(false)}
+        />
+      )}
 
       {project.styleId !== null && !usedStyle && loaded && (
         <p className="text-sm text-warning" role="alert">

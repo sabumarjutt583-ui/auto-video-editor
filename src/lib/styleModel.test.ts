@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { blankStyle, CATEGORIES, duplicateStyle, groupStyles, isComplete, missingFields, newCustomId, REQUIRED_FIELDS } from "./styleModel.ts";
+import { blankStyle, STYLE_ORDER, CATEGORIES, duplicateStyle, groupStyles, isComplete, missingFields, newCustomId, REQUIRED_FIELDS } from "./styleModel.ts";
 import type { StyleProfile } from "../types/style.ts";
 
 function style(id: string, name: string, category: string, filled = false): StyleProfile {
@@ -45,4 +45,10 @@ test("duplicating makes an editable custom copy", () => {
   assert.equal(copy.id, "custom_cinematic_realism_copy");
   assert.equal(copy.name, "Cinematic Realism (copy)");
   assert.equal(copy.lighting, original.lighting);
+});
+
+test("popular styles come first in a category, other styles after them by name", () => {
+  const all = [style("watercolor", "Watercolor", "Painting"), style("custom_a", "Aaa", "Painting"), style("oil_painting", "Oil Painting", "Painting")];
+  assert.deepEqual(groupStyles(all)[0]?.styles.map((s) => s.id), ["oil_painting", "watercolor", "custom_a"]);
+  assert.equal(new Set(STYLE_ORDER).size, STYLE_ORDER.length);
 });

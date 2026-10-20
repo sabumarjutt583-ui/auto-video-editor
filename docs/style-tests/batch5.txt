@@ -1,0 +1,49 @@
+STYLE TEST - BATCH 5 (not generated yet)
+
+These sample prompts need the real Gemini pipeline, which needs a Gemini key and internet.
+The build sandbox had neither, so no prompts were generated and none were invented here.
+
+How to fill this file:
+1. npm run dev:admin  (Admin Edition)
+2. Admin > Style Test. For each style below: pick it, press Run test, press Export TXT.
+3. Paste the 5 prompts under the style's heading.
+
+Sample story (resources/style-test/sample_story.txt):
+An old father stands at the window of his small apartment, watching the street.
+On the table behind him, two cups and a plate of fresh bread wait for his grown son.
+Outside, rain runs down the glass and a bus stops at the corner, but nobody steps off.
+He sits down slowly in his worn chair and holds his phone, afraid to call.
+At last a tall young man hurries along the rainy street, and the father smiles and opens the door.
+
+Styles (10):
+
+
+
+
+
+=== retro ===
+(S01-S05 prompts go here)
+
+=== fashion_editorial ===
+(S01-S05 prompts go here)
+
+=== luxury_commercial ===
+(S01-S05 prompts go here)
+
+=== product_photography ===
+(S01-S05 prompts go here)
+
+=== architectural_visualization ===
+(S01-S05 prompts go here)
+
+=== educational_3d ===
+(S01-S05 prompts go here)
+
+=== medical_3d ===
+(S01-S05 prompts go here)
+
+=== scientific_visualization ===
+(S01-S05 prompts go here)
+
+=== hyper_realistic_3d_render ===
+(S01-S05 prompts go here)

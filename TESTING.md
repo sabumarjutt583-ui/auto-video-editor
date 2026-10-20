@@ -80,3 +80,15 @@ Run date: 2026-10-18 (Linux sandbox, headless).
 Bugs found and fixed in this run: log redaction swallowed the full stop after a key; the Admin build did not register the logs and app-update commands.
 
 Not tested here: Windows installer and a clean Windows PC, GPU encoders, real Groq/Gemini/Freesound network calls, the updater install path (needs https and signed files), real audio playback, 4K speed.
+
+## Style system checks
+- `npm run styles:check`: table with 51 complete and 0 incomplete styles; the 5 style tests pass.
+- Admin Edition (`npm run dev:admin`) > Admin > Style Test: pick Cinematic Realism, press Run test (needs the Gemini key). Expect 5 prompts (S01 to S05), all ending with the style lock; Copy and Export TXT work.
+- User build: `grep -rlE "Style Test|sample_story" dist` prints nothing.
+- Not tested here: the real Gemini call of Style Test (no key/network in the sandbox).
+- Batch 1 sample prompts (docs/style-tests/batch1.txt) still have to be generated with Admin > Style Test (needs the Gemini key).
+- Batch 2 sample prompts (docs/style-tests/batch2.txt) also still need Admin > Style Test. Open an old project saved with the old 3D style id: it must now show 3D Animated Film.
+- Batch 3 sample prompts (docs/style-tests/batch3.txt) also still need Admin > Style Test.
+- Batch 4 sample prompts (docs/style-tests/batch4.txt) also still need Admin > Style Test.
+- Batch 5 sample prompts (docs/style-tests/batch5.txt) still need Admin > Style Test.
+- Styles package: `STYLES_PACKAGE_OUT=<folder> cargo test --features admin the_shipped_styles_make` builds styles-package-<version>.zip + manifest from resources/styles and installs it into a temp user folder (51 styles load).

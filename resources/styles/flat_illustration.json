@@ -1,5 +1,20 @@
 {
   "id": "flat_illustration",
   "name": "Flat Illustration",
-  "category": "Flat & Graphic"
+  "category": "Flat & Graphic",
+  "version": "1.0.0",
+  "core_identity": "A clean, friendly modern flat illustration of the kind used in editorials and explainer videos. It feels calm, contemporary and easy to read, built from simple shapes and a few soft colours. Geometric forms, no realistic light and faceless or near-faceless people make it recognizable.",
+  "medium": "Modern flat digital illustration in editorial and explainer style, with solid colour shapes.",
+  "lighting": "No realistic lighting at all. Form is shown with flat colour shapes, and at most one flat darker shadow shape under an object or on one side. No gradients, no glow and no cast shadows.",
+  "color_palette": "A limited, harmonious palette of four to six soft modern colours, such as dusty teal, warm sand, coral, mustard and deep navy, with off-white backgrounds. Colours are matte and slightly desaturated, with moderate contrast.",
+  "camera": "A flat, front-facing or slightly elevated view with no perspective depth, using layered overlapping shapes to suggest space. Scenes are shown as clear compositions of a few objects. Everything is sharp, with no blur.",
+  "composition": "Simple, balanced layouts with a clear focal shape, generous empty space and objects arranged on a grid or thirds. Furniture and props are reduced to basic geometry, and plants, windows or lamps frame the figure.",
+  "texture": "Smooth solid fills with crisp shape edges, no outlines or very thin ones, and an optional subtle grain overlay for a printed feel. Simple pattern shapes such as dots and stripes on clothes and rugs.",
+  "characters": "Simplified figures with elongated or stylised limbs, small rounded heads, and small dots or no facial features at all. Hair is a single solid shape, hands are tiny simple shapes and clothing is made from a few colour blocks. Emotion is carried by posture and position, not by the face.",
+  "mood": "clean, friendly, calm, modern, approachable",
+  "negative": "realistic lighting, photorealism, 3D render, CGI look, detailed shading, gradients, heavy outlines, painting, watercolor, sketchy lines, anime, comic book, neon colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Elements slide in and pop up with smooth easing, shapes grow from their centre, and layers drift with gentle parallax. Lines and small details animate one by one. Camera is flat with slow slides or scales. No realistic motion, no shake and no 3D camera moves.",
+  "style_lock": "modern flat digital illustration, solid colour shapes, limited soft palette, no realistic lighting, one flat shadow shape, simple geometric forms, subtle grain overlay, simplified faceless figure, elongated limbs, layered flat composition, clean editorial look, subtle printed feel",
+  "thumbnail": "",
+  "example_prompt": "A flat illustration of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. He is a simple navy and sand shape with no face, beside a coral chair and a mustard lamp shape on a teal wall. modern flat digital illustration, solid colour shapes, limited soft palette, no realistic lighting, one flat shadow shape, simple geometric forms, subtle grain overlay, simplified faceless figure, elongated limbs, layered flat composition, clean editorial look, subtle printed feel"
 }

@@ -162,6 +162,10 @@ pub async fn admin_import_current(app: AppHandle) -> Result<AdminOverview, AppEr
         }
         workspace::import_folder(&sfx_from, &sfx_to, |n| n.ends_with(".wav") || n == "index.json")?;
         workspace::import_folder(&styles_from, &workspace::styles_dir(&root), |n| n.ends_with(".json"))?;
+        let thumbs_from = styles_from.join(crate::thumbnails::FOLDER);
+        if thumbs_from.is_dir() {
+            workspace::import_folder(&thumbs_from, &workspace::styles_dir(&root).join(crate::thumbnails::FOLDER), |n| n.ends_with(".webp"))?;
+        }
         Ok(())
     })
     .await?;
@@ -223,4 +227,43 @@ pub async fn admin_build_package(app: AppHandle, kind: Kind, out_dir: Option<Str
         Ok(built)
     })
     .await
+}
+
+#[derive(Deserialize)]
+pub struct ThumbnailItem {
+    pub id: String,
+    pub path: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThumbnailReport {
+    pub imported: Vec<String>,
+    /// File name and reason.
+    pub failed: Vec<(String, String)>,
+    /// Styles of the working copy that still have no thumbnail.
+    pub missing: Vec<String>,
+}
+
+/// Where the style profiles of this checkout live, when the app runs from the source tree (development).
+fn source_styles_dir() -> Option<PathBuf> {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("resources").join("styles");
+    (cfg!(debug_assertions) && dir.is_dir()).then_some(dir)
+}
+
+/// Crops, resizes and converts the chosen pictures to thumbnails in the working styles (which go into the next
+/// package) and, when running from the source tree, in resources/styles too.
+#[tauri::command]
+pub async fn admin_import_thumbnails(app: AppHandle, items: Vec<ThumbnailItem>) -> Result<ThumbnailReport, AppError> {
+    let workspace_dir = workspace::styles_dir(&root(&app)?);
+    let pairs: Vec<(String, PathBuf)> = items.into_iter().map(|i| (i.id, PathBuf::from(i.path))).collect();
+    let report = crate::thumbnails::import_into(&workspace_dir, &pairs).await;
+    let mut primary = workspace_dir;
+    if let Some(source) = source_styles_dir() {
+        let done: Vec<(String, PathBuf)> = pairs.iter().filter(|(id, _)| report.imported.contains(id)).cloned().collect();
+        crate::thumbnails::import_into(&source, &done).await;
+        primary = source;
+    }
+    let missing = run_blocking(move || Ok(crate::thumbnails::missing_in(&primary))).await?;
+    Ok(ThumbnailReport { imported: report.imported, failed: report.failed, missing })
 }

@@ -26,6 +26,8 @@
         "scope": [
           "$APPDATA/projects/**",
           "$APPDATA/library/**",
+          "$APPDATA/styles/**",
+          "$RESOURCE/resources/styles/**",
           "$APPDATA/admin/**",
           "$RESOURCE/resources/fonts/**",
           "$RESOURCE/resources/sfx/**"

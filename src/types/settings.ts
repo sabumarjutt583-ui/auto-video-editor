@@ -17,6 +17,10 @@ export interface AppSettings {
   libraryUpdateUrl: string;
   /** Ids of the sounds marked as favorites. */
   sfxFavorites: string[];
+  /** Ids of the styles marked as favorites. */
+  styleFavorites: string[];
+  /** The last styles that were used, newest first (at most 6). */
+  recentStyles: string[];
   /** Address of latest.json for app updates. Empty = the address built into the app. */
   appUpdateUrl: string;
   autoCheckAppUpdates: boolean;

@@ -58,3 +58,22 @@ pub async fn delete_custom_style(app: AppHandle, id: String) -> Result<(), AppEr
     let custom = custom_dir(&app)?;
     run_blocking(move || styles::delete_custom(&custom, &id)).await
 }
+
+/// Makes the thumbnail of one of the user's own styles from a picture (any size; cropped to 4:3).
+/// Returns the saved style with the thumbnail's full path.
+#[tauri::command]
+pub async fn set_custom_style_thumbnail(app: AppHandle, id: String, source: String) -> Result<StyleProfile, AppError> {
+    let custom = custom_dir(&app)?;
+    if !id.starts_with(styles::CUSTOM_PREFIX) || !styles::valid_id(&id) {
+        return Err(AppError::new("Only your own styles can have their own picture.", format!("Not a custom style id: {id:?}")));
+    }
+    crate::thumbnails::convert(std::path::Path::new(&source), &custom.join(crate::thumbnails::rel_path(&id))).await?;
+    run_blocking(move || {
+        let file = custom.join(format!("{id}.json"));
+        let text = std::fs::read_to_string(&file).map_err(|e| AppError::new("The style could not be read.", e.to_string()))?;
+        let mut style = styles::parse_style(&text).map_err(|why| AppError::new("The style could not be read.", why))?;
+        style.thumbnail = crate::thumbnails::rel_path(&id);
+        styles::save_custom(&custom, style)
+    })
+    .await
+}

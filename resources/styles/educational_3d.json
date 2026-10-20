@@ -1,5 +1,20 @@
 {
   "id": "educational_3d",
   "name": "Educational 3D",
-  "category": "Educational & Science"
+  "category": "Educational & Science",
+  "version": "1.0.0",
+  "core_identity": "A clean 3D explainer render that makes an idea easy to see and understand. It feels friendly, clear and approachable, like an animated lesson. A single isolated subject, bright distinct colours and a plain background make it recognizable.",
+  "medium": "Clean 3D explainer render with simple stylised models and smooth materials.",
+  "lighting": "Bright, soft studio lighting with no dramatic shadows. Even fill light, gentle soft shadow under objects and a light rim for separation. Highlights are small and clean, and the background is evenly lit.",
+  "color_palette": "Clear, bright, distinct colours that separate different parts: blue, orange, green, yellow and red against a clean white or light grey background. Colours are saturated but friendly, with clean contrast between parts.",
+  "camera": "A clean 3D view with a 35 mm to 50 mm feel, a slightly elevated three-quarter angle and a sharp subject. Backgrounds are plain with no blur. Close-ups clearly isolate the key part, and framing is centred.",
+  "composition": "An isolated subject on a clean background, with a clear focus on the concept and plenty of empty space. Few simple props, parts clearly separated and large simple shapes. No clutter and no distracting background.",
+  "texture": "Smooth, slightly glossy plastic-like or matte materials with clean bevelled edges and soft highlights. Simple surface detail only, with no dirt and no noise.",
+  "characters": "Simple, friendly, stylised 3D figures if needed, with rounded bodies, big heads, simple dot or oval eyes and small smiles. Hair and clothes are smooth shapes in clear colours, and gestures are clear, such as pointing or holding. Older figures have white hair and a gentle smile.",
+  "mood": "clear, friendly, simple, bright, helpful",
+  "negative": "text labels, arrows with letters, clutter, busy background, dramatic shadows, photorealism, gritty textures, horror, painting, sketch, anime, dark gloomy colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Smooth rotation of the subject, parts separating and moving apart to explain how they fit, and clear zooms to the key detail. Simple figures nod or gesture slowly. No shake, no fast cuts and no confusing camera moves.",
+  "style_lock": "clean 3D explainer render, bright soft studio light, soft shadow under objects, clear distinct bright colours, isolated subject, plain white background, smooth glossy materials, simple stylised 3D figure, rounded friendly shapes, clear focus on the concept, tidy minimal props, friendly easy-to-understand look",
+  "thumbnail": "",
+  "example_prompt": "A clean 3D explainer render of a friendly stylised elderly man with white hair sitting alone at a simple blue table, holding a small cup of tea, an orange empty chair opposite him. Everything floats on a plain white background with a soft shadow below. clean 3D explainer render, bright soft studio light, soft shadow under objects, clear distinct bright colours, isolated subject, plain white background, smooth glossy materials, simple stylised 3D figure, rounded friendly shapes, clear focus on the concept, tidy minimal props, friendly easy-to-understand look"
 }

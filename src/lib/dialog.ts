@@ -57,6 +57,17 @@ export async function pickMediaFiles(title: string): Promise<string[]> {
   return Array.isArray(selected) ? selected.filter((p): p is string => typeof p === "string") : [];
 }
 
+/** Opens the system picker for several pictures (PNG, JPG, WebP). Resolves to the chosen files (empty if cancelled). */
+export async function pickPictureFiles(title: string): Promise<string[]> {
+  const selected = await open({
+    directory: false,
+    multiple: true,
+    title,
+    filters: [{ name: "Pictures", extensions: ["png", "jpg", "jpeg", "webp"] }],
+  });
+  return Array.isArray(selected) ? selected.filter((p): p is string => typeof p === "string") : [];
+}
+
 /** Opens the system picker for music files. Resolves to the chosen files (empty if cancelled). */
 export async function pickMusicFiles(title: string): Promise<string[]> {
   const selected = await open({

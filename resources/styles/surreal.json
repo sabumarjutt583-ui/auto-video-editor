@@ -1,5 +1,20 @@
 {
   "id": "surreal",
   "name": "Surreal",
-  "category": "Artistic Mood"
+  "category": "Artistic Mood",
+  "version": "1.0.0",
+  "core_identity": "Realistic-looking digital art in which the impossible is shown with total conviction: symbolic, strange and sharply real. It feels like a vivid dream logic captured in a photograph. Unexpected scale, floating or melting objects and clear realistic light make it recognizable.",
+  "medium": "Realistic-looking surreal digital art, photographic rendering of impossible scenes.",
+  "lighting": "Clear, realistic lighting with a believable source such as a low sun, a streetlight or a window, and crisp cast shadows that make the impossible feel real. Contrast is moderate to strong, with long dramatic shadows and clean highlights.",
+  "color_palette": "Rich, slightly heightened colours: deep teal skies, warm amber sunsets, saturated blues and rust reds, with clean realistic skin tones. Saturation is moderate to high but natural, and contrast stays clear.",
+  "camera": "A realistic 24 mm to 50 mm lens look at eye level or slightly low, with sharp focus across the scene and natural perspective. Wide frames emphasise strange scale and empty space. Shallow depth of field only for close subjects.",
+  "composition": "Unexpected scale and placement: a giant clock in a desert, a door standing in the sea, a table on a cloud, objects floating, melting or merging. One strong symbolic idea per image, centred or on a third, with a calm empty setting and sharp clear shapes.",
+  "texture": "Photographic detail with real materials: skin, wood, metal, cloth, water and sand rendered sharply, clean surfaces and crisp edges. The surreal parts have the same realistic texture as the normal parts.",
+  "characters": "Realistic people with natural proportions, real skin texture and believable clothes, shown calmly in impossible situations. Faces are serious or quietly puzzled, not afraid. Poses are ordinary, so the strangeness comes from the setting.",
+  "mood": "strange, symbolic, eerie, thoughtful, dreamlike",
+  "negative": "soft hazy glow, pastel dreamy blur, cartoon, anime, illustration, painting, flat vector, horror gore, messy collage, low resolution, plastic skin, oversaturated neon colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow impossible movements: objects floating gently, sky flowing like water, clocks or doors drifting. Camera makes a slow push-in or a slow dolly. The people stay still or move calmly. No fast cuts, no shake and no morphing of faces.",
+  "style_lock": "realistic surreal digital art, impossible but believable scene, unexpected scale, floating objects, clear realistic lighting, crisp cast shadows, rich heightened colours, sharp photographic detail, symbolic composition, empty calm setting, real skin texture, eye-level 35mm lens look",
+  "thumbnail": "",
+  "example_prompt": "A surreal photograph: an elderly man sits alone at a kitchen table in the middle of a flat dark sea at night, holding a cup of tea, an empty chair opposite him. A huge pale moon hangs low above the water, and a lit doorway floats beside the table. realistic surreal digital art, impossible but believable scene, unexpected scale, floating objects, clear realistic lighting, crisp cast shadows, rich heightened colours, sharp photographic detail, symbolic composition, empty calm setting, real skin texture, eye-level 35mm lens look"
 }

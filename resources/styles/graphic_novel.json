@@ -1,5 +1,20 @@
 {
   "id": "graphic_novel",
   "name": "Graphic Novel",
-  "category": "Comic & Story"
+  "category": "Comic & Story",
+  "version": "1.0.0",
+  "core_identity": "A serious, cinematic illustration from a mature graphic novel, inked and washed with muted colour. It feels literary, weary and atmospheric, darker and more realistic than a superhero comic. Expressive ink lines, cross-hatching and one dominant tone per scene make it recognizable.",
+  "medium": "Mature graphic novel illustration, expressive ink drawing with painted watercolour-style colour washes.",
+  "lighting": "Moody, atmospheric chiaroscuro with a strong single light source, deep ink shadows and soft glows from lamps, windows and street lights. Light fades into hatched shadow, and mist or rain adds depth. Contrast is high but gradations are allowed in the washes.",
+  "color_palette": "A limited, muted palette with washes of colour and one dominant tone per scene, such as dusty ochre, steel blue or sepia brown. Accents of a single warm colour appear sparingly, and blacks are solid ink.",
+  "camera": "Cinematic framing with wide establishing shots, medium shots and tight close-ups on tired faces. Realistic perspective, moderate foreshortening and occasional high or low angles. Distant background is softened by wash and haze.",
+  "composition": "Film-like composition with space, silhouettes, strong verticals of doors, windows and lamp posts, and figures small in big rooms. Heavy shadow areas, a clear focal point and a quiet, literary stillness.",
+  "texture": "Expressive ink lines with varied weight, cross-hatching, scratchy dry-brush strokes, watercolour washes with soft edges and paper grain showing through. Surfaces such as brick, wood and cloth are suggested by hatching.",
+  "characters": "Realistic proportions and weary, emotional faces drawn with ink lines and hatching, with heavy eye bags, deep wrinkles and thoughtful expressions. Hair is drawn in loose strokes, clothing is worn with heavy folds, and hands are carefully drawn. Characters look like real people, not heroes.",
+  "mood": "serious, literary, weary, atmospheric, introspective",
+  "negative": "speech bubbles, captions, text, letters, photorealism, 3D render, CGI look, bright cheerful colors, flat cartoon, anime, manga, superhero comic style, halftone pop art, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow cinematic drift or gentle push-in on an essentially still illustration. Rain streaks, smoke, steam and mist move slowly, and lamp light flickers faintly. Figures barely move, only a breath or a slow blink. No fast moves and no flashy effects.",
+  "style_lock": "mature graphic novel illustration, expressive ink linework, varied line weight, cross-hatching, watercolour colour washes, one dominant muted tone, chiaroscuro lighting, solid ink shadows, realistic proportions, weary emotional face, cinematic framing, paper grain",
+  "thumbnail": "",
+  "example_prompt": "An elderly man sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A single lamp lights his weary, deeply lined face in dusty ochre wash, while the rest of the room fades into dense hatched shadow. mature graphic novel illustration, expressive ink linework, varied line weight, cross-hatching, watercolour colour washes, one dominant muted tone, chiaroscuro lighting, solid ink shadows, realistic proportions, weary emotional face, cinematic framing, paper grain"
 }

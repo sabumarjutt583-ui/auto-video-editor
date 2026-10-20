@@ -1,5 +1,20 @@
 {
   "id": "soft_pastel",
   "name": "Soft Pastel",
-  "category": "Artistic Mood"
+  "category": "Artistic Mood",
+  "version": "1.0.0",
+  "core_identity": "A soft, dreamy digital painting in sweet pastel colours that feels cosy and calming, like a cute illustrated daydream. It is brighter and more drawn than hazy, with gentle rounded forms. Baby pink, mint and lavender with a chalky airbrushed texture make it recognizable.",
+  "medium": "Soft digital painting in pastel colours, with airbrush and chalk-pastel textures.",
+  "lighting": "Soft diffused light with no harsh shadows and very low contrast. Shadows are slightly deeper pastel tones such as lavender or rose, and lamps and windows give warm, gentle glows. The overall light is bright and cosy.",
+  "color_palette": "Baby pink, mint green, lavender, peach, butter yellow and sky blue, with cream whites. Colours are light, clean and sweet, with low contrast and a bright, even tonality.",
+  "camera": "A gentle eye-level or slightly high view with softly rounded shapes, mostly medium shots and cosy wide interiors. Background details are simplified and softly painted, with mild softness only at the far edges. Framing is warm and friendly.",
+  "composition": "Cosy, centred compositions with the character framed by rounded shapes such as windows, clouds, cushions and plants, and plenty of soft empty space. Small cute details like stars, hearts and tiny flowers are scattered around.",
+  "texture": "Soft airbrush gradients and chalk-pastel grain, smooth rounded edges, faint paper texture and tiny sparkles. Outlines, where present, are soft coloured lines in a darker pastel.",
+  "characters": "Soft rounded features with gentle expressions: round faces, small dot or oval eyes with tiny highlights, blushing cheeks and small smiles. Hair is a soft rounded shape with pastel highlights, clothing is cosy knits and blankets, and hands are small and rounded. Elderly characters are soft and sweet with fluffy white hair.",
+  "mood": "cozy, gentle, calming, cute, sweet",
+  "negative": "harsh shadows, dark gloomy colors, high contrast, hazy glowing fog, photorealism, 3D render, CGI look, gritty texture, thick black outlines, neon colors, horror, anime, comic book, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow gentle floating moves, with soft sparkles twinkling and small stars or petals drifting. Light glows pulse softly and clouds move slowly. Characters sway or blink slightly. No fast moves, no shake and no sharp effects.",
+  "style_lock": "soft pastel digital painting, baby pink and mint and lavender palette, peach and butter yellow, soft diffused light, low contrast, airbrush and chalk-pastel texture, soft rounded features, gentle expression, cosy illustrated look, tiny sparkles, bright and sweet, cute calming daydream",
+  "thumbnail": "",
+  "example_prompt": "A soft pastel painting of a gentle elderly man with fluffy white hair sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A butter yellow lamp glow warms the lavender room, and small sparkles float by the pink window. soft pastel digital painting, baby pink and mint and lavender palette, peach and butter yellow, soft diffused light, low contrast, airbrush and chalk-pastel texture, soft rounded features, gentle expression, cosy illustrated look, tiny sparkles, bright and sweet, cute calming daydream"
 }

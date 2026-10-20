@@ -1,5 +1,20 @@
 {
   "id": "stop_motion",
   "name": "Stop Motion",
-  "category": "Animation & Cartoon"
+  "category": "Animation & Cartoon",
+  "version": "1.0.0",
+  "core_identity": "A photograph of a handcrafted puppet world built from fabric, wood, paper and wire, slightly eerie and full of charm. It feels like a quiet miniature theatre from a darker fairy tale. Thin stitched puppets, glass-bead eyes and moody small-set light make it recognizable.",
+  "medium": "Photograph of a stop-motion puppet set with armature puppets in fabric clothes, wood and paper miniatures.",
+  "lighting": "Dramatic small-set lighting with a focused warm key light, moody practical lamps and deep soft shadows. Light pools on tabletops and faces and falls off quickly into darkness. Miniature scale gives a shallow depth of field and a theatrical glow.",
+  "color_palette": "Muted, autumnal and slightly gothic: moss green, rust orange, mustard, faded plum, dusty grey-blue and deep brown, with creamy off-whites. Saturation is low to moderate and contrast is moderate, with dark corners.",
+  "camera": "Miniature-scale macro lens at puppet eye level with a shallow depth of field, using close-ups on faces and hands and wide shots of the set. Slightly low angles make the world feel large. Camera is steady and locked off.",
+  "composition": "Carefully staged miniature set with layered foreground props, a puppet in the middle and a handmade backdrop. Crooked windows, tall narrow furniture and tiny hand-made details fill the edges. Slightly off-centre, theatrical symmetry.",
+  "texture": "Real fabric with visible weave and stitches, wood grain, folded paper, wire, buttons, thread and tiny hand-painted props. Surfaces are dusty, slightly worn and handmade, with no smooth clay look.",
+  "characters": "Thin, elongated puppet figures with narrow limbs, large heads, glass-bead or button eyes and simple hand-carved faces with stitched mouths. Hair is yarn or thread, hands are wire-and-fabric with long fingers, and clothes are tiny sewn garments with visible seams and patches.",
+  "mood": "handcrafted, eerie, charming, melancholic, whimsical",
+  "negative": "photorealistic, smooth CGI look, 3D render, soft clay figures, plasticine fingerprints, glossy plastic, 2D drawing, anime, painting, bright cheerful colors, real human skin, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Choppy frame-by-frame movement at about 12 frames per second, with the fabric twitching slightly between frames and the puppet's limbs moving in small stepped poses. Slow locked camera pushes or slides, and lamp light that flickers softly. No smooth fluid motion, no fast moves and no morphing.",
+  "style_lock": "stop-motion puppet photograph, fabric-clothed armature puppet, glass-bead eyes, visible stitches and fabric weave, wood and paper miniature set, dramatic small-set lighting, muted autumnal palette, gothic charm, shallow miniature depth of field, thin elongated figure, tiny sewn garments, hand-painted miniature props",
+  "thumbnail": "",
+  "example_prompt": "A thin puppet of an elderly man with glass-bead eyes and yarn hair sits alone at a tiny wooden kitchen table at night, holding a small cup of tea, an empty chair opposite him. A single miniature lamp lights his stitched wool cardigan. stop-motion puppet photograph, fabric-clothed armature puppet, glass-bead eyes, visible stitches and fabric weave, wood and paper miniature set, dramatic small-set lighting, muted autumnal palette, gothic charm, shallow miniature depth of field, thin elongated figure, tiny sewn garments, hand-painted miniature props"
 }

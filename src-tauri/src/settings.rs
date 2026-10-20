@@ -57,6 +57,10 @@ pub struct Settings {
     pub library_update_url: String,
     /// Ids of the sounds the person marked as favorites.
     pub sfx_favorites: Vec<String>,
+    /// Ids of the styles the person marked as favorites.
+    pub style_favorites: Vec<String>,
+    /// The last styles that were used, newest first (at most 6).
+    pub recent_styles: Vec<String>,
     /// Where the app looks for new app versions (the address of latest.json). Empty = the address built into the app.
     pub app_update_url: String,
     /// Look for a new app version when the app starts.
@@ -80,12 +84,28 @@ impl Default for Settings {
             force_cpu_encoding: false,
             library_update_url: option_env!("AVE_LIBRARY_URL").unwrap_or_default().to_string(),
             sfx_favorites: Vec::new(),
+            style_favorites: Vec::new(),
+            recent_styles: Vec::new(),
             app_update_url: String::new(),
             auto_check_app_updates: true,
             debug_logging: false,
             onboarding_done: false,
         }
     }
+}
+
+/// Trims a list of style ids: no empty ones, no repeats, a safe length, at most `max` entries.
+fn clean_ids(ids: &[String], max: usize) -> Result<Vec<String>, AppError> {
+    let mut clean: Vec<String> = Vec::new();
+    for id in ids.iter().map(|id| id.trim()).filter(|id| !id.is_empty()) {
+        if id.len() > 80 || id.contains(char::is_control) {
+            return Err(invalid("A style id in the settings is not valid."));
+        }
+        if !clean.iter().any(|c| c == id) && clean.len() < max {
+            clean.push(id.to_string());
+        }
+    }
+    Ok(clean)
 }
 
 impl Settings {
@@ -122,7 +142,13 @@ impl Settings {
             }
         }
 
+        let style_favorites = clean_ids(&self.style_favorites, 500)?;
+        let mut recent_styles = clean_ids(&self.recent_styles, 6)?;
+        recent_styles.truncate(6);
+
         Ok(Self {
+            style_favorites,
+            recent_styles,
             library_update_url,
             app_update_url,
             sfx_favorites,
@@ -278,6 +304,9 @@ mod tests {
         let ok = ok.validated().unwrap();
         assert_eq!(ok.library_update_url, "https://example.com/rel");
         assert_eq!(ok.sfx_favorites, vec!["a", "b"]);
+        let styles = Settings { style_favorites: vec![" noir ".into(), "noir".into()], recent_styles: (0..9).map(|i| format!("s{i}")).collect(), ..Settings::default() }.validated().unwrap();
+        assert_eq!(styles.style_favorites, vec!["noir"]);
+        assert_eq!(styles.recent_styles.len(), 6);
         let bad = Settings { library_update_url: "http://example.com".into(), ..Settings::default() };
         assert!(bad.validated().is_err());
         let bad_app = Settings { app_update_url: "http://example.com/latest.json".into(), ..Settings::default() };

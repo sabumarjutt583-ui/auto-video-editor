@@ -1,5 +1,20 @@
 {
   "id": "photorealistic",
   "name": "Photorealistic",
-  "category": "Realistic"
+  "category": "Realistic",
+  "version": "1.0.0",
+  "core_identity": "A plain, neutral photograph of a real moment, so natural that it passes as an unedited camera file. It feels candid, honest and everyday rather than dramatic. What makes it recognizable is the absence of any visible grade: true colours, even exposure and ordinary light.",
+  "medium": "High-end digital photograph taken with a full-frame mirrorless camera, with minimal post-processing.",
+  "lighting": "Natural daylight from a window or open sky, or ordinary practical room light, with balanced exposure and soft shadows that keep full detail. No dramatic rim light, no heavy contrast and no spotlight effect. Night scenes use real lamps and streetlights at believable brightness.",
+  "color_palette": "True-to-life colours with neutral white balance and moderate saturation. Skin tones stay natural pink-beige to brown, whites stay white and greens stay plain green. No teal-and-orange grade and no tinted shadows.",
+  "camera": "Standard 35 mm to 50 mm lens look at eye level, with moderate depth of field that blurs the background gently but keeps the surroundings readable. Sharp across the frame with clean corners and no anamorphic flare. Slightly imperfect handheld framing is welcome.",
+  "composition": "Everyday snapshot-quality framing with the subject near the centre or on a third, and real surroundings visible and a little cluttered. Straight horizons and natural crops, with no staged symmetry and no letterbox feel.",
+  "texture": "Clean sensor detail with no added film grain and only faint natural noise in dark areas. Visible skin pores, fine hairs, fabric weave, scuffs and dust on real surfaces. Sharp where focused and softly blurred elsewhere.",
+  "characters": "Real people with natural proportions, visible pores, fine lines, uneven skin tone and small facial asymmetries. Hair has loose strands and flyaways, and clothing is ordinary, creased and slightly worn. Expressions are candid and unposed, such as a half smile, a glance away or a tired blink, never a model pose or a retouched glamour look.",
+  "mood": "calm, honest, candid, everyday, neutral",
+  "negative": "cinematic color grade, teal and orange grade, film grain, dramatic shadows, anime, cartoon, illustration, painting, 3D render, CGI look, plastic skin, airbrushed skin, oversaturated colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Steady, minimal camera: a very slight handheld drift or a slow, small push-in, as if shot by a person standing still. Subjects move naturally and in small ways, such as a blink, a breath, turning a head or lifting a cup. No whip pans, no dramatic zooms, no slow motion and no morphing of faces or objects.",
+  "style_lock": "photorealistic, unedited digital photograph, natural daylight, neutral white balance, true-to-life colours, moderate saturation, balanced exposure, 35mm lens look, sharp natural detail, visible skin pores, candid expression, ordinary real surroundings",
+  "thumbnail": "",
+  "example_prompt": "An elderly man sits alone at a kitchen table at night, both hands around a cup of tea, an empty chair opposite him. A ceiling lamp and the dark window give plain, even light on his creased face, a checked tablecloth and a worn cardigan. photorealistic, unedited digital photograph, natural daylight, neutral white balance, true-to-life colours, moderate saturation, balanced exposure, 35mm lens look, sharp natural detail, visible skin pores, candid expression, ordinary real surroundings"
 }

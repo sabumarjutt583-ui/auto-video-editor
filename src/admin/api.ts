@@ -60,3 +60,12 @@ export const adminSaveStyle = (text: string) => invoke<string>("admin_save_style
 export const adminReadStyle = (id: string) => invoke<string>("admin_read_style", { id });
 export const adminRemoveStyle = (id: string) => invoke<void>("admin_remove_style", { id });
 export const adminBuildPackage = (kind: "sfx" | "styles", outDir: string | null) => invoke<BuiltPackage>("admin_build_package", { kind, outDir });
+
+export interface ThumbnailImportReport {
+  imported: string[];
+  /** File name and reason. */
+  failed: [string, string][];
+  /** Styles that still have no thumbnail. */
+  missing: string[];
+}
+export const adminImportThumbnails = (items: { id: string; path: string }[]) => invoke<ThumbnailImportReport>("admin_import_thumbnails", { items });

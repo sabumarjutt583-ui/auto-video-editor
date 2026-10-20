@@ -1,5 +1,20 @@
 {
   "id": "architectural_visualization",
   "name": "Architectural Visualization",
-  "category": "Commercial"
+  "category": "Commercial",
+  "version": "1.0.0",
+  "core_identity": "A photorealistic architectural render that shows interiors and exteriors in clean, bright, aspirational light. It feels calm, spacious and professionally polished, like a real estate or design portfolio. Straight lines, daylight through large windows and neutral materials make it recognizable.",
+  "medium": "Photorealistic architectural render of an interior or exterior, produced with physically based lighting.",
+  "lighting": "Natural daylight streaming through large windows, balanced exposure and soft global illumination with gentle bounce light. Warm interior lamps at dusk, soft shadows and subtle reflections on floors and glass. Time-of-day light is clear and natural.",
+  "color_palette": "Neutral whites, light greys, warm wood, natural stone and fresh greenery, with a few soft accent colours in cushions or art. Colours are natural and clean with moderate contrast and bright airy tones.",
+  "camera": "Straight vertical lines with corrected perspective, wide-angle 16 mm to 24 mm interior shots at eye level or chest height, and exterior views from a human height or a gentle aerial angle. Everything is sharp, with deep focus.",
+  "composition": "Balanced, symmetrical or one-point perspective views that show the space, furniture arranged neatly, and clear leading lines from floors and ceilings. Windows frame greenery, and the space feels uncluttered and open.",
+  "texture": "Realistic materials: oak floors, plaster walls, marble, brushed metal, linen, glass and concrete, with crisp edges, subtle reflections and fine surface detail. Clean render quality with no noise and no dirt.",
+  "characters": "Few, small, natural people who are never the focus: relaxed figures sitting, reading or walking in ordinary clothes, seen from a distance with calm natural poses. Faces are small and not detailed, and the people fit the space naturally.",
+  "mood": "bright, calm, spacious, aspirational, clean",
+  "negative": "tilted vertical lines, fisheye distortion, cluttered mess, dark gloomy interior, dirty surfaces, cartoon, anime, illustration, painting, sketch, people as main focus, low resolution, oversaturated colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow smooth walkthrough moves, a gentle dolly along the room, and time-of-day light changes in which sun patches slowly cross the floor. Curtains and leaves stir softly. People move slowly. No shake, no fast cuts and no fisheye effects.",
+  "style_lock": "photorealistic architectural visualization, natural daylight through large windows, soft global illumination, straight vertical lines, wide-angle eye-level view, neutral white and warm wood and stone palette, greenery, crisp realistic materials, clean spacious interior, small natural figure, bright airy aspirational mood, soft reflections on floors and glass",
+  "thumbnail": "",
+  "example_prompt": "A bright architectural render of a modern open kitchen at dusk: a small elderly man sits alone at a wooden dining table, holding a cup of tea, an empty chair opposite him. Warm pendant lights glow, and large windows show soft blue evening light and greenery. photorealistic architectural visualization, natural daylight through large windows, soft global illumination, straight vertical lines, wide-angle eye-level view, neutral white and warm wood and stone palette, greenery, crisp realistic materials, clean spacious interior, small natural figure, bright airy aspirational mood, soft reflections on floors and glass"
 }

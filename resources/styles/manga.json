@@ -1,5 +1,20 @@
 {
   "id": "manga",
   "name": "Manga",
-  "category": "Comic & Story"
+  "category": "Comic & Story",
+  "version": "1.0.0",
+  "core_identity": "A dramatic black-and-white comic panel drawn in ink on paper, like a page from a printed Japanese comic. It is graphic, intense and emotional, with all shading made from lines and dots. Bold ink, grey screentone and speed lines make it recognizable.",
+  "medium": "Black-and-white Japanese comic panel, drawn in ink with screentone dots and no colour.",
+  "lighting": "Lighting is shown with solid black ink shadows, white highlights and screentone gradients instead of soft light. Strong side light throws one half of a face into black, and dramatic scenes use a heavy shadow band across the eyes. Backlight becomes a clean white halo.",
+  "color_palette": "Black and white only, with several grades of grey screentone dots at different densities. Paper-white highlights, solid inky blacks and no other colour or grey wash.",
+  "camera": "Dynamic comic framing: extreme close-ups on eyes, low and high angles, tilted horizons and wide establishing panels. Foreshortening on hands and objects close to the viewer. Backgrounds are drawn sharp, with focus effects shown by speed lines or hatching.",
+  "composition": "Panel-style composition with strong diagonals, large areas of empty white or black for impact, and one clear focal point. Speed lines and impact lines radiate behind a surprised or shocked character, and tiny sweat drops or sparkles mark emotion.",
+  "texture": "Bold varied ink lines from fine hair-thin strokes to thick contour lines, crisp screentone dots, cross-hatching and solid black fills. Backgrounds use ruled-line detail and tone sheets for walls, sky and fabric.",
+  "characters": "Anime-style faces drawn in ink: large expressive eyes with sharp highlights, a small nose and a mouth that stretches in strong emotion. Hair is drawn in sharp, flowing locks, with strong shadow over the eyes for drama. Emotion is exaggerated through sweat drops, tears, popping veins and wide eyes; older characters have heavy line wrinkles.",
+  "mood": "dramatic, intense, emotional, graphic, gripping",
+  "negative": "color, colour, painted shading, soft gradients, photorealism, 3D render, CGI look, western comic style, speech bubbles, captions, sound effect words, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Panel-like still image with a subtle slow zoom or drift. Speed lines slide across the frame, screentone shimmer is avoided, and a small element such as a falling tear, smoke or a flickering light may move. No fluid full animation and no colour flashes.",
+  "style_lock": "Japanese manga panel, black and white ink drawing, grey screentone dots, bold varied ink lines, solid black shadows, speed lines, impact lines, cross-hatching, dramatic angle, large expressive eyes, sweat drops, shadow over the eyes, printed comic page look",
+  "thumbnail": "",
+  "example_prompt": "Manga panel at a low angle: an elderly man sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A heavy shadow falls over his eyes, a single tear shines on his cheek, and fine speed lines gather around the dark window. Japanese manga panel, black and white ink drawing, grey screentone dots, bold varied ink lines, solid black shadows, speed lines, impact lines, cross-hatching, dramatic angle, large expressive eyes, sweat drops, shadow over the eyes, printed comic page look"
 }

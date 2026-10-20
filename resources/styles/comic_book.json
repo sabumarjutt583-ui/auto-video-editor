@@ -1,5 +1,20 @@
 {
   "id": "comic_book",
   "name": "Comic Book",
-  "category": "Comic & Story"
+  "category": "Comic & Story",
+  "version": "1.0.0",
+  "core_identity": "A bold, heroic full-colour western comic book panel, punchy and full of attitude. It feels like a printed page in motion, with big shapes and strong contrast. Thick inked outlines, flat colours with halftone dots and solid black shadows make it recognizable.",
+  "medium": "Full-colour western comic book panel, inked line art with flat colours and halftone dots.",
+  "lighting": "Hard dramatic lighting from one strong source, with solid black shadow shapes and clean white highlights. Rim light outlines figures in bright colour, and dramatic backlight creates silhouettes. Shadows are shapes, not gradients.",
+  "color_palette": "Bold flat colours with strong contrast: primary red, royal blue and golden yellow, with deep purple and green shadows. Halftone dots shade colour transitions, and each scene leans on one or two dominant colours.",
+  "camera": "Dramatic angles with strong foreshortening: low hero angles, high overhead views and tilted frames. Close-ups on faces and fists, and wide splash-style establishing frames. Everything is drawn in sharp focus.",
+  "composition": "Dynamic diagonal composition with large figures dominating the frame, strong silhouettes and leading lines of perspective. Dramatic empty areas of black, and props that point to the focal point.",
+  "texture": "Confident thick inked outlines with varied weight, hatching and feathering for shadow, visible halftone dot patterns, and flat colour fills. Surfaces are simple, graphic and printed, with slightly rough ink edges.",
+  "characters": "Strong anatomy with defined jawlines, broad shoulders and dramatic muscular or angular forms, shown in dynamic poses. Faces have clear heavy brows, simple eyes and strong expressions. Hair is drawn in solid shapes with line highlights, and clothing wrinkles are inked in bold lines; older characters have deep ink lines and strong character.",
+  "mood": "bold, heroic, punchy, dramatic, energetic",
+  "negative": "speech bubbles, captions, sound effect words, photorealism, painterly blur, soft gradients, watercolor, anime, manga, 3D render, CGI look, thin delicate lines, muted dull colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Punchy push-ins and quick slides with a panel-like freeze and subtle movement inside the frame. Dust, sparks and light pulses animate, with halftone dots staying fixed. No smooth realistic motion, no blur and no morphing.",
+  "style_lock": "western comic book panel, thick inked outlines, flat bold colours, halftone dot shading, solid black shadows, hatching, strong contrast, dramatic foreshortened angle, dynamic pose, heroic anatomy, bright rim light, printed comic page look",
+  "thumbnail": "",
+  "example_prompt": "Dramatic low-angle panel: an elderly man with a heavy brow and deep ink lines sits alone at a kitchen table at night, gripping a cup of tea, an empty chair opposite him. A single lamp throws a hard shadow shape, and halftone dots shade the blue wall. western comic book panel, thick inked outlines, flat bold colours, halftone dot shading, solid black shadows, hatching, strong contrast, dramatic foreshortened angle, dynamic pose, heroic anatomy, bright rim light, printed comic page look"
 }

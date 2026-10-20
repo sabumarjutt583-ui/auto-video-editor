@@ -1,5 +1,20 @@
 {
   "id": "black_and_white_photography",
   "name": "Black & White Photography",
-  "category": "Realistic"
+  "category": "Realistic",
+  "version": "1.0.0",
+  "core_identity": "A fine-art black-and-white photograph that feels timeless, honest and humane. It is cleaner, softer and more tonal than crime-film monochrome, and gives its attention to faces, hands and textures. A full, smooth range of greys and fine silver grain make it recognizable.",
+  "medium": "Fine-art black-and-white photograph printed on silver-gelatin paper, shot on medium-format film.",
+  "lighting": "Natural window light, overcast sky or open shade, giving soft directional light with gentle shadows. A rich tonal range runs from deep black through many mid greys to clean white, without crushed blacks. Occasional side light reveals skin and fabric texture.",
+  "color_palette": "Monochrome only, with neutral grey tones, clean whites, rich but detailed blacks and smooth gradation between them. No sepia and no colour tint.",
+  "camera": "Medium-format look with a 50 mm to 90 mm lens, sharp from centre to edge, with moderate to shallow depth of field. Eye-level and straight-on portraits, with a few wide landscape and street frames. Calm, deliberate framing.",
+  "composition": "Strong simple shapes, leading lines, repeating textures and generous negative space around faces. Portraits fill the frame, and hands, doorways and window light work as graphic elements. Balanced, tidy and unhurried.",
+  "texture": "Fine silver-gelatin grain, sharp micro-detail in skin, fabric, wood and stone, and smooth tonal transitions. Wrinkles, pores, cracked paint and weathered surfaces are shown with care.",
+  "characters": "Expressive portraits of real people of every age, with wrinkles, freckles, scars and grey hair rendered in full detail. Eyes are sharp and engaged, with the gaze direct or lowered in quiet thought. Clothing is simple and textured, such as wool, linen and denim.",
+  "mood": "timeless, honest, contemplative, humane, quiet",
+  "negative": "color, colour, sepia tint, crime mood, venetian blind shadows, hard thriller lighting, harsh high contrast, dutch angle, cartoon, anime, illustration, painting, 3D render, CGI look, digital oversharpening, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Almost still: a very slow drift or a barely perceptible push-in held for a long time. Subjects stay in contemplative stillness with only a breath, a slow blink or a head turn. Natural light shifts gently. No fast moves, no shake and no dramatic effects.",
+  "style_lock": "fine-art black-and-white photograph, silver-gelatin print, rich tonal range, deep blacks and clean whites, soft natural light, fine silver grain, sharp micro-detail, medium-format lens look, expressive portrait, visible wrinkles and texture, strong simple shapes, timeless calm mood",
+  "thumbnail": "",
+  "example_prompt": "An elderly man sits alone at a wooden kitchen table at night, holding a cup of tea in both hands, an empty chair opposite him. Soft light from a single lamp lets every wrinkle on his face and hands show against the dark room. fine-art black-and-white photograph, silver-gelatin print, rich tonal range, deep blacks and clean whites, soft natural light, fine silver grain, sharp micro-detail, medium-format lens look, expressive portrait, visible wrinkles and texture, strong simple shapes, timeless calm mood"
 }

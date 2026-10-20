@@ -1,5 +1,20 @@
 {
   "id": "medical_3d",
   "name": "Medical 3D",
-  "category": "Educational & Science"
+  "category": "Educational & Science",
+  "version": "1.0.0",
+  "core_identity": "A clean, accurate medical 3D visualization that feels clinical but never frightening. Organs and cells are shown as smooth, softly glowing models. Semi-translucent tissue, soft pinks and blues and a clean dark background make it recognizable.",
+  "medium": "Medical 3D visualization render of anatomy and cells, with semi-translucent materials.",
+  "lighting": "Soft studio light with subtle translucency, where light passes gently through tissue, and a gentle inner glow. Soft rim light in cool blue, low contrast shadows and clean specular highlights. Backgrounds receive a gentle radial light.",
+  "color_palette": "Anatomical but clean colours: soft reds, pinks and blues, with pale ivory for bone and a clinical white or dark blue background. Colours are gentle and moderately saturated, never harsh and never gory.",
+  "camera": "A clean macro or product-style view with 50 mm to 100 mm lens feel, sharp on the main structure and a smooth soft background. Close-up views of organs and cells, and slow three-quarter angles. Framing is centred and tidy.",
+  "composition": "A single organ, cell cluster or human silhouette centred on a clean background with generous empty space. Structures are well separated with a clear focal point, and secondary elements fade softly into the background.",
+  "texture": "Smooth semi-translucent tissues, fine cellular detail, soft membranes, delicate vessels and glassy highlights. Surfaces are clean and glossy with subtle subsurface glow and no wounds.",
+  "characters": "When people appear, they are shown as clean semi-translucent human silhouettes or simple smooth anatomical figures with no detailed facial features, calm posture and soft inner glow. Clothing is absent or a plain smooth shape. Older figures are shown through posture and white hair shapes.",
+  "mood": "clinical, calm, accurate, reassuring, clean",
+  "negative": "gore, blood, graphic surgery, disturbing imagery, text labels, wounds, exposed raw flesh, horror, cartoon, anime, illustration, painting, photograph of real patient, dirty surfaces, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow rotation of the structure, a fly-through of organs or cells with smooth camera motion, and gentle pulsing of tissue or a soft heartbeat glow. Particles drift slowly in fluid. No fast cuts, no shake and no disturbing movements.",
+  "style_lock": "medical 3D visualization, semi-translucent tissue, subtle subsurface glow, soft studio light, clean clinical background, soft reds and pinks and blues, smooth glossy membranes, fine cellular detail, calm accurate look, cool blue rim light, centred anatomical subject, gentle pulsing glow",
+  "thumbnail": "",
+  "example_prompt": "A medical 3D visualization of a calm semi-translucent human figure of an elderly man sitting at a simple table at night, holding a cup of tea, an empty chair opposite him. Soft pink inner glow and a cool blue rim light stand out against a dark blue background. medical 3D visualization, semi-translucent tissue, subtle subsurface glow, soft studio light, clean clinical background, soft reds and pinks and blues, smooth glossy membranes, fine cellular detail, calm accurate look, cool blue rim light, centred anatomical subject, gentle pulsing glow"
 }

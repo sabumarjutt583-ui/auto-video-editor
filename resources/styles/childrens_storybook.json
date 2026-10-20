@@ -1,5 +1,20 @@
 {
   "id": "childrens_storybook",
   "name": "Children's Storybook",
-  "category": "Comic & Story"
+  "category": "Comic & Story",
+  "version": "1.0.0",
+  "core_identity": "A cute, simple illustration from a modern picture book for young children. It feels safe, joyful and gentle, with round shapes and soft colours. Chunky rounded figures, rosy cheeks and soft crayon-like texture make it recognizable.",
+  "medium": "Illustration from a modern picture book for young children, soft gouache and crayon texture on paper.",
+  "lighting": "Soft, even, friendly light with no scary shadows, no hard contrast and no dark corners. Shadows are tiny and pale, and glow is shown with warm yellow patches around lamps and the sun.",
+  "color_palette": "Bright friendly pastels and primaries: sunny yellow, sky blue, apple green, peach pink and soft red, with creamy paper-white. Colours are cheerful and clean, with gentle contrast.",
+  "camera": "Flat, front-facing picture-book view at a child's eye level, with simple wide scenes and gentle close-ups. No lens blur and no dramatic angles. Everything is clear and easy to read.",
+  "composition": "Simple, uncluttered scenes with a large friendly character, a few round props and soft shapes, and space around them. A cosy centred layout with a clear subject and a plain painted background.",
+  "texture": "Soft crayon and gouache texture with slight paper grain, round chunky shapes, gentle pencil outlines in soft brown, and tiny dots or stars for decoration. No sharp edges and no heavy detail.",
+  "characters": "Big round heads, simple dot or small oval eyes, rosy cheeks and friendly smiles on short, chunky bodies. Hair is a soft simple shape, hands are mittens with tiny fingers, and clothes are simple colourful shapes. Elderly characters are round and kind with a white moustache or bun, soft glasses and a warm smile.",
+  "mood": "cute, safe, cheerful, warm, gentle",
+  "negative": "scary, dark, realistic, sharp edges, violence, horror, gloomy shadows, photorealistic, 3D render, CGI look, anime, comic book, gritty texture, neon colors, thin scratchy lines, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Gentle bounces, soft floating moves and slow pans across the picture. Stars, bubbles and leaves drift softly, and characters sway or nod slightly. No fast moves, no shaking and no scary effects.",
+  "style_lock": "children's picture book illustration, soft gouache and crayon texture, round chunky shapes, bright friendly pastels, soft even light, gentle brown pencil outlines, big round head, rosy cheeks, simple dot eyes, friendly smile, plain painted background, cozy and safe",
+  "thumbnail": "",
+  "example_prompt": "A kind round grandfather with a white moustache sits alone at a little kitchen table at night, holding a cup of tea with a gentle smile, an empty chair opposite him. A big yellow lamp glow and a window full of little stars surround him. children's picture book illustration, soft gouache and crayon texture, round chunky shapes, bright friendly pastels, soft even light, gentle brown pencil outlines, big round head, rosy cheeks, simple dot eyes, friendly smile, plain painted background, cozy and safe"
 }

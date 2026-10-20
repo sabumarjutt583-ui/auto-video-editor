@@ -1,5 +1,20 @@
 {
   "id": "steampunk",
   "name": "Steampunk",
-  "category": "Fantasy & Sci-Fi"
+  "category": "Fantasy & Sci-Fi",
+  "version": "1.0.0",
+  "core_identity": "A detailed Victorian-industrial fantasy where brass machines, steam and invention rule the world. It feels adventurous, warm and richly crafted, full of gears and copper pipes. Gas lamp glow, polished metal and goggles make it recognizable.",
+  "medium": "Detailed Victorian-industrial fantasy illustration, rendered with painterly digital detail.",
+  "lighting": "Warm gas lamps, furnace glow and candlelight, with steam catching the light in soft beams. Strong warm key light with deep brown shadows, glints on polished brass and copper, and sooty smoke haze in the air.",
+  "color_palette": "Brass, copper, bronze, dark wood, leather brown and soot black, with warm amber glows and a few deep green or burgundy accents. Colours are warm and rich with moderate saturation and strong contrast.",
+  "camera": "Wide views of workshops, airships and machine-filled streets with a 24 mm to 50 mm lens feel, and close shots of gears, gauges and hands. Slightly low angles make machines feel massive. Depth of field is moderate with foreground steam softly blurred.",
+  "composition": "Crowded, layered scenes with large machines and pipes framing the character, gear wheels in the foreground, and a glowing furnace or lamp as the focal point. Diagonals of pipes and chains lead the eye, and small gadgets fill the shelves.",
+  "texture": "Rivets, gears, pipes, pressure gauges, polished and tarnished metal, riveted plates, worn leather and rough wood, with soot, oil stains and billowing steam. Metal surfaces show warm reflections and scratches.",
+  "characters": "Real-looking people in Victorian clothing: waistcoats, high collars, long coats, bustles and top hats, with goggles on hats, leather straps and mechanical accessories such as a brass arm piece or a small gear brooch. Faces are weathered and curious, with moustaches or neat braids. Older characters wear spectacles with brass lenses.",
+  "mood": "inventive, adventurous, warm, industrial, whimsical",
+  "negative": "modern objects, plastic, neon lights, sci-fi chrome, clean futuristic design, fantasy elves, cartoon, anime, flat vector, photograph, low resolution, oversaturated colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Gears turning steadily, steam puffing from pipes, pistons pumping and gauges needles trembling, with a slow camera push or a slow pan across the machinery. Flames flicker and smoke drifts. Figures make deliberate small movements. No fast cuts and no shake.",
+  "style_lock": "Victorian steampunk illustration, polished brass and copper machines, turning gears, rivets and pipes, pressure gauges, warm gas lamp glow, furnace light, steam catching light, dark wood and leather brown palette, soot, goggles and leather straps, Victorian clothing",
+  "thumbnail": "",
+  "example_prompt": "A steampunk workshop kitchen at night: an elderly man in a waistcoat and brass-rimmed spectacles sits alone at a riveted wooden table, holding a copper cup of tea, an empty chair opposite him. A gas lamp glows warm, and steam curls from a brass kettle behind him. Victorian steampunk illustration, polished brass and copper machines, turning gears, rivets and pipes, pressure gauges, warm gas lamp glow, furnace light, steam catching light, dark wood and leather brown palette, soot, goggles and leather straps, Victorian clothing"
 }

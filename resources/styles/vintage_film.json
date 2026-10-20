@@ -1,5 +1,20 @@
 {
   "id": "vintage_film",
   "name": "Vintage Film",
-  "category": "Cinematic & Film"
+  "category": "Cinematic & Film",
+  "version": "1.0.0",
+  "core_identity": "A still from a worn 1970s 35mm print, like a faded memory found in a drawer. It feels nostalgic, warm and slightly imperfect. A yellow-orange cast, lifted blacks, heavy grain and soft edges make it recognizable.",
+  "medium": "Still from a 1970s 35mm colour film print with visible age, grain and light leaks.",
+  "lighting": "Soft, slightly overexposed highlights, warm low sun and hazy window light, with gentle contrast. Bright areas bloom and bleed softly into the shadows. Indoor light comes from period tungsten lamps with a warm glow.",
+  "color_palette": "A faded warm yellow-orange cast over everything, lifted milky blacks, washed olive greens, dusty red and mustard, and cream whites. Saturation is low to moderate and colours look sun-bleached.",
+  "camera": "Vintage prime lens look from 35 mm to 85 mm with soft focus at the edges, a gentle vignette and slight colour fringing. Moderate depth of field at eye level, with the occasional zoom-lens framing. Focus and framing are slightly imperfect.",
+  "composition": "Casual, snapshot-like but pleasing framing, with subjects slightly off-centre and period cars, furniture, wallpaper and signage in the background. Edges are softened by vignette and the occasional light leak at the frame edge.",
+  "texture": "Strong visible film grain, orange-red light leaks at the frame edge, fine dust and scratches, and soft-focus corners. Corduroy, knits and polyester show a gentle blur.",
+  "characters": "Real people styled for the 1960s and 70s unless the story says otherwise: longer hair, sideburns, feathered or bouffant hair, wide collars, flared trousers, knit tops and large-frame glasses. Skin is slightly warm and soft with grain, and expressions are natural and relaxed.",
+  "mood": "nostalgic, faded, warm, wistful, sentimental",
+  "negative": "modern clothing, modern objects, digital sharpness, crisp clean look, teal grade, high contrast, black and white, cartoon, anime, illustration, painting, 3D render, CGI look, oversaturated colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slightly shaky old-camera feel with a gentle wobble, a slow zoom in or out, and soft focus drifts. A subtle frame flicker and a light-leak pulse at the edges. Subjects move naturally in a relaxed home-movie way. No smooth gimbal moves and no sharp digital motion.",
+  "style_lock": "1970s 35mm film print still, faded warm yellow-orange cast, lifted milky blacks, washed olive greens, slightly overexposed highlights, strong film grain, orange light leaks, soft focus edges, gentle vignette, dust and scratches, period 1960s-70s clothing and hair, sun-bleached nostalgic look",
+  "thumbnail": "",
+  "example_prompt": "An elderly man in a wide-collared knit cardigan sits alone at a formica kitchen table at night, holding a cup of tea, an empty chair opposite him. A warm tungsten lamp glows over floral wallpaper behind him. 1970s 35mm film print still, faded warm yellow-orange cast, lifted milky blacks, washed olive greens, slightly overexposed highlights, strong film grain, orange light leaks, soft focus edges, gentle vignette, dust and scratches, period 1960s-70s clothing and hair, sun-bleached nostalgic look"
 }

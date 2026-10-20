@@ -1,5 +1,20 @@
 {
   "id": "acrylic_painting",
   "name": "Acrylic Painting",
-  "category": "Painting"
+  "category": "Painting",
+  "version": "1.0.0",
+  "core_identity": "A bold, modern acrylic painting with vivid colour and confident marks. It feels bright, graphic and contemporary, flatter and punchier than an oil painting. Opaque colour blocks, strong complementary contrasts and visible brush and knife strokes make it recognizable.",
+  "medium": "Contemporary acrylic painting on stretched canvas with opaque flat colour and palette knife marks.",
+  "lighting": "Clear bright light with simple shadows painted as flat shapes in a darker, cooler version of the local colour. No soft glow and no deep darkness, and highlights are bright flat patches. Night scenes use deep saturated blues with bright lamp yellows.",
+  "color_palette": "Vivid saturated colours with strong complementary contrasts: cobalt blue against orange, magenta against green, and yellow against violet. Large flat blocks of colour with a few white and dark accents. Contrast is high and colours stay clean, not muddy.",
+  "camera": "The artist's view is a straight-on, slightly simplified vantage with a flattened sense of space, mostly wide to medium framing. Perspective is simplified and shapes are stacked in planes. Everything stays in focus, with no blur.",
+  "composition": "Bold simple shapes arranged in large colour planes, with the figure as a strong silhouette against a contrasting background. Tilted tables and flattened perspective, a clear focal point and generous areas of single colour.",
+  "texture": "Opaque flat colour areas, visible confident brush strokes with bristle marks, palette knife scrapes and ridges, thick paint edges and a matte plastic-like finish. Some layers are dry-brushed so underlying colour shows through at the edges.",
+  "characters": "Stylised but recognisable people built from simplified planes of the face, with large shapes for the cheeks, nose and brow, and flat colour with one or two bold shadow planes. Eyes are simple dark shapes, hair is a bold block of colour and clothing is made of a few big colour planes. Skin may use unexpected colours such as pink, ochre and green planes.",
+  "mood": "bold, modern, vibrant, energetic, confident",
+  "negative": "photorealism, soft airbrush gradients, watercolor, oil painting glazing, pencil sketch, anime, cartoon outlines, 3D render, CGI look, muted dull colors, tiny fussy detail, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Gentle pans and slow pushes across the canvas, with a soft colour shimmer where the paint seems to glisten. Brush marks seem to shift subtly and light pulses a little. Figures are almost still. No fast moves, no 3D effects and no morphing of faces.",
+  "style_lock": "contemporary acrylic painting, opaque flat colour blocks, vivid saturated palette, strong complementary contrasts, confident visible brush strokes, palette knife marks, simplified planes of the face, flat painted shadows, bold simple shapes, matte canvas finish, matte plastic-like paint finish, dry-brushed edges",
+  "thumbnail": "",
+  "example_prompt": "An elderly man is painted in bold planes, sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A bright orange lamp shape glows against a deep cobalt blue wall, and his face is built from flat ochre and pink planes. contemporary acrylic painting, opaque flat colour blocks, vivid saturated palette, strong complementary contrasts, confident visible brush strokes, palette knife marks, simplified planes of the face, flat painted shadows, bold simple shapes, matte canvas finish, matte plastic-like paint finish, dry-brushed edges"
 }

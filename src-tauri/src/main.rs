@@ -20,6 +20,7 @@ mod render;
 mod settings;
 mod sfx;
 mod styles;
+mod thumbnails;
 mod timing;
 
 /// Every command of the app. The Admin Edition has the same list plus its own commands.
@@ -71,6 +72,7 @@ macro_rules! handler {
             commands::styles::list_styles,
             commands::styles::save_custom_style,
             commands::styles::delete_custom_style,
+            commands::styles::set_custom_style_thumbnail,
             commands::timing::read_text_file,
             commands::timing::transcribe_voice,
             commands::audio::apply_silence_removal,
@@ -131,6 +133,7 @@ macro_rules! handler {
             commands::styles::list_styles,
             commands::styles::save_custom_style,
             commands::styles::delete_custom_style,
+            commands::styles::set_custom_style_thumbnail,
             commands::timing::read_text_file,
             commands::timing::transcribe_voice,
             commands::audio::apply_silence_removal,
@@ -151,6 +154,7 @@ macro_rules! handler {
             admin::commands::admin_read_style,
             admin::commands::admin_remove_style,
             admin::commands::admin_build_package,
+            admin::commands::admin_import_thumbnails,
         ]
     };
 }

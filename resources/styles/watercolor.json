@@ -1,5 +1,20 @@
 {
   "id": "watercolor",
   "name": "Watercolor",
-  "category": "Painting"
+  "category": "Painting",
+  "version": "1.0.0",
+  "core_identity": "A light, airy picture painted in transparent watercolour, where colour floats and bleeds on wet paper. It feels gentle, poetic and slightly unfinished, with the white of the paper doing much of the work. Soft blooms, luminous washes and loose suggested details make it recognizable.",
+  "medium": "Transparent watercolour painting on cold-press paper, with loose washes and little pencil underdrawing.",
+  "lighting": "Light is suggested by leaving white paper unpainted and by thin, glowing washes, with no cast-shadow drawing. Shadows are pale cool blue or violet glazes laid over lighter colour. Windows and lamps appear as warm unpainted or pale yellow patches that bleed softly outwards.",
+  "color_palette": "Transparent, luminous colours: soft cerulean and cobalt blues, warm yellow ochre, rose madder and gentle sage green. Colours mix on the paper and blend in soft gradients, with low to moderate saturation and bright paper-white highlights.",
+  "camera": "The artist's view is a calm, slightly distant eye-level vantage, with wide scenes reduced to a few washes and medium views with a clear focal area. Background areas are left loose, faded or unpainted at the edges, as vignettes. No sharp focus effects.",
+  "composition": "A vignette layout with the main subject in the sharpest, most detailed area and edges dissolving into bare white paper. Large open washes for sky and walls, a few confident lines for furniture and a loose horizon.",
+  "texture": "Soft wet-in-wet blooms with feathery edges, granulation where pigment settles in the paper pits, hard edges and cauliflower blooms where washes dried, and visible cold-press paper texture. White paper is left as highlights, with a few dry-brush strokes and fine pen-thin brush lines.",
+  "characters": "People are painted loosely with simplified features, suggested by a few washes and dabs. Faces have dots or soft shadows for eyes, no detailed noses or mouths, and skin is a pale warm wash that bleeds into clothing colours. Hair and clothing are single brush shapes, and emotion is carried by posture rather than detail.",
+  "mood": "airy, gentle, poetic, dreamy, tender",
+  "negative": "thick opaque paint, digital gradients, hard black outlines, photorealism, airbrush smoothness, oil painting, acrylic flat color, 3D render, CGI look, anime, comic book, neon colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Very slow pans and drifts across the painting, with paint-like soft movement. Colour washes seem to bloom and spread slowly, and light shifts gently as if the sun were moving behind the paper. No hard cuts, no fast moves and no morphing of faces.",
+  "style_lock": "transparent watercolour painting, cold-press paper texture, wet-in-wet blooms, pigment granulation, luminous soft washes, white paper highlights, loose suggested details, soft blue and warm ochre palette, rose accents, vignette edges, delicate brushwork, pencil-thin brush accents",
+  "thumbnail": "",
+  "example_prompt": "An elderly man is painted loosely in soft washes, sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A pale yellow lamp wash glows on the table and bleeds into a violet-blue window. transparent watercolour painting, cold-press paper texture, wet-in-wet blooms, pigment granulation, luminous soft washes, white paper highlights, loose suggested details, soft blue and warm ochre palette, rose accents, vignette edges, delicate brushwork, pencil-thin brush accents"
 }

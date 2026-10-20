@@ -1,5 +1,20 @@
 {
   "id": "2d_cartoon",
   "name": "2D Cartoon",
-  "category": "Animation & Cartoon"
+  "category": "Animation & Cartoon",
+  "version": "1.0.0",
+  "core_identity": "A funny, bold frame from a classic TV cartoon, where everything is exaggerated for laughs. It feels playful, loud and instantly readable. Thick black outlines, flat candy colours and huge expressions make it recognizable.",
+  "medium": "Classic 2D TV cartoon frame with thick outlines and flat colour fills.",
+  "lighting": "Almost no shading: flat, bright, even fills with at most a single simple shadow shape under objects. No realistic light direction, no gradients and no glow, except cartoon sparkles and stars.",
+  "color_palette": "Bright primary and candy colours: sunshine yellow, tomato red, sky blue, lime green and hot pink, with high saturation and clear contrast between figure and background. Backgrounds use simpler, lighter versions of the same colours.",
+  "camera": "Flat, straight-on stage view with simple wide and medium framing, and occasional exaggerated close-ups for a punchline. Everything is in sharp focus with no depth blur. Camera angles are simple and theatrical.",
+  "composition": "Big readable shapes and silhouettes, with the character large and centred and props simplified. Backgrounds are simple painted shapes with few details, and bold diagonal poses push the gag. Plenty of empty space around the action.",
+  "texture": "Smooth flat fills with thick, bold black outlines of even weight, tiny dots or lines for cheeks and shine, and no surface texture. Simple speed lines, stars and sweat drops used as cartoon symbols.",
+  "characters": "Big heads, rubbery noodle limbs, huge round eyes and wide stretchy mouths, with simple rounded shapes and chunky shoes. Four-finger hands are fine. Expressions are huge: jaws drop, eyes pop and brows jump. Elderly characters have a big nose, tufty white hair and wobbly legs, drawn as a funny exaggerated shape.",
+  "mood": "playful, comedic, loud, silly, cheerful",
+  "negative": "photorealistic, 3D render, CGI look, anime, manga, realistic shading, soft gradients, painting, watercolor, sketchy lines, thin outlines, muted dull colors, scary look, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Squash and stretch, bouncy exaggerated movement and quick snappy poses held for a beat. Fast comic takes, bouncing walks and wobbling objects, with simple camera pushes for punchlines. No realistic slow motion and no 3D camera moves.",
+  "style_lock": "classic 2D TV cartoon frame, thick bold black outlines, flat bright fills, no shading, candy primary colours, big head, rubbery limbs, huge round eyes, exaggerated expression, simple background shapes, cartoon sparkles, squash and stretch pose",
+  "thumbnail": "",
+  "example_prompt": "A grumpy elderly cartoon man with a huge nose and tufty white hair sits alone at a kitchen table at night, holding a cup of tea with a droopy face, an empty chair opposite him. Bright yellow table, blue wall, and a big cartoon moon in the window. classic 2D TV cartoon frame, thick bold black outlines, flat bright fills, no shading, candy primary colours, big head, rubbery limbs, huge round eyes, exaggerated expression, simple background shapes, cartoon sparkles, squash and stretch pose"
 }

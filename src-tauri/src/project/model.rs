@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::settings::{AspectRatio, Quality, Settings};
 
 /// Bump this when the shape of project.json changes, and add a step in migrate.rs.
-pub const SCHEMA_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

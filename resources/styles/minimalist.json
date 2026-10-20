@@ -1,5 +1,20 @@
 {
   "id": "minimalist",
   "name": "Minimalist",
-  "category": "Flat & Graphic"
+  "category": "Flat & Graphic",
+  "version": "1.0.0",
+  "core_identity": "A calm, elegant graphic image reduced to its essentials: one subject and a great deal of empty space. It feels quiet, deliberate and refined, with nothing extra. Two or three colours, huge negative space and simple forms make it recognizable.",
+  "medium": "Minimalist graphic image with smooth flat areas of colour and very few shapes.",
+  "lighting": "Almost no lighting: flat colour areas with at most one soft shadow or a single gentle gradient behind the subject. Shadows are long, simple and pale. Glow is limited to one soft circle of lighter colour.",
+  "color_palette": "Two to three colours maximum, muted or monochrome, such as warm grey with a single terracotta accent, or soft navy with cream. Low saturation, low contrast and a calm overall tone.",
+  "camera": "A frontal, flat or slightly elevated view, with the subject small within a wide frame. No perspective detail, no blur and no lens effects, only clean shapes and precise placement.",
+  "composition": "One clear subject, huge negative space, and placement either centred or on the rule of thirds. The horizon or table line is a single clean line, and everything else is empty. Balance comes from one small accent against open space.",
+  "texture": "Smooth flat surfaces or a very subtle fine grain. No detailed texture, no patterns and no visible brush or line work. Edges are crisp and simple.",
+  "characters": "People appear as silhouettes or very simple forms, built from a circle for the head and a few smooth shapes for the body, with no facial features. Clothing is a single colour shape, and posture and placement carry the emotion. Figures are small in the frame.",
+  "mood": "calm, quiet, elegant, essential, still",
+  "negative": "clutter, many objects, busy backgrounds, detailed textures, patterns, photorealism, 3D render, CGI look, painting, sketchy lines, bright neon colors, heavy shadows, ornate decoration, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Almost still, with a very slow drift or a barely perceptible push-in. A single element may move slowly, such as steam rising or a shadow lengthening. Colours do not change. No fast moves, no shake and no extra effects.",
+  "style_lock": "minimalist graphic image, one clear subject, huge negative space, two or three muted colours, flat smooth colour areas, subtle fine grain, simple silhouette figure, no facial features, single clean horizon line, calm balanced composition, essential shapes only, calm elegant mood",
+  "thumbnail": "",
+  "example_prompt": "A minimalist image of an elderly man as a small dark silhouette sitting at a simple table in a vast empty warm grey room at night, holding a cup of tea, an empty chair opposite him. One terracotta circle of lamp light is the only accent. minimalist graphic image, one clear subject, huge negative space, two or three muted colours, flat smooth colour areas, subtle fine grain, simple silhouette figure, no facial features, single clean horizon line, calm balanced composition, essential shapes only, calm elegant mood"
 }

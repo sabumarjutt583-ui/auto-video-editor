@@ -4,6 +4,8 @@ import { KeyCard } from "./KeyCard";
 import { LibraryCard } from "./LibraryCard";
 import { SearchCard } from "./SearchCard";
 import { StylesCard } from "./StylesCard";
+import { StyleTestCard } from "./StyleTestCard";
+import { ThumbnailsCard } from "./ThumbnailsCard";
 import { useAdmin } from "./useAdmin";
 
 /** The Admin Edition page: build the sound library and style packages. Not part of the user build. */
@@ -22,6 +24,8 @@ export default function AdminPage() {
           <SearchCard keySet={overview.keySet} reload={reload} />
           <LibraryCard overview={overview} act={act} />
           <StylesCard overview={overview} act={act} />
+          <StyleTestCard />
+          <ThumbnailsCard />
           <BuildCard overview={overview} act={act} />
         </>
       ) : (

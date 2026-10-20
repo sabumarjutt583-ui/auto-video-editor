@@ -1,5 +1,20 @@
 {
   "id": "pencil_sketch",
   "name": "Pencil Sketch",
-  "category": "Drawing & Sketch"
+  "category": "Drawing & Sketch",
+  "version": "1.0.0",
+  "core_identity": "A delicate graphite pencil drawing in a sketchbook, honest and observed like an artist's study. It feels quiet, careful and intimate. Soft grey shading, visible hatching and construction lines on off-white paper make it recognizable.",
+  "medium": "Graphite pencil drawing on white sketchbook paper, with fine hatching and soft smudged shading.",
+  "lighting": "Light is described by tone alone: soft graphite shading that builds gradually from pale grey to darker grey, with clean untouched paper for the brightest areas. A single gentle light direction, with soft cast shadows drawn in light hatching.",
+  "color_palette": "Grey graphite tones only, on off-white paper, from pale silver grey to soft dark grey. No colour, no pure black fills and no ink.",
+  "camera": "The artist's view is an observational eye-level vantage, as if drawn from life, with medium and close views and a few wide room studies. The drawing is complete in the focal area and fades into loose outline and bare paper at the edges. No lens effects.",
+  "composition": "Sketchbook-page layout with the main subject carefully drawn in the centre and the surroundings only lightly indicated. Faint construction lines, perspective guidelines and small test strokes remain visible near the edges, and the paper is left blank around.",
+  "texture": "Fine hatching and cross-hatching, smudged soft shading blended with a finger, visible construction lines, light eraser marks and paper tooth showing through the graphite. Line weight varies from hair-thin to soft medium, with grainy graphite texture.",
+  "characters": "Carefully observed people with realistic proportions and soft shading on the face, drawn with gentle contour lines and hatched shadows. Eyes, wrinkles and hands receive the most detail, while clothing folds are drawn with simple loose lines. Expressions are quiet and natural, like a study of a real model.",
+  "mood": "delicate, honest, quiet, observant, intimate",
+  "negative": "color, colour, ink, heavy black fills, digital look, smooth airbrush shading, photorealism, painting, watercolor, 3D render, CGI look, anime, cartoon, comic book, thick marker lines, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Very subtle camera drift over the paper, as if the drawing was made moments ago. Faint graphite dust or a slow light shift across the page may move, and a few strokes may appear to settle. No fast moves, no flashing and no morphing of faces.",
+  "style_lock": "graphite pencil drawing on sketchbook paper, fine hatching and cross-hatching, smudged soft shading, visible construction lines, paper tooth, grey graphite tones on off-white paper, delicate varied line weight, soft shading on face, carefully observed study, light eraser marks, gentle contour lines, quiet intimate mood",
+  "thumbnail": "",
+  "example_prompt": "A pencil study of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. Soft hatched shadows fall across his face and hands, and light construction lines mark the table and chair. graphite pencil drawing on sketchbook paper, fine hatching and cross-hatching, smudged soft shading, visible construction lines, paper tooth, grey graphite tones on off-white paper, delicate varied line weight, soft shading on face, carefully observed study, light eraser marks, gentle contour lines, quiet intimate mood"
 }

@@ -1,5 +1,20 @@
 {
   "id": "product_photography",
   "name": "Product Photography",
-  "category": "Commercial"
+  "category": "Commercial",
+  "version": "1.0.0",
+  "core_identity": "A professional studio product photograph that looks clean, sharp and ready for a catalog or advertisement. The product is the hero, lit perfectly on a simple background. Softbox light, true colours and a soft contact shadow make it recognizable.",
+  "medium": "Professional studio product photograph shot on a high-resolution camera with a macro or short telephoto lens.",
+  "lighting": "Softbox studio lighting with controlled, clean reflections on surfaces, gentle gradient highlights and a soft shadow right under the product. Fill cards open up shadows and a subtle rim light separates edges. Light is even and shadows are light.",
+  "color_palette": "True product colours on a neutral grey, white or seamless coloured background. Colours are accurate, clean and moderately saturated, with a neutral white balance and a soft tonal gradient behind.",
+  "camera": "A 85 mm to 105 mm macro or short telephoto lens look, slightly elevated three-quarter or straight-on angle, sharp across the hero product and softly blurred background. Focus-stacked clarity on the product.",
+  "composition": "The product is centred and hero-sized with minimal props, a clean seamless surface and generous space around it. People are usually absent; if present, only hands or partial figures appear, holding or using the product.",
+  "texture": "Crisp surface detail: glass, ceramic glaze, metal brushing, fabric weave and condensation droplets, with clean reflections and no dust. Smooth clean backgrounds with no grain.",
+  "characters": "Usually no people. If a person is needed, only hands or partial figures appear, with clean natural skin, tidy nails, simple sleeves and calm relaxed gestures, and no faces in focus. Older hands show gentle wrinkles and are carefully lit.",
+  "mood": "clean, sharp, professional, polished, inviting",
+  "negative": "logos, brand names, clutter, busy background, dirty surfaces, harsh shadows, messy props, cartoon, anime, illustration, painting, 3D render, CGI look, low resolution, motion blur, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow 360 degree rotation of the product, a gentle push-in, and a light sweep that glides across its surface. Steam or droplets may move slightly. Hands move slowly and cleanly. No fast cuts, no shake and no sudden zooms.",
+  "style_lock": "professional studio product photograph, softbox lighting, controlled clean reflections, soft shadow under product, true product colours, seamless neutral background, hero product centred, macro lens look, crisp surface detail, minimal props, catalog advertising look, sharp focus",
+  "thumbnail": "",
+  "example_prompt": "A studio product photograph of a ceramic cup of tea held in an elderly man's hands at a plain table at night, the man shown only from the chest down, an empty chair softly visible opposite. Softbox light shines on the glaze, with a soft shadow beneath the cup. professional studio product photograph, softbox lighting, controlled clean reflections, soft shadow under product, true product colours, seamless neutral background, hero product centred, macro lens look, crisp surface detail, minimal props, catalog advertising look, sharp focus"
 }

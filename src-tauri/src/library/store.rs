@@ -131,6 +131,11 @@ pub fn validate(kind: Kind, dir: &Path) -> Result<usize, AppError> {
     }
 }
 
+/// `thumbnails/<style id>.webp`: the only kind of file a style package may keep in a folder.
+pub fn is_thumbnail_name(name: &str) -> bool {
+    name.strip_prefix("thumbnails/").and_then(|file| file.strip_suffix(".webp")).is_some_and(crate::styles::valid_id)
+}
+
 /// Installs a downloaded zip. Nothing in the app changes unless every check passes.
 pub fn install(root: &Path, kind: Kind, zip_bytes: &[u8], manifest: &Manifest) -> Result<PackageInfo, AppError> {
     manifest.check(kind)?;
@@ -141,7 +146,7 @@ pub fn install(root: &Path, kind: Kind, zip_bytes: &[u8], manifest: &Manifest) -
         ));
     }
     let entries = read_zip(zip_bytes).map_err(|e| AppError::new("The downloaded package could not be opened, so nothing was changed.", e))?;
-    if entries.iter().any(|e| e.name.contains('/')) {
+    if entries.iter().any(|e| e.name.contains('/') && !(kind == Kind::Styles && is_thumbnail_name(&e.name))) {
         return Err(AppError::new("The package has folders inside it, which is not allowed. Nothing was changed.", "nested file names"));
     }
 
@@ -155,6 +160,9 @@ pub fn install(root: &Path, kind: Kind, zip_bytes: &[u8], manifest: &Manifest) -
                 continue;
             }
             let path = staging.join(&entry.name);
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| io("The library folder could not be created.", e, parent))?;
+            }
             std::fs::write(&path, &entry.data).map_err(|e| io("The package could not be saved. Please check that the disk is not full.", e, &path))?;
         }
         let count = validate(kind, &staging)?;

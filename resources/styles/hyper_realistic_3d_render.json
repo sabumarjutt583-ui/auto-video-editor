@@ -1,5 +1,20 @@
 {
   "id": "hyper_realistic_3d_render",
   "name": "Hyper-realistic 3D Render",
-  "category": "Realistic"
+  "category": "Realistic",
+  "version": "1.0.0",
+  "core_identity": "An ultra-detailed 3D CGI render that is perfect, crisp and slightly too flawless to be a photograph. Every material is precise and every reflection exact, with render-level sharpness. Micro-detail and ray-traced light make it recognizable.",
+  "medium": "Ultra-detailed 3D CGI render produced with a physically based ray-tracing renderer.",
+  "lighting": "Physically based ray-traced lighting with perfect reflections, accurate global illumination, crisp soft shadows and clean specular highlights. Light sources are clear and bright, and caustics and subsurface scattering are rendered precisely.",
+  "color_palette": "Rich and accurate colours with a clean neutral white balance, deep blacks and bright highlights. Saturation is natural to slightly enhanced, with a clear separation between materials and perfect tonal gradients.",
+  "camera": "A virtual 35 mm to 85 mm camera with a physically based depth of field, perfectly sharp focus planes and clean bokeh. Slightly low or eye-level angles, wide establishing views and macro close-ups of materials. No lens dirt and no noise.",
+  "composition": "Carefully built, polished scenes with perfect geometry, clean arrangement of props and strong depth layers. A clear focal subject, tidy backgrounds and an eye for symmetry and perfect curves.",
+  "texture": "Micro-detail everywhere: skin pores, fine hairs, fabric fibres, scratches, dust specks and wood grain, with perfect materials such as glass, metal and ceramic. Everything is razor sharp and clean, with no photographic grain.",
+  "characters": "Highly detailed digital humans with natural proportions, pores, peach fuzz, wet eyes with accurate reflections and individually modelled hair strands. Skin has subsurface glow and clothing shows fibre-level weave and seams. Expressions are natural and calm, and older characters show detailed wrinkles and age spots.",
+  "mood": "precise, polished, immersive, pristine, striking",
+  "negative": "casual snapshot photo, film grain, soft vintage look, low-poly, cartoon, anime, illustration, painting, flat vector, plastic toy look, uncanny dead eyes, low resolution, noise, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Smooth cinematic CGI camera moves such as a slow glide, a gentle crane or a macro push-in. Reflections shift accurately, steam and dust drift with realistic physics, and hair and fabric move naturally. No shake, no fast cuts and no morphing.",
+  "style_lock": "ultra-detailed 3D CGI render, physically based ray-traced lighting, perfect reflections, global illumination, razor-sharp render clarity, micro-detail skin pores and fabric fibres, flawless materials, rich accurate colours, digital human, physically based depth of field, polished perfection, clean render sharpness",
+  "thumbnail": "",
+  "example_prompt": "A hyper-detailed CGI render of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A warm ceiling lamp lights every wrinkle and pore, with perfect reflections on the ceramic cup and glossy wood. ultra-detailed 3D CGI render, physically based ray-traced lighting, perfect reflections, global illumination, razor-sharp render clarity, micro-detail skin pores and fabric fibres, flawless materials, rich accurate colours, digital human, physically based depth of field, polished perfection, clean render sharpness"
 }

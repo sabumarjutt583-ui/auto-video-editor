@@ -1,4 +1,7 @@
+import { ImagePlus, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
+
+import { pickFile } from "../../lib/dialog";
 
 import { toAppError } from "../../lib/errors";
 import { CATEGORIES, REQUIRED_FIELDS } from "../../lib/styleModel";
@@ -9,7 +12,8 @@ import { Button, Field, Modal, Select, TextInput } from "../ui";
 interface StyleFormProps {
   title: string;
   initial: StyleProfile;
-  onSave: (style: StyleProfile) => Promise<void>;
+  /** `picture` is the file chosen with Upload thumbnail, or null. */
+  onSave: (style: StyleProfile, picture: string | null) => Promise<void>;
   onClose: () => void;
 }
 
@@ -22,6 +26,7 @@ export function StyleForm({ title, initial, onSave, onClose }: StyleFormProps) {
   const [problem, setProblem] = useState<string | null>(null);
   const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
+  const [picture, setPicture] = useState<string | null>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -33,7 +38,7 @@ export function StyleForm({ title, initial, onSave, onClose }: StyleFormProps) {
     setBusy(true);
     setError(null);
     try {
-      await onSave(style);
+      await onSave(style, picture);
     } catch (caught) {
       setError(toAppError(caught, "The style could not be saved."));
       setBusy(false);
@@ -67,8 +72,29 @@ export function StyleForm({ title, initial, onSave, onClose }: StyleFormProps) {
             <textarea id={`style-${key}`} value={style[key]} rows={key === "style_lock" ? 2 : 3} onChange={(e) => setStyle({ ...style, [key]: e.target.value })} className={AREA_CLASSES} />
           </Field>
         ))}
-        <Field label="Preview picture (optional)" htmlFor="style-thumbnail" hint="Path to a picture file on this computer.">
-          <TextInput id="style-thumbnail" value={style.thumbnail} onChange={(e) => setStyle({ ...style, thumbnail: e.target.value })} />
+        <Field label="Thumbnail (optional)" htmlFor="style-thumbnail" hint="A PNG, JPG or WebP picture. It is cropped to 4:3 and shrunk. Without one, the gallery shows a colour card.">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              id="style-thumbnail"
+              icon={ImagePlus}
+              disabled={busy}
+              onClick={() => void pickFile("Choose a thumbnail picture", "Pictures", ["png", "jpg", "jpeg", "webp"]).then((file) => file && setPicture(file))}
+            >
+              Upload thumbnail
+            </Button>
+            {picture ? (
+              <>
+                <span className="max-w-72 truncate text-sm text-muted" title={picture}>
+                  {picture.split(/[\\/]/).pop()}
+                </span>
+                <Button icon={X} onClick={() => setPicture(null)} disabled={busy}>
+                  Remove
+                </Button>
+              </>
+            ) : (
+              <span className="text-sm text-muted">{style.thumbnail ? "This style already has a picture." : "No picture chosen."}</span>
+            )}
+          </div>
         </Field>
         {error && <ErrorNotice error={error} />}
         <div className="flex justify-end gap-2">

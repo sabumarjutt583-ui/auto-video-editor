@@ -1,5 +1,20 @@
 {
   "id": "paper_cutout",
   "name": "Paper Cutout",
-  "category": "Comic & Story"
+  "category": "Comic & Story",
+  "version": "1.0.0",
+  "core_identity": "A handmade layered cut-paper diorama, photographed like a tiny stage set. It feels crafty, colourful and cosy, with depth built from stacked sheets of paper. Solid coloured paper, crisp cut edges and small real shadows between layers make it recognizable.",
+  "medium": "Layered cut-paper diorama photographed on a tabletop, made from coloured paper sheets.",
+  "lighting": "Soft studio light from above and slightly to the side, casting small, soft real shadows between the paper layers and under each cut-out edge. Light is even, with a gentle falloff toward the back layers. Lamps or moons are glowing paper discs with a faint bright edge.",
+  "color_palette": "Solid coloured paper in a limited, harmonious palette of four to six colours, such as deep teal, mustard, coral, cream and navy. Colours are matte and flat, with slight tone differences between layers to create depth.",
+  "camera": "The photographer's view is a straight-on frontal view of the diorama with a slightly shallow depth of field that softens the far layers, and some close views of single layers. Camera is steady and lens-sharp on the main figure.",
+  "composition": "Three to six stacked layers: foreground leaves or edges, a middle layer with the figure and furniture, and background shapes for walls, windows and sky. Strong simple silhouettes with clear spacing between layers.",
+  "texture": "Visible paper fibres, crisp scissor-cut and knife-cut edges, slight layering offsets, tiny curls at edges, and glued tabs or folded paper strips for raised parts. Matte surfaces with a slight grain and no gloss.",
+  "characters": "Simple flat paper shapes: a round or oval cut-out head, a body made of a few cut shapes, minimal faces with tiny dot eyes and a small mouth, and mitten-like paper hands. Hair is a separate paper shape, clothes are patterned papers layered on top, and expressions are simple.",
+  "mood": "handmade, crafty, cozy, playful, calm",
+  "negative": "photorealism, 3D render, CGI look, glossy plastic, painting, watercolor, pencil sketch, anime, comic book, realistic skin, gradients, harsh shadows, neon colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Layers move in parallax at different speeds as the camera slides sideways or pushes in slowly. Paper flutters slightly in a small breeze, and pieces swing a little on their hinges. Figures make small stiff, stepped movements. No smooth realistic motion and no morphing.",
+  "style_lock": "layered cut-paper diorama, solid coloured paper, visible paper fibres, crisp cut edges, small real shadows between layers, limited harmonious palette, matte flat colours, slight layer offsets, simple flat paper figure, minimal dot face, handmade crafty look, soft studio light",
+  "thumbnail": "",
+  "example_prompt": "A cut-paper diorama: an elderly man made of cream and navy paper shapes sits alone at a mustard paper kitchen table at night, holding a tiny paper cup of tea, an empty paper chair opposite him. A round paper lamp casts a soft shadow onto the teal wall layer behind. layered cut-paper diorama, solid coloured paper, visible paper fibres, crisp cut edges, small real shadows between layers, limited harmonious palette, matte flat colours, slight layer offsets, simple flat paper figure, minimal dot face, handmade crafty look, soft studio light"
 }

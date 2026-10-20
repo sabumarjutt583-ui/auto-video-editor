@@ -100,6 +100,19 @@ pub fn parse_style(text: &str) -> Result<StyleProfile, String> {
     })
 }
 
+/// The absolute path of a profile's thumbnail when the file exists next to the profiles, else "".
+/// Only plain relative paths inside `dir` are followed.
+pub fn resolve_thumbnail(dir: &Path, relative: &str) -> String {
+    let relative = relative.trim();
+    let plain = !relative.is_empty() && !relative.starts_with('/') && !relative.contains('\\') && !relative.contains(':') && relative.split('/').all(|part| !part.is_empty() && part != "." && part != "..");
+    let file = dir.join(relative);
+    if plain && file.is_file() {
+        file.to_string_lossy().into_owned()
+    } else {
+        String::new()
+    }
+}
+
 /// Loads every `*.json` file in `dir`. A missing folder gives an empty list.
 pub fn load_dir(dir: &Path, builtin: bool, warnings: &mut Vec<String>) -> Vec<StyleProfile> {
     let Ok(entries) = fs::read_dir(dir) else { return Vec::new() };
@@ -116,6 +129,7 @@ pub fn load_dir(dir: &Path, builtin: bool, warnings: &mut Vec<String>) -> Vec<St
         match fs::read_to_string(&file).map_err(|e| e.to_string()).and_then(|text| parse_style(&text)) {
             Ok(mut style) => {
                 style.builtin = builtin;
+                style.thumbnail = resolve_thumbnail(dir, &style.thumbnail);
                 styles.push(style);
             }
             Err(reason) => warnings.push(format!("Style file {label} was skipped: {reason}.")),
@@ -159,12 +173,16 @@ pub fn save_custom(custom_dir: &Path, mut style: StyleProfile) -> Result<StylePr
         return Err(AppError::new("Please choose a category for the style.", "empty category"));
     }
     style.builtin = false;
+    // The picture, if there is one, lives next to the profile and is named after the id.
+    let relative = crate::thumbnails::rel_path(&style.id);
+    style.thumbnail = if custom_dir.join(&relative).is_file() { relative } else { String::new() };
     fs::create_dir_all(custom_dir).map_err(|e| AppError::new("The styles folder could not be created.", e.to_string()))?;
     let target = custom_dir.join(format!("{}.json", style.id));
     let temp = custom_dir.join(format!("{}.json.tmp", style.id));
     let text = serde_json::to_string_pretty(&style).map_err(|e| AppError::new("The style could not be saved.", e.to_string()))?;
     fs::write(&temp, text + "\n").map_err(|e| AppError::new("The style could not be saved.", format!("{e} ({})", temp.display())))?;
     fs::rename(&temp, &target).map_err(|e| AppError::new("The style could not be saved.", format!("{e} ({})", target.display())))?;
+    style.thumbnail = resolve_thumbnail(custom_dir, &style.thumbnail);
     Ok(style)
 }
 
@@ -172,6 +190,7 @@ pub fn delete_custom(custom_dir: &Path, id: &str) -> Result<(), AppError> {
     if !id.starts_with(CUSTOM_PREFIX) || !valid_id(id) {
         return Err(AppError::new("Only your own styles can be deleted.", format!("Not a custom style id: {id:?}")));
     }
+    let _ = fs::remove_file(custom_dir.join(crate::thumbnails::rel_path(id)));
     match fs::remove_file(custom_dir.join(format!("{id}.json"))) {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -280,5 +299,37 @@ mod tests {
         assert!(delete_custom(&custom, "../x").is_err());
         assert!(delete_custom(&custom, "cinematic_realism").is_err());
         let _ = fs::remove_dir_all(&custom);
+    }
+
+    #[test]
+    fn a_thumbnail_is_resolved_only_when_the_file_exists_inside_the_folder() {
+        let dir = temp("thumbs");
+        fs::create_dir_all(dir.join("thumbnails")).unwrap();
+        fs::write(dir.join("thumbnails").join("a.webp"), b"x").unwrap();
+        fs::write(dir.join("a.json"), r#"{"id":"a","name":"A","category":"C","thumbnail":"thumbnails/a.webp"}"#).unwrap();
+        fs::write(dir.join("b.json"), r#"{"id":"b","name":"B","category":"C","thumbnail":"thumbnails/missing.webp"}"#).unwrap();
+        fs::write(dir.join("c.json"), r#"{"id":"c","name":"C","category":"C","thumbnail":"../outside.webp"}"#).unwrap();
+        let mut warnings = Vec::new();
+        let styles = load_dir(&dir, true, &mut warnings);
+        let path_of = |id: &str| styles.iter().find(|s| s.id == id).unwrap().thumbnail.clone();
+        assert!(path_of("a").ends_with("a.webp") && Path::new(&path_of("a")).is_absolute());
+        assert_eq!(path_of("b"), "");
+        assert_eq!(path_of("c"), "");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_custom_style_keeps_a_relative_thumbnail_on_disk_and_loses_it_with_the_style() {
+        let dir = temp("custom-thumb");
+        fs::create_dir_all(dir.join("thumbnails")).unwrap();
+        fs::write(dir.join("thumbnails").join("custom_x.webp"), b"x").unwrap();
+        let style = StyleProfile { id: "custom_x".into(), name: "X".into(), category: "Painting".into(), thumbnail: "C:\\somewhere\\else.png".into(), ..StyleProfile::default() };
+        let saved = save_custom(&dir, style).unwrap();
+        assert!(saved.thumbnail.ends_with("custom_x.webp"));
+        let on_disk = fs::read_to_string(dir.join("custom_x.json")).unwrap();
+        assert!(on_disk.contains("\"thumbnail\": \"thumbnails/custom_x.webp\""), "{on_disk}");
+        delete_custom(&dir, "custom_x").unwrap();
+        assert!(!dir.join("thumbnails").join("custom_x.webp").exists());
+        let _ = fs::remove_dir_all(&dir);
     }
 }

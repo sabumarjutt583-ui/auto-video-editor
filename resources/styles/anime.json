@@ -1,5 +1,20 @@
 {
   "id": "anime",
   "name": "Anime",
-  "category": "Animation & Cartoon"
+  "category": "Animation & Cartoon",
+  "version": "1.0.0",
+  "core_identity": "A clean, vivid frame from Japanese-style TV and film animation, where feeling is carried by big eyes, wind and sky. It looks hand-drawn and cel-shaded, with detailed painted backgrounds behind simpler characters. Thin clean outlines, bright rim light and huge painted clouds make it recognizable.",
+  "medium": "2D Japanese-style TV and film animation frame, cel-shaded characters over a painted background.",
+  "lighting": "Cel shading with two to three flat tone steps for shadows, a bright rim light along hair and shoulders, and soft bloom around lamps, windows and the sun. Skies are painted with big layered cumulus clouds and beams of light. Shadows have crisp hard edges, never smooth gradients on characters.",
+  "color_palette": "Saturated but harmonious colours: clear sky blues, fresh leaf greens and warm sunset oranges with soft pink highlights. Shadow tones are slightly cooler and more purple than the base colour. Night scenes use deep indigo with warm window yellows.",
+  "camera": "Cinematic virtual-lens framing with wide establishing views, medium shots and close-ups on eyes. Moderate background softness painted as a gentle blur, and dramatic low or high angles for emotion. Occasional slight lens flare on bright lights.",
+  "composition": "Characters placed on thirds against richly detailed backgrounds, with leading lines of power poles, roads and rooftops. Large sky area, foreground leaves or window frames for depth, and clean uncluttered character silhouettes.",
+  "texture": "Smooth flat colour fills with clean thin outlines, subtle painted texture in backgrounds, and tiny sparkles and light dust. Hair is drawn in defined locks with one or two highlight streaks.",
+  "characters": "Slim, stylised figures with large expressive eyes that have bright highlights and layered irises, a small nose and a small simple mouth. Hair is drawn in defined locks and strands with stylised colour, and clothing has simple clean folds. Emotions are readable at once through eyebrows, eye shine and blush; older characters get lines and grey hair but keep the same simplified face style.",
+  "mood": "vivid, expressive, heartfelt, bright, wistful",
+  "negative": "photorealistic, 3D render, CGI look, western cartoon, comic book halftone, thick brush painting, rough sketch, rubbery limbs, grotesque proportions, oversaturated neon, muddy colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Smooth limited-animation feel: held poses with small moves, hair and clothes swaying in wind, and gentle camera pans across the painted background. Eyes blink and shine, and light flickers softly. No fast morphing, no 3D camera spins and no shaking.",
+  "style_lock": "anime frame, cel-shaded characters, two-tone hard shadows, clean thin outlines, bright rim light, soft bloom on lights, painted background, big layered clouds, saturated harmonious colours, large expressive eyes with highlights, defined hair locks, slim proportions",
+  "thumbnail": "",
+  "example_prompt": "An elderly man sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. Warm lamp light and a rim of blue moonlight from the window fall on his gentle, lined face and grey hair. anime frame, cel-shaded characters, two-tone hard shadows, clean thin outlines, bright rim light, soft bloom on lights, painted background, big layered clouds, saturated harmonious colours, large expressive eyes with highlights, defined hair locks, slim proportions"
 }

@@ -56,6 +56,15 @@ fn collect(kind: Kind, source: &Path) -> Result<Vec<ZipEntry>, AppError> {
             for name in names {
                 entries.push(ZipEntry { data: read(&source.join(&name))?, name });
             }
+            // The thumbnails travel with the styles, so users get new pictures without a new app version.
+            let thumbs = source.join(crate::thumbnails::FOLDER);
+            if thumbs.is_dir() {
+                let mut files: Vec<String> = std::fs::read_dir(&thumbs).map_err(|e| io("The thumbnails folder could not be read.", e, &thumbs))?.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.ends_with(".webp")).collect();
+                files.sort();
+                for file in files {
+                    entries.push(ZipEntry { data: read(&thumbs.join(&file))?, name: format!("{}/{file}", crate::thumbnails::FOLDER) });
+                }
+            }
         }
     }
     Ok(entries)
@@ -148,5 +157,24 @@ mod tests {
         store::install(&user, Kind::Styles, &std::fs::read(&built.zip_path).unwrap(), &manifest).unwrap();
         let library = crate::styles::load_all(&store::installed_dir(&user, Kind::Styles), &temp("none"));
         assert_eq!(library.styles.len(), 2, "{:?}", library.warnings);
+    }
+
+    /// Builds the styles package from the styles that ship in resources/styles.
+    /// Set `STYLES_PACKAGE_OUT=<folder>` to keep the zip and manifest there.
+    #[test]
+    fn the_shipped_styles_make_a_valid_package() {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../resources/styles");
+        let info: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(source.join(store::INFO_FILE)).unwrap()).unwrap();
+        let version = info["version"].as_u64().unwrap();
+        let out = std::env::var("STYLES_PACKAGE_OUT").map(PathBuf::from).unwrap_or_else(|_| temp("pkg-styles-out"));
+        let built = build(Kind::Styles, &source, &out, version, info["date"].as_str().unwrap()).unwrap();
+        assert_eq!(built.count, 51);
+        let manifest = Manifest::parse(&std::fs::read_to_string(&built.manifest_path).unwrap(), Kind::Styles).unwrap();
+        let user_root = temp("pkg-styles-user");
+        store::install(&user_root, Kind::Styles, &std::fs::read(&built.zip_path).unwrap(), &manifest).unwrap();
+        let mut warnings = Vec::new();
+        let styles = crate::styles::load_dir(&store::installed_dir(&user_root, Kind::Styles), true, &mut warnings);
+        assert!(warnings.is_empty(), "{warnings:?}");
+        assert_eq!(styles.len(), 51);
     }
 }

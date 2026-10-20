@@ -1,0 +1,20 @@
+{
+  "id": "animated_film_3d",
+  "name": "3D Animated Film",
+  "category": "Animation & Cartoon",
+  "version": "1.0.0",
+  "core_identity": "A warm, polished frame from a modern family 3D animated feature, where everything is soft, rounded and full of personality. It feels charming and emotional, like a storybook made real. Smooth stylised surfaces, glowing warm light and very expressive faces make it recognizable.",
+  "medium": "Frame from a modern family 3D animated feature film, rendered with soft global illumination.",
+  "lighting": "Soft global illumination with a warm key light, gentle bounce light from walls and floor, and subtle subsurface scattering that makes skin and ears glow. Shadows are soft and tinted with colour, and rim light separates characters from the background. Windows and lamps cast cosy pools of light.",
+  "color_palette": "Rich, warm, saturated-but-soft colours: honey yellows, tomato reds, teal blues and leafy greens, with harmonious shadow tints. Colours are clean and pleasing, never neon and never muddy.",
+  "camera": "Smooth cinematic virtual camera with 35 mm to 85 mm lens feel, shallow depth of field with creamy blur on backgrounds, and slightly low angles for warmth. Wide establishing shots show detailed miniature-feeling sets, and close-ups focus on eyes.",
+  "composition": "Clear readable staging with the character large in frame, rounded shapes, and props that tell the story, such as a cup, a photo or an empty chair. Warm foreground framing, layered depth, and uncluttered but detailed rooms.",
+  "texture": "Smooth stylised surfaces with subtle detail: visible fabric weave, wood grain, soft knit, glossy ceramic and fine hair strands. Skin is smooth and slightly waxy with soft glow. No harsh realism or pores.",
+  "characters": "Slightly exaggerated proportions with larger heads, large glossy eyes, rounded friendly shapes and small simple noses. Very expressive faces with strong eyebrows and mouth shapes; elderly characters stay cute and warm, with gentle wrinkles, bushy brows and soft round bodies, never realistic. Hair is shaped into stylised soft masses, and clothing is simple and textured.",
+  "mood": "warm, charming, heartfelt, polished, playful",
+  "negative": "photorealistic, live-action photo, 2D flat drawing, anime, comic book, painting, scary look, uncanny valley realism, gritty textures, harsh shadows, oversaturated neon, plastic toy look, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Bouncy, expressive character animation with anticipation and soft overshoot, plus smooth cinematic camera moves such as gentle pushes, arcs and slow pans. Hands, ears and eyebrows act, and cloth settles softly. No jitter, no sudden zoom and no realistic stiff motion.",
+  "style_lock": "3D animated family film frame, soft global illumination, warm key light, gentle bounce light, subsurface skin glow, smooth stylised surfaces, subtle fabric and wood detail, rich warm colours, large glossy eyes, rounded friendly shapes, expressive face, shallow depth of field",
+  "thumbnail": "",
+  "example_prompt": "An elderly man with soft round cheeks and bushy white brows sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A warm lamp glows on the knitted fabric of his cardigan and the wooden table. 3D animated family film frame, soft global illumination, warm key light, gentle bounce light, subsurface skin glow, smooth stylised surfaces, subtle fabric and wood detail, rich warm colours, large glossy eyes, rounded friendly shapes, expressive face, shallow depth of field"
+}

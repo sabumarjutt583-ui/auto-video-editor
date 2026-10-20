@@ -1,5 +1,20 @@
 {
   "id": "scientific_visualization",
   "name": "Scientific Visualization",
-  "category": "Educational & Science"
+  "category": "Educational & Science",
+  "version": "1.0.0",
+  "core_identity": "A precise, awe-inspiring scientific 3D visualization of things too small, too large or too fast to see, such as molecules, planets and galaxies. It feels vast, exact and glowing against darkness. Luminous particles, energy fields and deep space black make it recognizable.",
+  "medium": "Scientific 3D visualization and data art, rendered with luminous particles and volumetric light.",
+  "lighting": "Glowing elements on dark backgrounds, volumetric light beams and soft bloom around bright cores. Rim glows trace edges of spheres and fields, and light scatters through fine dust. Contrast is high with deep black surrounding.",
+  "color_palette": "Deep space black or navy with glowing blue, cyan, violet and orange. Hot white cores fade into coloured halos, and colours are saturated only in the glowing parts, with clean dark negative space.",
+  "camera": "A smooth virtual camera with a wide 24 mm to 50 mm feel, macro views of molecules, planetary orbits and cosmic wide shots with strong sense of scale. Shallow depth of field blurs distant particles into soft glowing dots.",
+  "composition": "A central glowing subject, such as a molecule, planet or energy field, surrounded by empty dark space and scattered particles. Orbits, lattices and flowing lines lead the eye, and scale is shown by contrast between tiny and huge.",
+  "texture": "Clean particles, glowing lines, energy fields, fine mesh lattices, translucent spheres and soft nebular gas. Surfaces are smooth with no dirt, and fine point-light details fill the dark.",
+  "characters": "Rarely needed. When a person is shown, he or she appears as a small silhouette or a figure made of glowing particles and fine lines, with no detailed face, calm posture and a faint rim glow. Scale against the huge subject carries the emotion.",
+  "mood": "awe-inspiring, precise, vast, luminous, mysterious",
+  "negative": "text, numbers, labels, equations, charts with letters, photorealistic faces, cartoon, anime, illustration, painting, bright daylight, cluttered background, low resolution, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
+  "motion_rules": "Slow orbiting camera moves around the subject, particles flowing along fields, electrons or planets moving in their orbits, and cosmic scale reveals as the camera pulls back. Glows pulse gently. No fast cuts, no shake and no sudden zooms.",
+  "style_lock": "scientific 3D visualization, glowing elements on deep space black, volumetric light beams, soft bloom, glowing blue and cyan and violet palette, orange accents, clean luminous particles, energy fields, fine glowing lines, vast cosmic scale, precise elegant look, glowing particle figure",
+  "thumbnail": "",
+  "example_prompt": "A scientific visualization of an elderly man as a small silhouette made of glowing blue particles sitting at a simple table in a vast dark space, holding a cup of tea, an empty chair opposite him. Fine violet energy lines drift around the table. scientific 3D visualization, glowing elements on deep space black, volumetric light beams, soft bloom, glowing blue and cyan and violet palette, orange accents, clean luminous particles, energy fields, fine glowing lines, vast cosmic scale, precise elegant look, glowing particle figure"
 }
