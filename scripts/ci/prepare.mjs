@@ -29,8 +29,10 @@ if (process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME !== `v$
 const repo = process.env.RELEASES_REPO;
 const confPath = join(root, "src-tauri", "tauri.conf.json");
 const conf = readFileSync(confPath, "utf8");
-if (!conf.includes(PLACEHOLDER)) fail(`tauri.conf.json has no ${PLACEHOLDER} placeholder in the updater address.`);
-writeFileSync(confPath, conf.replaceAll(PLACEHOLDER, repo));
+if (conf.includes(PLACEHOLDER)) writeFileSync(confPath, conf.replaceAll(PLACEHOLDER, repo));
+else if (!conf.includes(`https://github.com/${repo}/releases/latest/download/latest.json`)) {
+  fail(`The updater address in tauri.conf.json does not use ${repo}. Put ${PLACEHOLDER} there, or the same repository as the variable RELEASES_REPO.`);
+}
 
 const notes = changelogSection(read("CHANGELOG.md"), version) ?? `Auto Editor v${version}`;
 writeFileSync(process.argv[2], `${notes}\n`);
