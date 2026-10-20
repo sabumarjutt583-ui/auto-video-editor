@@ -4,7 +4,15 @@
 #   build-ffmpeg-macos.sh <out-dir>
 # Result: <out-dir>/ffmpeg and <out-dir>/ffprobe. Only system libraries are linked dynamically.
 # The workflow caches <out-dir>, so this long build runs only when this file changes.
-set -euo pipefail
+set -Eeuo pipefail
+
+# On any failure, show the line (and the tail of FFmpeg's configure log) as an error annotation of the workflow run.
+annotate() { printf '::error::%s\n' "$(printf '%s' "$1" | head -c 3500 | awk '{printf "%s%%0A", $0}')"; }
+on_error() {
+  annotate "build-ffmpeg-macos.sh failed at line $1"
+  if [ -n "${WORK:-}" ] && [ -f "$WORK/ffmpeg/ffbuild/config.log" ]; then annotate "$(tail -n 25 "$WORK/ffmpeg/ffbuild/config.log")"; fi
+}
+trap 'on_error $LINENO' ERR
 
 OUT="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 WORK="$(mktemp -d)"
@@ -15,7 +23,9 @@ JOBS="$(sysctl -n hw.ncpu)"
 
 FREETYPE=2.13.3; FRIBIDI=1.0.16; HARFBUZZ=10.2.0; LIBASS=0.17.3; WEBP=1.5.0; OPENH264=2.5.0; FFMPEG=8.1
 
-export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
+# Only our own static libraries may be found (never the dynamic ones of Homebrew).
+export PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig"
+unset PKG_CONFIG_PATH
 export CFLAGS="-O2 -I$PREFIX/include" CXXFLAGS="-O2 -I$PREFIX/include" LDFLAGS="-L$PREFIX/lib"
 export MACOSX_DEPLOYMENT_TARGET=11.0
 
@@ -49,7 +59,7 @@ echo "== openh264"; fetch "https://github.com/cisco/openh264/archive/refs/tags/v
 echo "== ffmpeg"; fetch "https://ffmpeg.org/releases/ffmpeg-$FFMPEG.tar.xz" "$WORK/ffmpeg"
 ( cd "$WORK/ffmpeg" && ./configure --prefix="$PREFIX/ff" --pkg-config-flags="--static" \
     --extra-cflags="-I$PREFIX/include" --extra-ldflags="-L$PREFIX/lib" --extra-libs="-lc++" \
-    --disable-gpl --disable-nonfree --disable-debug --disable-doc --disable-ffplay --enable-ffmpeg --enable-ffprobe \
+    --disable-autodetect --enable-zlib --enable-bzlib --enable-iconv --disable-gpl --disable-nonfree --disable-debug --disable-doc --disable-ffplay --enable-ffmpeg --enable-ffprobe \
     --enable-static --disable-shared --enable-libass --enable-libfreetype --enable-libfribidi --enable-libharfbuzz \
     --enable-libwebp --enable-libopenh264 --enable-videotoolbox --enable-audiotoolbox \
     && make -j"$JOBS" && make install )
@@ -60,8 +70,9 @@ strip -x "$OUT/ffmpeg" "$OUT/ffprobe"
 
 # Only Apple's own libraries may be loaded at run time (nothing from Homebrew or from this build folder).
 for f in "$OUT/ffmpeg" "$OUT/ffprobe"; do
-  if otool -L "$f" | tail -n +2 | awk '{print $1}' | grep -Ev '^(/usr/lib/|/System/Library/)'; then
-    echo "::error::$f needs a library that is not part of macOS (listed above), so it would not run on other Macs."
+  bad="$(otool -L "$f" | tail -n +2 | awk '{print $1}' | grep -Ev '^(/usr/lib/|/System/Library/)' || true)"
+  if [ -n "$bad" ]; then
+    annotate "$f needs libraries that are not part of macOS, so it would not run on other Macs: $bad"
     exit 1
   fi
 done

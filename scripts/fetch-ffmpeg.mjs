@@ -64,6 +64,8 @@ function hostTriple() {
 
 function fail(message) {
   console.error(`\n[ffmpeg] ${message}\n`);
+  // On GitHub Actions the message also becomes an error annotation of the run.
+  if (process.env.GITHUB_ACTIONS) console.log(`::error::[ffmpeg] ${message.replace(/\r?\n/g, "%0A")}`);
   process.exit(1);
 }
 

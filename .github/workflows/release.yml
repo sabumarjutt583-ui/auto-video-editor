@@ -95,7 +95,7 @@ jobs:
     name: Build ${{ matrix.name }}
     needs: preflight
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - name: Windows
