@@ -60,7 +60,8 @@ writeFileSync(changelogPath, addChangelogSection(changelog, version, date, notes
 setVersionEverywhere(version);
 
 git("add", "-A");
-git("commit", "-m", `Release ${tag}`);
+// RELEASE_COMMIT_TRAILERS (optional) adds lines such as Co-Authored-By at the end of the message.
+git("commit", "-m", `Release ${tag}${process.env.RELEASE_COMMIT_TRAILERS ? `\n\n${process.env.RELEASE_COMMIT_TRAILERS}` : ""}`);
 git("tag", "-a", tag, "-m", `Auto Editor ${tag}`);
 console.log(git("log", "-1", "--oneline"));
 git("push", "origin", branch);
