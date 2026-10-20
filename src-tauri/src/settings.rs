@@ -65,6 +65,8 @@ pub struct Settings {
     pub app_update_url: String,
     /// Look for a new app version when the app starts.
     pub auto_check_app_updates: bool,
+    /// When the app last looked for a new version (seconds since 1970; 0 = never).
+    pub last_app_update_check: u64,
     /// Write longer texts into the log files (for support). Off by default.
     pub debug_logging: bool,
     /// The first-run screens have been seen (or skipped).
@@ -88,6 +90,7 @@ impl Default for Settings {
             recent_styles: Vec::new(),
             app_update_url: String::new(),
             auto_check_app_updates: true,
+            last_app_update_check: 0,
             debug_logging: false,
             onboarding_done: false,
         }

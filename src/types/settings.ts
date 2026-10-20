@@ -24,6 +24,8 @@ export interface AppSettings {
   /** Address of latest.json for app updates. Empty = the address built into the app. */
   appUpdateUrl: string;
   autoCheckAppUpdates: boolean;
+  /** When the app last looked for a new version (seconds since 1970; 0 = never). */
+  lastAppUpdateCheck: number;
   /** Write longer texts into the log files (for support). */
   debugLogging: boolean;
   /** The first-run screens were seen or skipped. */

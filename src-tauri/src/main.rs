@@ -181,6 +181,7 @@ fn main() {
         .manage(commands::app_update::PendingUpdate::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             start_logging(app.handle());
             // Find out which encoders work while the app starts, so the first render does not wait.

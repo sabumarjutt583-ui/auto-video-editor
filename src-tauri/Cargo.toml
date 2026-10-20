@@ -21,6 +21,7 @@ tokio = { version = "1", features = ["process", "time", "sync", "macros", "io-ut
 keyring = "4"
 # native-tls = Windows Schannel / macOS Secure Transport, so no extra C toolchain is needed to build.
 reqwest = { version = "0.13", default-features = false, features = ["native-tls", "json", "http2", "system-proxy"] }
+tauri-plugin-process = "2"
 tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy", "zip"] }
 
 [dev-dependencies]

@@ -17,11 +17,14 @@
     "build:admin": "tauri build --features admin --config src-tauri/tauri.admin.conf.json",
     "styles:check": "node scripts/styles-check.mjs",
     "styles:list": "node scripts/styles-list.mjs",
-    "styles:thumbnails": "node scripts/thumbnail-prompts.mjs"
+    "styles:thumbnails": "node scripts/thumbnail-prompts.mjs",
+    "release": "node scripts/release.mjs",
+    "test:scripts": "node --test scripts/release.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.3",
+    "@tauri-apps/plugin-process": "^2.4.0",
     "lucide-react": "^1.59.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

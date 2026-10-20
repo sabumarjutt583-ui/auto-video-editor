@@ -58,7 +58,7 @@
     },
     "createUpdaterArtifacts": true,
     "publisher": "Auto Video Editor",
-    "copyright": "Copyright © 2026 Auto Video Editor",
+    "copyright": "Copyright \u00a9 2026 Auto Video Editor",
     "category": "Video",
     "shortDescription": "Prompts and automatic video editing for faceless YouTube narration videos.",
     "longDescription": "Auto Video Editor turns a voice-over and a script into image prompts, then builds the finished video: timeline, captions, music, sound effects and a final MP4 render. Everything is edited on your own computer.",
@@ -81,9 +81,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhGNDcxMTI4RDVBOEM5NTEKUldSUnlhalZLQkZIaitzYnpXYW1kKzliV25UcnZYTnA0TnhqQTZ5NlJiaWZRdy9WdzNCZWJLTEsK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUzOTMyNzA1RkMzMEI1NDQKUldSRXRURDhCU2VUNDlpL0JFZDRmOGlnbDdTOG8yZzZWMzhhaFFHdVZyK2pRQ1MzUGo3SDZKcHgK",
       "endpoints": [
-        "https://github.com/OWNER/REPO/releases/latest/download/latest.json"
+        "https://github.com/<RELEASES_REPO>/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

@@ -11,6 +11,7 @@ import {
   SettingsPage,
   SfxLibraryPage,
 } from "./pages";
+import { shouldAutoCheck, STARTUP_DELAY_MS } from "./lib/appUpdate/schedule";
 import { useAppUpdateStore } from "./store/appUpdateStore";
 import { useLibraryStore } from "./store/libraryStore";
 import { useJobStore } from "./store/jobStore";
@@ -32,7 +33,18 @@ export function App() {
     if (!settingsLoaded) return;
     void useLibraryStore.getState().refresh();
     if (useSettingsStore.getState().settings?.libraryUpdateUrl) void useLibraryStore.getState().check(true);
-    if (useSettingsStore.getState().settings?.autoCheckAppUpdates) void useAppUpdateStore.getState().check(true);
+  }, [settingsLoaded]);
+
+  // App updates: wait 5 seconds after the start, then look quietly (switched on, at most once a day).
+  useEffect(() => {
+    if (!settingsLoaded) return undefined;
+    const timer = window.setTimeout(() => {
+      const saved = useSettingsStore.getState().settings;
+      if (saved && shouldAutoCheck(saved.autoCheckAppUpdates, saved.lastAppUpdateCheck, Math.floor(Date.now() / 1000))) {
+        void useAppUpdateStore.getState().check(true);
+      }
+    }, STARTUP_DELAY_MS);
+    return () => window.clearTimeout(timer);
   }, [settingsLoaded]);
 
   // Progress of background jobs (FFmpeg, transcription) arrives as events.

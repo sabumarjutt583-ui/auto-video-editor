@@ -11,3 +11,8 @@ src-tauri/gen/schemas
 src-tauri/binaries/*
 !src-tauri/binaries/.gitkeep
 dist-packages
+
+# Updater signing keys: never commit (see RELEASE.md)
+*.key
+.tauri-keys/
+.tauri/

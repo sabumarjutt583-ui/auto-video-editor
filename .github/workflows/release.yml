@@ -1,0 +1,294 @@
+name: Release
+
+# Builds the installers for Windows, macOS and Linux and publishes ONE release in the PUBLIC releases
+# repository (variable RELEASES_REPO). The source repository itself never gets a release.
+# Nothing is published unless all three platforms were built successfully.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  RELEASES_REPO: ${{ vars.RELEASES_REPO }}
+
+jobs:
+  # 1. Stop early, with a clear message, when a setting is missing.
+  preflight:
+    name: Check settings
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check RELEASES_REPO and the secrets
+        env:
+          SOURCE_REPO: ${{ github.repository }}
+          HAS_RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN != '' }}
+          HAS_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: node scripts/ci/check-config.mjs
+      - name: The releases repository must be public and reachable
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          private="$(gh api "repos/$RELEASES_REPO" --jq .private)" || { echo "::error::The token RELEASES_TOKEN cannot see $RELEASES_REPO. Check the repository name and the token's access."; exit 1; }
+          if [ "$private" != "false" ]; then
+            echo "::error::$RELEASES_REPO is private. The releases repository must be PUBLIC, otherwise nobody can download the installers."; exit 1
+          fi
+      - name: Check that the version is the same everywhere
+        id: prepare
+        run: node scripts/ci/prepare.mjs "$RUNNER_TEMP/notes.md"
+      - name: Run the script tests
+        run: node --test scripts/release.test.mjs
+
+  # 2. FFmpeg for macOS is built from source (LGPL), once per CPU type, and cached.
+  ffmpeg-macos:
+    name: FFmpeg for macOS (${{ matrix.arch }})
+    needs: preflight
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-14
+            triple: aarch64-apple-darwin
+          - arch: x86_64
+            runner: macos-15-intel
+            triple: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache the FFmpeg build
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-out
+          key: ffmpeg-macos-${{ matrix.arch }}-${{ hashFiles('scripts/ci/build-ffmpeg-macos.sh') }}
+      - name: Build FFmpeg (about 20 minutes, only when not cached)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: bash scripts/ci/build-ffmpeg-macos.sh ffmpeg-out
+      - name: Name the files like Tauri sidecars and check them
+        run: |
+          mkdir -p sidecars
+          cp ffmpeg-out/ffmpeg "sidecars/ffmpeg-${{ matrix.triple }}"
+          cp ffmpeg-out/ffprobe "sidecars/ffprobe-${{ matrix.triple }}"
+          bash scripts/ci/verify-ffmpeg.sh sidecars "${{ matrix.triple }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-${{ matrix.triple }}
+          path: sidecars/*
+          if-no-files-found: error
+          retention-days: 3
+
+  # 3a. Windows and Linux.
+  build-desktop:
+    name: Build ${{ matrix.name }}
+    needs: preflight
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            key: windows
+          - name: Linux
+            os: ubuntu-22.04
+            key: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux system packages
+        if: matrix.key == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl wget file patchelf libssl-dev libxdo-dev \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Cache FFmpeg
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/binaries
+          key: ffmpeg-${{ matrix.key }}-${{ hashFiles('scripts/fetch-ffmpeg.mjs') }}
+      - name: Download FFmpeg and FFprobe (LGPL)
+        shell: bash
+        run: node scripts/fetch-ffmpeg.mjs --if-missing
+      - name: Check that FFmpeg and FFprobe run
+        shell: bash
+        run: |
+          triple="$(rustc -vV | sed -n 's/^host: //p')"
+          bash scripts/ci/verify-ffmpeg.sh src-tauri/binaries "$triple"
+
+      - run: npm ci
+      - name: Use the real releases repository in the updater address
+        shell: bash
+        run: node scripts/ci/prepare.mjs "$RUNNER_TEMP/notes.md"
+      - name: The user build must not contain admin code
+        if: matrix.key == 'linux'
+        run: |
+          npm run build
+          if grep -rIl -e "Style thumbnails" -e "Style Test" -e "admin-page" dist; then echo "::error::Admin code is in the user bundle."; exit 1; fi
+          rm -rf dist
+
+      - name: Build the installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundles-${{ matrix.key }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.exe.sig
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/appimage/*.AppImage.sig
+            src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: error
+          retention-days: 3
+
+  # 3b. macOS, one universal app (Intel + Apple Silicon).
+  build-macos:
+    name: Build macOS
+    needs: [preflight, ffmpeg-macos]
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Get the FFmpeg sidecars
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ffmpeg-*
+          path: src-tauri/binaries
+          merge-multiple: true
+      - name: Make the universal sidecars and check them
+        run: |
+          cd src-tauri/binaries
+          chmod +x ffmpeg-* ffprobe-*
+          for tool in ffmpeg ffprobe; do
+            lipo -create "$tool-aarch64-apple-darwin" "$tool-x86_64-apple-darwin" -output "$tool-universal-apple-darwin"
+          done
+          chmod +x ffmpeg-universal-apple-darwin ffprobe-universal-apple-darwin
+          cd ../..
+          bash scripts/ci/verify-ffmpeg.sh src-tauri/binaries aarch64-apple-darwin
+          bash scripts/ci/verify-ffmpeg.sh src-tauri/binaries universal-apple-darwin
+          # The Intel build runs through Rosetta when this Mac has it; it was already checked on an Intel Mac.
+          arch -x86_64 src-tauri/binaries/ffmpeg-x86_64-apple-darwin -version | head -1 || echo "Rosetta is not available here; skipped."
+
+      - run: npm ci
+      - name: Use the real releases repository in the updater address
+        run: node scripts/ci/prepare.mjs "$RUNNER_TEMP/notes.md"
+
+      - name: Build the universal app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          args: --target universal-apple-darwin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundles-macos
+          path: |
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz.sig
+          if-no-files-found: error
+          retention-days: 3
+
+  # 4. Only when ALL builds worked: one public release with every file. latest.json is uploaded last.
+  publish:
+    name: Publish the release
+    needs: [preflight, build-desktop, build-macos]
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+      VERSION: ${{ needs.preflight.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bundles-*
+          path: builds
+          merge-multiple: true
+
+      - name: Prepare the files, the five fixed-name copies and latest.json
+        run: |
+          node scripts/ci/prepare.mjs "$RUNNER_TEMP/notes.md"
+          git checkout -- src-tauri/tauri.conf.json
+          node scripts/ci/make-release-files.mjs builds release-files latest-file "$RUNNER_TEMP/notes.md" "$VERSION" "$RELEASES_REPO"
+          ls -l release-files latest-file
+
+      - name: Create the release as a draft (nobody can see it yet)
+        id: draft
+        run: |
+          tag="v$VERSION"
+          if state="$(gh release view "$tag" --repo "$RELEASES_REPO" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [ "$state" = "true" ]; then
+              gh release delete "$tag" --repo "$RELEASES_REPO" --yes   # a draft left by an earlier failed run
+            else
+              echo "::error::$RELEASES_REPO already has a published release $tag. Use a new version number."; exit 1
+            fi
+          fi
+          gh release create "$tag" --repo "$RELEASES_REPO" --draft --title "Auto Editor v$VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload all installers
+        run: |
+          tag="v$VERSION"
+          gh release upload "$tag" release-files/* --repo "$RELEASES_REPO" --clobber
+
+      - name: Upload latest.json (last)
+        run: gh release upload "v$VERSION" latest-file/latest.json --repo "$RELEASES_REPO" --clobber
+
+      - name: Publish (not a draft, not a pre-release, marked as latest)
+        run: gh release edit "v$VERSION" --repo "$RELEASES_REPO" --draft=false --prerelease=false --latest
+
+      - name: Remove the unfinished draft if something failed
+        if: failure() && steps.draft.outputs.created == 'true'
+        run: gh release delete "v$VERSION" --repo "$RELEASES_REPO" --yes --cleanup-tag || true
+
+      - name: Show the links
+        run: |
+          {
+            echo "### Released v$VERSION"
+            echo "https://github.com/$RELEASES_REPO/releases/tag/v$VERSION"
+            for f in AutoEditor-windows-x64-setup.exe AutoEditor-windows-x64.msi AutoEditor-macos-universal.dmg AutoEditor-linux-x64.AppImage AutoEditor-linux-x64.deb; do
+              echo "- https://github.com/$RELEASES_REPO/releases/latest/download/$f"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

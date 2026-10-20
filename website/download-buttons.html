@@ -1,0 +1,117 @@
+<!--
+  Auto Editor download buttons. Paste this whole block into any web page.
+
+  BEFORE YOU USE IT: replace <RELEASES_REPO> with the name of your public releases repository
+  (for example  myname/autoeditor-releases). In your editor use "Replace all" - the text appears
+  in the five download links and once in the script at the bottom.
+
+  The links always give the newest version, so you never have to change them again:
+  https://github.com/<RELEASES_REPO>/releases/latest/download/<file name>
+-->
+<div id="ae-download" class="ae-box">
+  <style>
+    .ae-box { --ae-bg:#14121f; --ae-card:#1d1a2e; --ae-line:#33304d; --ae-text:#ece9f8; --ae-muted:#a29fbd; --ae-accent:#8b5cf6; --ae-accent-2:#a78bfa;
+      max-width:720px; margin:0 auto; padding:28px 20px; background:var(--ae-bg); color:var(--ae-text); border:1px solid var(--ae-line); border-radius:20px;
+      font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; text-align:center; box-sizing:border-box; }
+    .ae-box *, .ae-box *::before, .ae-box *::after { box-sizing:border-box; }
+    .ae-box h2 { margin:0 0 4px; font-size:1.5rem; }
+    .ae-box p { margin:0; }
+    .ae-version { min-height:1.5em; margin:2px 0 18px; color:var(--ae-muted); font-size:.9rem; }
+    .ae-buttons { display:flex; flex-direction:column; gap:12px; }
+    .ae-item { display:flex; flex-direction:column; align-items:center; gap:4px; }
+    .ae-btn { display:block; width:100%; padding:14px 18px; background:var(--ae-card); color:var(--ae-text); border:1px solid var(--ae-line); border-radius:14px;
+      font-weight:600; text-decoration:none; transition:border-color .15s, background .15s, transform .15s; }
+    .ae-btn:hover, .ae-btn:focus-visible { border-color:var(--ae-accent-2); transform:translateY(-1px); outline:none; }
+    .ae-item.ae-match .ae-btn { background:var(--ae-accent); border-color:var(--ae-accent); color:#fff; font-size:1.1rem; padding:18px; }
+    .ae-item.ae-match .ae-btn:hover { background:var(--ae-accent-2); border-color:var(--ae-accent-2); }
+    .ae-sub { font-size:.85rem; color:var(--ae-muted); }
+    .ae-sub a { color:var(--ae-accent-2); }
+    .ae-mobile { display:none; padding:18px; background:var(--ae-card); border:1px solid var(--ae-line); border-radius:14px; }
+    .ae-box.ae-is-mobile .ae-mobile { display:block; }
+    .ae-box.ae-is-mobile .ae-buttons, .ae-box.ae-is-mobile .ae-version { display:none; }
+    .ae-notes { margin-top:22px; text-align:left; font-size:.9rem; color:var(--ae-muted); }
+    .ae-notes h3 { margin:0 0 6px; font-size:1rem; color:var(--ae-text); }
+    .ae-notes ul { margin:0; padding-left:1.2em; }
+    .ae-notes li { margin-bottom:6px; }
+    .ae-notes strong { color:var(--ae-text); }
+  </style>
+
+  <h2>Download Auto Editor</h2>
+  <p class="ae-version" id="ae-version" aria-live="polite"></p>
+
+  <div class="ae-buttons" id="ae-buttons">
+    <div class="ae-item" data-os="windows">
+      <a class="ae-btn" href="https://github.com/<RELEASES_REPO>/releases/latest/download/AutoEditor-windows-x64-setup.exe">Download for Windows</a>
+      <span class="ae-sub">Windows 10 or 11, 64-bit</span>
+    </div>
+    <div class="ae-item" data-os="mac">
+      <a class="ae-btn" href="https://github.com/<RELEASES_REPO>/releases/latest/download/AutoEditor-macos-universal.dmg">Download for Mac</a>
+      <span class="ae-sub">Intel and Apple Silicon</span>
+    </div>
+    <div class="ae-item" data-os="linux">
+      <a class="ae-btn" href="https://github.com/<RELEASES_REPO>/releases/latest/download/AutoEditor-linux-x64.AppImage">Download for Linux</a>
+      <span class="ae-sub">AppImage, 64-bit &middot; or get the <a href="https://github.com/<RELEASES_REPO>/releases/latest/download/AutoEditor-linux-x64.deb">.deb</a></span>
+    </div>
+  </div>
+
+  <p class="ae-mobile">Auto Editor is a desktop app. Please open this page on your computer.</p>
+
+  <div class="ae-notes">
+    <h3>Install notes</h3>
+    <ul>
+      <li><strong>Windows:</strong> if &ldquo;Windows protected your PC&rdquo; appears, click <strong>More info</strong>, then <strong>Run anyway</strong>.</li>
+      <li><strong>Mac:</strong> if the app cannot be opened, right-click the app, choose <strong>Open</strong>, then <strong>Open</strong> again.</li>
+      <li><strong>Linux:</strong> make the AppImage executable (right-click &gt; Properties &gt; Allow executing) or use the .deb.</li>
+    </ul>
+  </div>
+
+  <script>
+    (function () {
+      var REPO = "<RELEASES_REPO>";
+      var box = document.getElementById("ae-download");
+      if (!box) return;
+
+      // 1. Which computer is this? Anything we cannot tell leaves the three buttons equal.
+      function detect() {
+        try {
+          var ua = navigator.userAgent || "";
+          var platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+          var touchMac = /Mac/i.test(platform) && navigator.maxTouchPoints > 1; // iPad
+          if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua) || touchMac) return "mobile";
+          if (/Win/i.test(platform) || /Windows/i.test(ua)) return "windows";
+          if (/Mac/i.test(platform) || /Macintosh/i.test(ua)) return "mac";
+          if (/Linux|X11|CrOS/i.test(platform + " " + ua)) return "linux";
+        } catch (e) { /* unknown */ }
+        return "";
+      }
+      var os = detect();
+      if (os === "mobile") {
+        box.classList.add("ae-is-mobile");
+      } else if (os) {
+        var list = document.getElementById("ae-buttons");
+        var match = list.querySelector('[data-os="' + os + '"]');
+        if (match) {
+          match.classList.add("ae-match");
+          list.insertBefore(match, list.firstChild);
+        }
+      }
+
+      // 2. Show the newest version number. If it cannot be loaded, show nothing.
+      function show(version) {
+        if (!version) return;
+        document.getElementById("ae-version").textContent = "Latest version: " + String(version).replace(/^v/, "");
+      }
+      function fromApi() {
+        return fetch("https://api.github.com/repos/" + REPO + "/releases/latest")
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (j) { if (j) show(j.tag_name); });
+      }
+      try {
+        fetch("https://github.com/" + REPO + "/releases/latest/download/latest.json")
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (j) { if (j && j.version) show(j.version); else return fromApi(); })
+          .catch(function () { return fromApi().catch(function () {}); });
+      } catch (e) { /* fail silently */ }
+    })();
+  </script>
+</div>

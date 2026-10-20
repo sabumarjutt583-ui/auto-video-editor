@@ -97,7 +97,7 @@ At the bottom, **Check for library update** downloads new sounds and styles if t
 ## Settings
 
 - **API keys**: paste, **Save**, **Test Key**, **Delete**. Keys are kept only in your computer's secure keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service). They are never written to files or logs.
-- **Models**, **defaults** (aspect ratio, quality, export folder), **Video encoding**, **Library updates**, **App updates**, **Help and logs**.
+- **Models**, **defaults** (aspect ratio, quality, export folder), **Video encoding**, **Library updates**, **Updates**, **Help and logs**.
 
 ### Updating the app
 
@@ -106,6 +106,26 @@ When a new version is published, a banner appears: **Update now**. The update is
 ### If something goes wrong
 
 Every error shows a short message and a **Details** button with the technical text. If you need help, open **Settings → Help and logs → Export logs**, choose a folder, and send the file you get. It contains no API keys. Turn on **Debug logging** only when the person helping you asks for it.
+
+## Install and update
+
+**Install.** Download the app for your computer from the download page of the website:
+
+- **Windows:** run `AutoEditor-windows-x64-setup.exe`. If "Windows protected your PC" appears, click **More info**, then **Run anyway**.
+- **Mac:** open the `.dmg` and drag the app to Applications. If the app cannot be opened, right-click it, choose **Open**, then **Open** again.
+- **Linux:** make the `.AppImage` executable (right-click > Properties > Allow executing) and open it, or install the `.deb`.
+
+These warnings only appear the first time.
+
+**Update.** The app looks for a new version a few seconds after it starts (at most once a day). When there is one, a bar at the top says **Version X.Y.Z is available** with a short note about what is new.
+
+1. Press **Update now**. You see the download progress (percent and MB). The update is checked for safety, installed, and the app starts again by itself.
+2. Press **Later** if you are busy. The bar comes back at the next check.
+3. If a render or another long task is running, the app asks you to wait until it is finished, or to cancel it, before it updates.
+
+Your projects are never touched by an update. In **Settings > Updates** you can see your version, press **Check for updates**, see when the last check was, and switch **Check for updates automatically** on or off. If something goes wrong (no internet, for example) you get a clear message with a **Details** button, and the app keeps working as before.
+
+New styles and sound effects are delivered separately (see **Settings > Library updates**) and do not need an app update.
 
 ## Questions
 
