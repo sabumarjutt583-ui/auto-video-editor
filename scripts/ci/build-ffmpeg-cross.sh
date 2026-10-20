@@ -61,7 +61,9 @@ TC
   *) echo "Usage: build-ffmpeg-cross.sh <linux|windows> <out-dir>"; exit 2;;
 esac
 export CC CXX AR RANLIB
-export CFLAGS="-O2 -I$P/include" CXXFLAGS="-O2 -I$P/include" CPPFLAGS="-I$P/include" LDFLAGS="-L$P/lib"
+# Ubuntu'"'"'s mingw switches the stack protector on, which needs a library that a static build does not have: turn it off.
+HARDEN="-fno-stack-protector -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0"
+export CFLAGS="-O2 $HARDEN -I$P/include" CXXFLAGS="-O2 $HARDEN -I$P/include" CPPFLAGS="-I$P/include" LDFLAGS="-L$P/lib"
 
 fetch() { # url dir
   local flag=z
@@ -138,7 +140,7 @@ fi
 echo "== ffmpeg"; fetch "https://ffmpeg.org/releases/ffmpeg-$FFMPEG.tar.xz" "$WORK/ffmpeg"
 # shellcheck disable=SC2046  # the component flags are meant to be split into words
 ( cd "$WORK/ffmpeg" && ./configure --prefix="$P/ff" "${PLATFORM_FLAGS[@]}" --pkg-config=pkg-config --pkg-config-flags="--static" \
-    --extra-cflags="-I$P/include" --extra-ldflags="-L$P/lib $LINK_FLAGS" --extra-libs="-lstdc++" \
+    --extra-cflags="-I$P/include $HARDEN" --extra-ldflags="-L$P/lib $LINK_FLAGS" --extra-libs="-lstdc++" \
     "${FFMPEG_COMMON_FLAGS[@]}" $(ffmpeg_component_flags "${EXTRA_ENCODERS[@]}") \
     --enable-zlib --enable-libass --enable-libwebp --enable-libopenh264 --enable-libopus --enable-libmp3lame "${EXTRA_FLAGS[@]}" \
     && make -j"$JOBS" && make install )
