@@ -12,7 +12,7 @@ on_error() {
   if [ -n "${WORK:-}" ]; then
     local log
     log="$(ls -t "$WORK"/*/config.log "$WORK"/ffmpeg/ffbuild/config.log 2>/dev/null | head -n 1 || true)"
-    if [ -n "$log" ]; then annotate "$log: $(tail -n 25 "$log")"; fi
+    if [ -n "$log" ]; then annotate "$log: $(grep -n -i -E "error|fail|not found|no such|cannot" "$log" | tail -n 12)"; fi
     annotate "pkg-config files: $(ls "$P/lib/pkgconfig" 2>/dev/null | tr '\n' ' ')"
   fi
 }
@@ -93,7 +93,7 @@ echo "== harfbuzz"; fetch "https://github.com/harfbuzz/harfbuzz/releases/downloa
 cmake_build "$WORK/harfbuzz" -DHB_HAVE_FREETYPE=ON -DHB_BUILD_UTILS=OFF -DHB_BUILD_SUBSET=OFF -DBUILD_TESTING=OFF
 
 echo "== libass"; fetch "https://github.com/libass/libass/releases/download/$LIBASS/libass-$LIBASS.tar.xz" "$WORK/libass"
-( cd "$WORK/libass" && ./configure "${CONFIGURE_HOST[@]}" --prefix="$P" --disable-shared --enable-static --disable-fontconfig --disable-require-system-font-provider --disable-directwrite --disable-coretext --disable-asm && make -j"$JOBS" && make install )
+( cd "$WORK/libass" && PKG_CONFIG="pkg-config --static" ./configure "${CONFIGURE_HOST[@]}" --prefix="$P" --disable-shared --enable-static --disable-fontconfig --disable-require-system-font-provider --disable-directwrite --disable-coretext --disable-asm && make -j"$JOBS" && make install )
 
 echo "== libwebp"; fetch "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-$WEBP.tar.gz" "$WORK/webp"
 cmake_build "$WORK/webp" -DWEBP_BUILD_ANIM_UTILS=OFF -DWEBP_BUILD_CWEBP=OFF -DWEBP_BUILD_DWEBP=OFF -DWEBP_BUILD_GIF2WEBP=OFF -DWEBP_BUILD_IMG2WEBP=OFF -DWEBP_BUILD_VWEBP=OFF -DWEBP_BUILD_WEBPINFO=OFF -DWEBP_BUILD_WEBPMUX=OFF -DWEBP_BUILD_EXTRAS=OFF

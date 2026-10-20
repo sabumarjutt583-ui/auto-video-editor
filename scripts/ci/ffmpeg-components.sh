@@ -18,11 +18,11 @@ DECODERS=(
   ass ssa srt subrip webvtt
 )
 DEMUXERS=(
-  mov matroska ogg mp3 wav flac aac image2 image2pipe png_pipe jpeg_pipe webp_pipe
-  concat lavfi srt ass webvtt s16le f32le
+  mov matroska ogg mp3 wav flac aac image2 image2pipe image_png_pipe image_jpeg_pipe image_webp_pipe
+  concat lavfi srt ass webvtt pcm_s16le pcm_f32le
 )
 MUXERS=(
-  mp4 mov matroska webm mp3 wav ogg opus flac adts image2 null webp srt ass webvtt s16le f32le
+  mp4 mov matroska webm mp3 wav ogg opus flac adts image2 null webp srt ass webvtt pcm_s16le pcm_f32le
 )
 PARSERS=(
   h264 hevc vp8 vp9 av1 mpeg4video aac aac_latm mpegaudio opus vorbis flac png mjpeg webp

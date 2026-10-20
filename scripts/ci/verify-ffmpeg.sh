@@ -30,6 +30,8 @@ check() { # kind list-flag names...
   local listing; listing="$("$ffmpeg" -hide_banner "$flag" 2>/dev/null || true)"
   local name
   for name in "$@"; do
+    # Some build names differ from the names FFmpeg prints: image_png_pipe -> png_pipe, pcm_s16le (format) -> s16le.
+    case "$kind:$name" in demuxer:image_*) name="${name#image_}";; demuxer:pcm_*|muxer:pcm_*) name="${name#pcm_}";; esac
     grep -Eq "[[:space:]]${name}([[:space:],]|\$)" <<<"$listing" || missing+=("$kind:$name")
   done
 }
