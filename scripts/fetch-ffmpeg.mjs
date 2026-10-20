@@ -45,6 +45,8 @@ const BUILDS = {
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const binariesDir = join(projectRoot, "src-tauri", "binaries");
 const ifMissing = process.argv.includes("--if-missing");
+// On Windows use the system tar (bsdtar, reads .zip). A shell such as Git Bash puts GNU tar first in PATH, and GNU tar cannot open zip files.
+const tarProgram = process.platform === "win32" ? join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
 
 function hostTriple() {
   try {
@@ -140,7 +142,7 @@ async function main() {
     console.log("[ffmpeg] Unpacking ...");
     const extractDir = join(workDir, "unpacked");
     mkdirSync(extractDir);
-    execFileSync("tar", ["-xf", archive, "-C", extractDir], { stdio: "inherit" });
+    execFileSync(tarProgram, ["-xf", archive, "-C", extractDir], { stdio: "inherit" });
 
     mkdirSync(binariesDir, { recursive: true });
     for (const { name, destination } of targets) {
