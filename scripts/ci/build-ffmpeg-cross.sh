@@ -9,7 +9,12 @@ set -Eeuo pipefail
 annotate() { printf '::error::%s\n' "$(printf '%s' "$1" | head -c 3500 | awk '{printf "%s%%0A", $0}')"; }
 on_error() {
   annotate "build-ffmpeg-cross.sh failed at line $1"
-  if [ -n "${WORK:-}" ] && [ -f "$WORK/ffmpeg/ffbuild/config.log" ]; then annotate "$(tail -n 25 "$WORK/ffmpeg/ffbuild/config.log")"; fi
+  if [ -n "${WORK:-}" ]; then
+    local log
+    log="$(ls -t "$WORK"/*/config.log "$WORK"/ffmpeg/ffbuild/config.log 2>/dev/null | head -n 1 || true)"
+    if [ -n "$log" ]; then annotate "$log: $(tail -n 25 "$log")"; fi
+    annotate "pkg-config files: $(ls "$P/lib/pkgconfig" 2>/dev/null | tr '\n' ' ')"
+  fi
 }
 trap 'on_error $LINENO' ERR
 
