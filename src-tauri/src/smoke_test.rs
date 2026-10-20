@@ -88,7 +88,7 @@ async fn smoke_test_every_feature_in_five_seconds() {
 
     // 4. Captions in six scripts. Each one is drawn on a black picture; a picture with letters is larger than a black one.
     let fonts = resources().join("fonts");
-    let fonts_arg = fonts.to_string_lossy().replace('\\', "/").replace(':', "\\:");
+    let fonts_arg = crate::render::plan::filter_path(&fonts);
     let size_of = |name: &str| std::fs::metadata(dir.join(name)).unwrap().len();
     ffmpeg(&["-f", "lavfi", "-i", "color=c=black:s=640x360:d=1", "-frames:v", "1", &p("tmp/black.png")]).await;
     let black = size_of("tmp/black.png");
@@ -103,7 +103,7 @@ async fn smoke_test_every_feature_in_five_seconds() {
     for (index, (font, text)) in samples.iter().enumerate() {
         let ass = dir.join(format!("tmp/caption{index}.ass"));
         std::fs::write(&ass, build_ass(&caption_request(font, text))).unwrap();
-        let ass_arg = ass.to_string_lossy().replace('\\', "/").replace(':', "\\:");
+        let ass_arg = crate::render::plan::filter_path(&ass);
         let out = format!("tmp/caption{index}.png");
         let log = ffmpeg(&["-f", "lavfi", "-i", "color=c=black:s=640x360:d=2", "-vf", &format!("subtitles=filename={ass_arg}:fontsdir={fonts_arg}"), "-ss", "0.9", "-frames:v", "1", &p(&out)]).await;
         assert!(!log.to_lowercase().contains("error"), "{font}: {log}");
