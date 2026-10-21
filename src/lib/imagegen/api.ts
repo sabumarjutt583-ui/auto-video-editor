@@ -19,6 +19,10 @@ export const imagegenBackgroundSnapshot = (id: string) => invoke<string | null>(
 export const imagegenShowBrowser = (id: string) => invoke<boolean>("imagegen_show_browser", { id });
 
 export const imagegenStart = (projectId: string, jobs: NewImageJob[], force: boolean, start: boolean) => invoke<AddReport>("imagegen_start", { projectId, jobs, force, start });
+/** "Only images": prompts typed by the person, saved in `<folder>/media`. An empty list only opens the folder's queue. */
+export const imagegenStartFolder = (folder: string, jobs: NewImageJob[], force: boolean, start: boolean) => invoke<AddReport>("imagegen_start_folder", { folder, jobs, force, start });
+/** A small WebP preview (data address) of a picture in the folder the queue works on, or null. */
+export const imagegenPreview = (folder: string, path: string, width: number) => invoke<string | null>("imagegen_preview", { folder, path, width });
 export const imagegenPause = () => invoke<void>("imagegen_pause");
 export const imagegenResume = () => invoke<void>("imagegen_resume");
 export const imagegenRetryFailed = (ids: string[]) => invoke<number>("imagegen_retry_failed", { ids });

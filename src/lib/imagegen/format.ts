@@ -1,4 +1,4 @@
-import type { AccountStatus, AccountView, ImageJob, JobStatus, Via } from "../../types/imagegen.ts";
+import type { AccountStatus, AccountView, ImageJob, JobStatus } from "../../types/imagegen.ts";
 
 export function jobStatusLabel(status: JobStatus): string {
   switch (status) {
@@ -10,19 +10,6 @@ export function jobStatusLabel(status: JobStatus): string {
       return "Done";
     case "failed":
       return "Failed";
-  }
-}
-
-export function viaLabel(via: Via | null): string {
-  switch (via) {
-    case "free":
-      return "Google account";
-    case "gemini":
-      return "Gemini API";
-    case "cloudflare":
-      return "Cloudflare API";
-    case null:
-      return "";
   }
 }
 

@@ -1,15 +1,14 @@
-//! The scheduler. It hands the queued scenes to the Google accounts (round-robin) or to the API,
+//! The scheduler. It hands the queued scenes to the Google accounts (round-robin),
 //! saves every finished picture into the project's `media` folder under its timecode name, and decides
 //! what each kind of error means. It does not know how a picture is made: that is the `Generators`
-//! trait (the browser worker and the API calls in the app, a fake in the tests).
+//! trait (the browser worker in the app, a fake in the tests).
 //!
 //! The rules (see docs/IMAGE_ENGINE_NOTES.md section 7):
 //! * a usage limit (429) pauses only that account (1, 2, 4 ... 30 minutes), the job waits, no attempt is used;
 //! * signed out / flagged / no access: that account takes no jobs until the user fixes it, no attempt is used;
 //! * browser or network trouble: the job is queued again, no attempt is used;
 //! * timeouts, server errors and empty answers retry with a delay, up to the maximum number of attempts;
-//! * content refusals and bad requests are never retried;
-//! * with "continue with the API" on, work moves to the API when no account can take it.
+//! * content refusals and bad requests are never retried.
 
 use std::collections::HashSet;
 use std::future::Future;
@@ -25,22 +24,19 @@ use tokio::sync::Notify;
 use super::accounts::{Accounts, AccountsFile, AccountView, FreeSummary};
 use super::config::EngineConfig;
 use super::errors::{ErrorKind, GenError};
-use super::queue::{AddReport, Job, NewJob, Queue, RequeueOptions, Requeued, Stats, Status, Via};
+use super::queue::{AddReport, Job, NewJob, Queue, RequeueOptions, Requeued, Stats, Status};
 use super::recovery;
 use super::save::{self, SaveError, Saved};
-use super::settings::{ApiProvider, Engine as Mode, ImageGenSettings};
+use super::settings::ImageGenSettings;
 use super::store::{load_json, save_json};
 use crate::commands::error::AppError;
 
 pub type Picture = Result<Vec<u8>, GenError>;
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
 
-/// How a picture is made. Implemented by the real browser/API code and by test fakes.
+/// How a picture is made. Implemented by the real browser code and by test fakes.
 pub trait Generators: Send + Sync + 'static {
     fn free(&self, account_id: &str, job: &Job, settings: &ImageGenSettings) -> BoxFuture<Picture>;
-    fn api(&self, job: &Job, settings: &ImageGenSettings) -> BoxFuture<Picture>;
-    /// The API can be used (a key is saved, an account id is set).
-    fn api_ready(&self, settings: &ImageGenSettings) -> bool;
     /// Hidden mode was refused: use a minimized window for this account. `false` when that is already so.
     fn switch_to_window(&self, account_id: &str) -> BoxFuture<bool>;
 }
@@ -72,7 +68,7 @@ pub fn now_ms() -> u64 {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Notice {
-    /// `consent`, `no_account`, `signing_in`, `all_limited`, `needs_attention`, `api_key_missing`, `storage`, `waiting_retry`.
+    /// `consent`, `no_account`, `signing_in`, `all_limited`, `needs_attention`, `storage`, `waiting_retry`.
     pub kind: &'static str,
     pub text: String,
     pub until: u64,
@@ -82,11 +78,8 @@ pub struct NoticeInput {
     pub now: u64,
     pub queued: usize,
     pub generating: usize,
-    pub engine: Mode,
     pub consent_ok: bool,
     pub summary: FreeSummary,
-    pub fallback: bool,
-    pub api_ready: bool,
     pub next_cooldown_end: u64,
     pub next_retry_at: u64,
     pub storage_error: Option<String>,
@@ -101,18 +94,22 @@ pub fn compute_notice(i: &NoticeInput) -> Option<Notice> {
     if let Some(error) = &i.storage_error {
         return make("storage", &format!("The pictures cannot be saved: {error} Generation continues when the folder works again."), 0);
     }
-    let api_will_help = i.fallback && i.api_ready;
-    match i.engine {
-        Mode::Api if !i.api_ready => make("api_key_missing", "The API key (or Cloudflare account id) is missing. Add it in Settings.", 0),
-        Mode::Api => (i.next_retry_at > i.now).then(|| Notice { kind: "waiting_retry", text: "Waiting a moment before trying again.".into(), until: i.next_retry_at }),
-        Mode::Free if api_will_help => None,
-        Mode::Free if !i.consent_ok => make("consent", "Please read and accept the notice about the free engine first.", 0),
-        Mode::Free if i.summary.total == 0 => make("no_account", "No Google account is connected yet. Add one in the accounts panel and press Sign in.", 0),
-        Mode::Free if i.summary.working > 0 => (i.next_retry_at > i.now).then(|| Notice { kind: "waiting_retry", text: "Waiting a moment before trying again.".into(), until: i.next_retry_at }),
-        Mode::Free if i.summary.starting > 0 => make("signing_in", "Waiting for a Google account to finish signing in.", 0),
-        Mode::Free if i.summary.cooling > 0 => Some(Notice { kind: "all_limited", text: "Every Google account reached its usage limit. The next one is ready again at the time shown.".into(), until: i.next_cooldown_end }),
-        Mode::Free => make("needs_attention", "No Google account can work right now (signed out, paused or asked for a check). Open the accounts panel.", 0),
+    if !i.consent_ok {
+        return make("consent", "Please read and accept the notice about the free engine first.", 0);
     }
+    if i.summary.total == 0 {
+        return make("no_account", "No Google account is connected yet. Add one in the accounts panel and press Sign in.", 0);
+    }
+    if i.summary.working > 0 {
+        return (i.next_retry_at > i.now).then(|| Notice { kind: "waiting_retry", text: "Waiting a moment before trying again.".into(), until: i.next_retry_at });
+    }
+    if i.summary.starting > 0 {
+        return make("signing_in", "Waiting for a Google account to finish signing in.", 0);
+    }
+    if i.summary.cooling > 0 {
+        return Some(Notice { kind: "all_limited", text: "Every Google account reached its usage limit. The next one is ready again at the time shown.".into(), until: i.next_cooldown_end });
+    }
+    make("needs_attention", "No Google account can work right now (signed out, paused or asked for a check). Open the accounts panel.", 0)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -121,10 +118,11 @@ pub struct JobView {
     pub id: String,
     pub order: u32,
     pub file_name: String,
+    pub prompt: String,
+    pub aspect: String,
     pub status: Status,
     pub attempts: u32,
     pub account_id: Option<String>,
-    pub via: Option<Via>,
     pub file: Option<String>,
     pub error: String,
     pub error_kind: Option<ErrorKind>,
@@ -143,7 +141,6 @@ pub struct Snapshot {
     pub settings: ImageGenSettings,
     pub config_version: String,
     pub consent_needed: bool,
-    pub api_ready: bool,
     pub notice: Option<Notice>,
     pub now: u64,
 }
@@ -156,18 +153,11 @@ struct Run {
     storage_retry_at: u64,
 }
 
-#[derive(Default)]
-struct ApiGate {
-    cooldown_until: u64,
-    level: u32,
-}
-
 struct State {
     settings: ImageGenSettings,
     config: Arc<EngineConfig>,
     accounts: Accounts,
     run: Option<Run>,
-    api: ApiGate,
 }
 
 struct Inner {
@@ -196,16 +186,11 @@ fn run_state_file(dir: &Path) -> PathBuf {
     dir.join("run.json")
 }
 
-enum Pick {
-    Free(Job, String),
-    Api(Job),
-}
-
 impl Engine {
     pub fn new(dir: PathBuf, gens: Arc<dyn Generators>, sink: Arc<dyn Sink>, config: EngineConfig) -> Self {
         let settings = load_json::<ImageGenSettings>(&dir.join("settings.json")).and_then(|s| s.validated().ok()).unwrap_or_default();
         let accounts = Accounts::new(load_json::<AccountsFile>(&dir.join("accounts.json")).unwrap_or_default());
-        let state = State { settings, config: Arc::new(config), accounts, run: None, api: ApiGate::default() };
+        let state = State { settings, config: Arc::new(config), accounts, run: None };
         Self { inner: Arc::new(Inner { dir, gens, sink, state: Mutex::new(state), wake: Notify::new(), tuning: Mutex::new(Tuning::default()) }) }
     }
 
@@ -408,8 +393,6 @@ impl Engine {
     // ----- the page's view -----
 
     pub fn snapshot(&self) -> Snapshot {
-        let api_ready_settings = self.settings();
-        let api_ready = self.inner.gens.api_ready(&api_ready_settings);
         let now = now_ms();
         let state = self.state();
         let consent_needed = !state.settings.consent_given(state.config.major().unwrap_or(1));
@@ -423,10 +406,11 @@ impl Engine {
                         id: j.id.clone(),
                         order: j.order,
                         file_name: j.file_name.clone(),
+                        prompt: j.prompt.clone(),
+                        aspect: j.aspect.clone(),
                         status: j.status,
                         attempts: j.attempts,
                         account_id: j.account_id.clone(),
-                        via: j.via,
                         file: j.file.clone(),
                         error: j.error.clone(),
                         error_kind: j.error_kind,
@@ -446,11 +430,8 @@ impl Engine {
                 now,
                 queued: stats.queued,
                 generating: stats.generating,
-                engine: state.settings.engine,
                 consent_ok: !consent_needed,
                 summary,
-                fallback: state.settings.fallback_to_api,
-                api_ready,
                 next_cooldown_end: state.accounts.next_cooldown_end(now),
                 next_retry_at: state.run.as_ref().map_or(0, |r| r.queue.next_ready_at(now)),
                 storage_error,
@@ -467,7 +448,6 @@ impl Engine {
             settings: state.settings.clone(),
             config_version: state.config.config_version.clone(),
             consent_needed,
-            api_ready,
             notice,
             now,
         }
@@ -500,31 +480,18 @@ impl Engine {
 
     /// Starts as many jobs as the limits allow.
     pub fn dispatch(&self) {
-        let api_ready = {
-            let settings = self.settings();
-            self.inner.gens.api_ready(&settings)
-        };
         loop {
             let picked = {
                 let mut state = self.state();
-                Self::pick(&mut state, now_ms(), api_ready)
+                Self::pick(&mut state, now_ms())
             };
-            let Some(pick) = picked else { return };
+            let Some((job, account)) = picked else { return };
             let _ = self.with_run(Self::save_run_quietly);
             let engine = self.clone();
             tokio::spawn(async move {
-                match pick {
-                    Pick::Free(job, account) => {
-                        let settings = engine.settings();
-                        let result = engine.inner.gens.free(&account, &job, &settings).await;
-                        engine.finish(job, Some(account), result).await;
-                    }
-                    Pick::Api(job) => {
-                        let settings = engine.settings();
-                        let result = engine.inner.gens.api(&job, &settings).await;
-                        engine.finish(job, None, result).await;
-                    }
-                }
+                let settings = engine.settings();
+                let result = engine.inner.gens.free(&account, &job, &settings).await;
+                engine.finish(job, account, result).await;
             });
             self.changed_light();
         }
@@ -543,51 +510,32 @@ impl Engine {
         let _ = Self::save_run(run);
     }
 
-    fn pick(state: &mut State, now: u64, api_ready: bool) -> Option<Pick> {
+    fn pick(state: &mut State, now: u64) -> Option<(Job, String)> {
         let parallel = state.settings.parallel.clamp(1, 8);
-        let (engine, fallback, provider) = (state.settings.engine, state.settings.fallback_to_api, state.settings.api_provider);
         let consent_ok = state.settings.consent_given(state.config.major().unwrap_or(1));
         let max_parallel = state.config.max_parallel;
-        let State { accounts, run, api, .. } = state;
+        let State { accounts, run, .. } = state;
         let run = run.as_mut()?;
-        if !run.running || run.storage_retry_at > now || run.queue.stats().generating as u32 >= parallel {
+        if !consent_ok || !run.running || run.storage_retry_at > now || run.queue.stats().generating as u32 >= parallel {
             return None;
         }
         let media = run.dir.join("media");
         let busy_targets: HashSet<String> = run.queue.jobs.iter().filter_map(|j| j.target.clone()).collect();
         let taken = |name: &str| busy_targets.contains(name) || media.join(name).exists();
 
-        if engine == Mode::Free && consent_ok {
-            if let Some(account) = accounts.claim_slot(now, parallel.min(max_parallel)) {
-                match run.queue.claim_next(now, Via::Free, Some(&account), &|j| !j.force_api, &taken) {
-                    Some(job) => return Some(Pick::Free(job, account)),
-                    None => accounts.release_slot(&account),
-                }
+        let account = accounts.claim_slot(now, parallel.min(max_parallel))?;
+        match run.queue.claim_next(now, Some(&account), &taken) {
+            Some(job) => Some((job, account)),
+            None => {
+                accounts.release_slot(&account);
+                None
             }
         }
-        if !api_ready || api.cooldown_until > now {
-            return None;
-        }
-        let summary = accounts.summary(now);
-        let free_can_work = engine == Mode::Free && consent_ok && (summary.working > 0 || summary.starting > 0);
-        let via = match provider {
-            ApiProvider::Gemini => Via::Gemini,
-            ApiProvider::Cloudflare => Via::Cloudflare,
-        };
-        let job = if engine == Mode::Api || (fallback && !free_can_work) {
-            run.queue.claim_next(now, via, None, &|_| true, &taken)
-        } else if fallback {
-            // The accounts work, but a job the free engine gave up on goes to the API.
-            run.queue.claim_next(now, via, None, &|j| j.force_api, &taken)
-        } else {
-            None
-        };
-        job.map(Pick::Api)
     }
 
     // ----- results -----
 
-    async fn finish(&self, job: Job, account: Option<String>, result: Picture) {
+    async fn finish(&self, job: Job, account: String, result: Picture) {
         let lease = job.lease.clone().unwrap_or_default();
         let outcome = match result {
             Ok(bytes) => self.store_picture(&job, &lease, bytes).await,
@@ -595,11 +543,9 @@ impl Engine {
         };
         match outcome {
             Ok(()) => {}
-            Err(error) => self.handle_error(&job, &lease, account.as_deref(), error).await,
+            Err(error) => self.handle_error(&job, &lease, &account, error).await,
         }
-        if let Some(account) = &account {
-            self.state().accounts.release_slot(account);
-        }
+        self.state().accounts.release_slot(&account);
         self.changed();
     }
 
@@ -660,75 +606,44 @@ impl Engine {
         Ok(())
     }
 
-    async fn handle_error(&self, job: &Job, lease: &str, account: Option<&str>, error: GenError) {
+    async fn handle_error(&self, job: &Job, lease: &str, account: &str, error: GenError) {
         let now = now_ms();
         let tuning = self.tuning();
         let max_attempts = self.settings().max_attempts;
-        let fallback_ready = {
-            let settings = self.settings();
-            settings.fallback_to_api && job.via == Some(Via::Free) && self.inner.gens.api_ready(&settings)
-        };
         // Access in hidden mode: the account may only be refused in a hidden browser. Try a minimized window once.
         let mut switched = false;
         if error.kind == ErrorKind::Access {
-            if let Some(account) = account {
-                switched = self.inner.gens.switch_to_window(account).await;
-            }
+            switched = self.inner.gens.switch_to_window(account).await;
         }
         let mut state = self.state();
         if switched {
             state.settings.browser_mode = super::settings::BrowserMode::Window;
             state.settings.browser_note = "Google did not accept the hidden browser, so the browser now runs in a minimized window.".to_string();
         }
-        let State { accounts, run, api, .. } = &mut *state;
+        let State { accounts, run, .. } = &mut *state;
         let Some(run) = run.as_mut() else { return };
         let mut options = RequeueOptions { error: error.message.clone(), error_kind: Some(error.kind), ..RequeueOptions::default() };
         let mut fail = false;
         match error.kind {
-            ErrorKind::RateLimit => match account {
-                Some(id) => {
-                    accounts.limit_pause(id, "Usage limit reached", error.retry_after_ms, now);
-                }
-                None => {
-                    api.level = (api.level + 1).min(6);
-                    let minutes = [1u64, 2, 4, 8, 16, 30][(api.level - 1) as usize];
-                    api.cooldown_until = now + (minutes * 60_000).max(error.retry_after_ms);
-                }
-            },
-            ErrorKind::Auth => match account {
-                Some(id) => accounts.mark_auth_error(id, &error.message),
-                None => {
-                    api.cooldown_until = now + 10 * 60_000;
-                    fail = true;
-                }
-            },
-            ErrorKind::Access => match account {
-                Some(id) if switched => {
-                    // Nothing wrong with the account yet: the job waits a second and runs in the new window.
-                    accounts.cooldown(id, "Trying a minimized window", Some(1_000), now);
-                }
-                Some(id) => {
-                    accounts.set_verified(id, Some(false), &error.message);
-                    accounts.set_last_error(id, &error.message);
-                }
-                None => fail = true,
-            },
-            ErrorKind::Flagged => {
-                if let Some(id) = account {
-                    accounts.mark_flagged(id, &error.message, now);
-                }
+            ErrorKind::RateLimit => {
+                accounts.limit_pause(account, "Usage limit reached", error.retry_after_ms, now);
             }
+            ErrorKind::Auth => accounts.mark_auth_error(account, &error.message),
+            ErrorKind::Access if switched => {
+                // Nothing wrong with the account yet: the job waits a second and runs in the new window.
+                accounts.cooldown(account, "Trying a minimized window", Some(1_000), now);
+            }
+            ErrorKind::Access => {
+                accounts.set_verified(account, Some(false), &error.message);
+                accounts.set_last_error(account, &error.message);
+            }
+            ErrorKind::Flagged => accounts.mark_flagged(account, &error.message, now),
             ErrorKind::Session => {
-                if let Some(id) = account {
-                    accounts.cooldown(id, "Browser problem", Some(tuning.session_cooldown_ms), now);
-                }
+                accounts.cooldown(account, "Browser problem", Some(tuning.session_cooldown_ms), now);
             }
-            ErrorKind::Network => match account {
-                Some(id) => {
-                    accounts.cooldown(id, "Connection problem", None, now);
-                }
-                None => api.cooldown_until = now + 10_000,
-            },
+            ErrorKind::Network => {
+                accounts.cooldown(account, "Connection problem", None, now);
+            }
             ErrorKind::Aborted => {}
             ErrorKind::Storage => {
                 // The folder cannot be written (missing, read-only, full): nothing is started for a while.
@@ -737,25 +652,16 @@ impl Engine {
             }
             ErrorKind::Blocked | ErrorKind::BadRequest => fail = true,
             ErrorKind::Timeout | ErrorKind::NoImage | ErrorKind::Server | ErrorKind::Unknown => {
-                if let Some(id) = account {
-                    accounts.mark_failure(id, &error.message);
-                }
+                accounts.mark_failure(account, &error.message);
                 let used = job.attempts + 1;
-                if used >= max_attempts && fallback_ready {
-                    // The free engine gave up: the API gets this one, with a fresh count.
-                    options.force_api = true;
-                } else {
-                    options.count_attempt = true;
-                    options.max_attempts = Some(max_attempts);
-                    let wait = tuning.retry_base_ms.saturating_mul(1u64 << (used - 1).min(10));
-                    options.delay_ms = wait.min(tuning.retry_max_ms);
-                }
+                options.count_attempt = true;
+                options.max_attempts = Some(max_attempts);
+                let wait = tuning.retry_base_ms.saturating_mul(1u64 << (used - 1).min(10));
+                options.delay_ms = wait.min(tuning.retry_max_ms);
             }
         }
-        if let Some(id) = account {
-            if matches!(error.kind, ErrorKind::Auth | ErrorKind::Flagged | ErrorKind::Access) {
-                accounts.set_last_error(id, &error.message);
-            }
+        if matches!(error.kind, ErrorKind::Auth | ErrorKind::Flagged | ErrorKind::Access) {
+            accounts.set_last_error(account, &error.message);
         }
         if fail {
             run.queue.fail(&job.id, lease, error.message.clone(), Some(error.kind), now);

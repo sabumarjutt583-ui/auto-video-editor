@@ -1,26 +1,23 @@
-//! The real way to make pictures: the browser workers (free engine) and the API calls.
+//! The real way to make pictures: one browser worker per Google account.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use super::api_engines::{cloudflare_image, gemini_image, CLOUDFLARE_BASE, GEMINI_BASE};
 use super::browser::locator;
 use super::browser::session::Mode;
 use super::config::EngineConfig;
 use super::engine::{BoxFuture, Generators, Picture};
 use super::errors::{ErrorKind, GenError};
 use super::queue::Job;
-use super::settings::{ApiProvider, BrowserMode, ImageGenSettings};
+use super::settings::{BrowserMode, ImageGenSettings};
 use super::worker::{FreeWorker, WorkerConfig};
-use crate::keys::{self, KeyStatus, Provider};
 
 pub struct RealGenerators {
     dir: PathBuf,
     config: Mutex<Arc<EngineConfig>>,
     workers: Mutex<HashMap<String, FreeWorker>>,
-    api_cache: Mutex<Option<(Instant, String, bool)>>,
     /// Extra browser switches (tests only).
     pub extra_args: Vec<String>,
 }
@@ -38,7 +35,7 @@ pub fn mode_of(mode: BrowserMode) -> Mode {
 
 impl RealGenerators {
     pub fn new(dir: PathBuf, config: Arc<EngineConfig>) -> Self {
-        Self { dir, config: Mutex::new(config), workers: Mutex::new(HashMap::new()), api_cache: Mutex::new(None), extra_args: Vec::new() }
+        Self { dir, config: Mutex::new(config), workers: Mutex::new(HashMap::new()), extra_args: Vec::new() }
     }
 
     pub fn profile_dir(&self, account_id: &str) -> PathBuf {
@@ -94,19 +91,6 @@ impl RealGenerators {
             lock(&self.workers).remove(&id);
         }
     }
-
-    pub fn invalidate_api_cache(&self) {
-        *lock(&self.api_cache) = None;
-    }
-}
-
-async fn read_key(provider: Provider) -> Result<String, GenError> {
-    let result = tokio::task::spawn_blocking(move || keys::require(provider)).await;
-    match result {
-        Ok(Ok(key)) => Ok(key),
-        Ok(Err(error)) => Err(GenError::new(ErrorKind::Auth, error.message)),
-        Err(_) => Err(GenError::new(ErrorKind::Auth, "The key could not be read from the keychain.")),
-    }
 }
 
 impl Generators for RealGenerators {
@@ -115,38 +99,6 @@ impl Generators for RealGenerators {
         let (prompt, aspect) = (job.prompt.clone(), job.aspect.clone());
         let (parallel, timeout) = (settings.parallel, Duration::from_secs(u64::from(settings.timeout_sec)));
         Box::pin(async move { worker?.generate(&prompt, &aspect, parallel, timeout).await })
-    }
-
-    fn api(&self, job: &Job, settings: &ImageGenSettings) -> BoxFuture<Picture> {
-        let (prompt, aspect) = (job.prompt.clone(), job.aspect.clone());
-        let settings = settings.clone();
-        Box::pin(async move {
-            match settings.api_provider {
-                ApiProvider::Gemini => {
-                    let key = read_key(Provider::Gemini).await?;
-                    gemini_image(GEMINI_BASE, &key, &settings.gemini_image_model, &prompt, &aspect).await
-                }
-                ApiProvider::Cloudflare => {
-                    let token = read_key(Provider::Cloudflare).await?;
-                    cloudflare_image(CLOUDFLARE_BASE, &settings.cloudflare_account_id, &token, &settings.cloudflare_model, &prompt).await
-                }
-            }
-        })
-    }
-
-    fn api_ready(&self, settings: &ImageGenSettings) -> bool {
-        let tag = format!("{:?}/{}", settings.api_provider, settings.cloudflare_account_id);
-        if let Some((at, cached_tag, ready)) = lock(&self.api_cache).as_ref() {
-            if *cached_tag == tag && at.elapsed() < Duration::from_secs(5) {
-                return *ready;
-            }
-        }
-        let ready = match settings.api_provider {
-            ApiProvider::Gemini => keys::status(Provider::Gemini).is_ok_and(|s| s == KeyStatus::Set),
-            ApiProvider::Cloudflare => !settings.cloudflare_account_id.is_empty() && keys::status(Provider::Cloudflare).is_ok_and(|s| s == KeyStatus::Set),
-        };
-        *lock(&self.api_cache) = Some((Instant::now(), tag, ready));
-        ready
     }
 
     fn switch_to_window(&self, account_id: &str) -> BoxFuture<bool> {

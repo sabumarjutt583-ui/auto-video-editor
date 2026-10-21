@@ -5,6 +5,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+- Image Generator now uses Google accounts only. The Gemini image API and Cloudflare FLUX engines (and the fallback) were removed; the Gemini key stays for scenes and prompts.
+- Google accounts (add, sign in, verify, test) are also in Settings.
+
+### Added
+- "Only images" mode: paste your own prompts (`Prompt 1:` blocks or one per line), pick a folder and shape, and the pictures are saved in `<folder>/media` as `Image 001.png`. No project needed. "Project scenes" mode is unchanged.
+
 ## [0.2.0] - 2026-10-21
 
 ### Added

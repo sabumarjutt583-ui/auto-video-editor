@@ -1,7 +1,5 @@
 /** Mirrors src-tauri/src/imagegen (engine.rs, accounts.rs, settings.rs, queue.rs). */
 
-export type GenEngine = "free" | "api";
-export type ApiProvider = "gemini" | "cloudflare";
 export type BrowserMode = "hidden" | "window";
 export type PictureAspect = "16:9" | "1:1" | "9:16";
 
@@ -11,13 +9,6 @@ export interface Consent {
 }
 
 export interface ImageGenSettings {
-  engine: GenEngine;
-  apiProvider: ApiProvider;
-  geminiImageModel: string;
-  cloudflareAccountId: string;
-  cloudflareModel: string;
-  /** "If Free fails or all accounts hit their limit, continue with API". */
-  fallbackToApi: boolean;
   /** Pictures made at the same time, 1 to 8. */
   parallel: number;
   maxAttempts: number;
@@ -29,8 +20,6 @@ export interface ImageGenSettings {
 }
 
 export type JobStatus = "queued" | "generating" | "completed" | "failed";
-export type Via = "free" | "gemini" | "cloudflare";
-
 export type GenErrorKind =
   | "auth"
   | "access"
@@ -51,10 +40,11 @@ export interface ImageJob {
   id: string;
   order: number;
   fileName: string;
+  prompt: string;
+  aspect: string;
   status: JobStatus;
   attempts: number;
   accountId: string | null;
-  via: Via | null;
   /** Saved picture, relative to the project folder. */
   file: string | null;
   error: string;
@@ -93,7 +83,7 @@ export interface AccountView {
   stats: { completed: number; failed: number };
 }
 
-export type NoticeKind = "consent" | "no_account" | "signing_in" | "all_limited" | "needs_attention" | "api_key_missing" | "storage" | "waiting_retry";
+export type NoticeKind = "consent" | "no_account" | "signing_in" | "all_limited" | "needs_attention" | "storage" | "waiting_retry";
 
 export interface Notice {
   kind: NoticeKind;
@@ -118,7 +108,6 @@ export interface ImageGenSnapshot {
   settings: ImageGenSettings;
   configVersion: string;
   consentNeeded: boolean;
-  apiReady: boolean;
   notice: Notice | null;
   now: number;
 }

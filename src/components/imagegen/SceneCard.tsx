@@ -1,6 +1,6 @@
 import { Image as ImageIcon, Loader2, Pencil, RefreshCw } from "lucide-react";
 
-import { jobStatusLabel, viaLabel } from "../../lib/imagegen/format";
+import { jobStatusLabel } from "../../lib/imagegen/format";
 import { projectFileUrl } from "../../lib/media/urls";
 import type { Scene } from "../../types";
 import type { ImageJob } from "../../types/imagegen";
@@ -48,7 +48,6 @@ export function SceneCard({ scene, job, projectDir, timecode, selected, onSelect
         {scene.prompt || "No prompt yet. Write the prompts in the Prompt Generator first."}
       </p>
       {job?.status === "failed" && job.error && <p className="text-xs text-danger">{job.error}</p>}
-      {job?.status === "completed" && job.via && <p className="text-xs text-muted">Made with {viaLabel(job.via)}</p>}
       <div className="flex justify-end gap-1">
         <IconButton icon={Pencil} label={`Edit prompt ${scene.id}`} onClick={onEdit} />
         <IconButton icon={RefreshCw} label={`Regenerate ${scene.id}`} disabled={scene.prompt.trim() === "" || scene.mediaType === "video"} onClick={onRegenerate} />

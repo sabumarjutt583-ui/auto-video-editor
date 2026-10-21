@@ -7,14 +7,16 @@ interface ControlsProps {
   stats: QueueStats;
   running: boolean;
   selected: number;
-  scenesReady: number;
   busy: boolean;
-  onGenerateAll: () => void;
   onPause: () => void;
   onResume: () => void;
   onRetryFailed: () => void;
   onRegenerateSelected: () => void;
-  onOpenEditor: () => void;
+  /** Project mode only: makes pictures for all scenes. */
+  onGenerateAll?: () => void;
+  scenesReady?: number;
+  /** Project mode only. */
+  onOpenEditor?: () => void;
 }
 
 function Counter({ label, value }: { label: string; value: number }) {
@@ -37,9 +39,11 @@ export function Controls(props: ControlsProps) {
         <Counter label="Failed" value={stats.failed} />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="primary" icon={Sparkles} onClick={props.onGenerateAll} disabled={props.busy || props.scenesReady === 0 || (running && stats.queued + stats.generating > 0)}>
-          Generate all scenes
-        </Button>
+        {props.onGenerateAll && (
+          <Button variant="primary" icon={Sparkles} onClick={props.onGenerateAll} disabled={props.busy || (props.scenesReady ?? 0) === 0 || (running && stats.queued + stats.generating > 0)}>
+            Generate all scenes
+          </Button>
+        )}
         {running ? (
           <Button icon={Pause} onClick={props.onPause}>
             Pause
@@ -55,9 +59,11 @@ export function Controls(props: ControlsProps) {
         <Button icon={RefreshCw} onClick={props.onRegenerateSelected} disabled={props.busy || props.selected === 0}>
           Regenerate selected{props.selected > 0 ? ` (${props.selected})` : ""}
         </Button>
-        <Button icon={ExternalLink} onClick={props.onOpenEditor} disabled={stats.completed === 0}>
-          Open in Auto Editor
-        </Button>
+        {props.onOpenEditor && (
+          <Button icon={ExternalLink} onClick={props.onOpenEditor} disabled={stats.completed === 0}>
+            Open in Auto Editor
+          </Button>
+        )}
       </div>
     </div>
   );

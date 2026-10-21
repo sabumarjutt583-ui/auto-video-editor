@@ -71,7 +71,6 @@ impl ImageGen {
         let before = self.engine.settings();
         self.engine.set_settings(settings)?;
         let after = self.engine.settings();
-        self.real.invalidate_api_cache();
         if before.browser_mode != after.browser_mode || before.browser_path != after.browser_path {
             self.real.close_all().await;
         }

@@ -1,6 +1,6 @@
 //! What can go wrong while an image is made, and what the app does about each kind.
 //!
-//! Every way of making an image (the Google account in a browser, the official APIs) reports
+//! Every way of making an image (a Google account in a browser) reports
 //! failures as a `GenError`. The scheduler only looks at the `kind`, so its retry rules do not
 //! depend on how the image was made.
 
@@ -51,11 +51,6 @@ pub struct GenError {
 impl GenError {
     pub fn new(kind: ErrorKind, message: impl Into<String>) -> Self {
         Self { kind, message: message.into(), retry_after_ms: 0 }
-    }
-
-    pub fn with_retry_after(mut self, ms: u64) -> Self {
-        self.retry_after_ms = ms;
-        self
     }
 
     pub fn aborted() -> Self {
@@ -117,21 +112,6 @@ pub fn classify_browser_error(raw: &str, prefix: &str) -> GenError {
     GenError::new(ErrorKind::NoImage, format!("{prefix}: {}", clip(first_line, 180)))
 }
 
-/// An API answer (HTTP status) as an error kind. Used by the Gemini and Cloudflare engines.
-pub fn classify_http_status(status: u16, body: &str) -> GenError {
-    let lower = body.to_lowercase();
-    match status {
-        429 => GenError::new(ErrorKind::RateLimit, "The usage limit of this service is reached."),
-        401 | 403 => GenError::new(ErrorKind::Auth, "The service did not accept the key. Please check the key in Settings."),
-        400 if lower.contains("api key not valid") || lower.contains("api_key_invalid") => GenError::new(ErrorKind::Auth, "The service did not accept the key. Please check the key in Settings."),
-        400 if lower.contains("safety") || lower.contains("blocked") || lower.contains("prohibited") || lower.contains("policy") => GenError::new(ErrorKind::Blocked, "The service refused this prompt (content rules)."),
-        400 | 422 => GenError::new(ErrorKind::BadRequest, "The service rejected this request."),
-        404 => GenError::new(ErrorKind::BadRequest, "The model was not found. Please check the model name in the settings."),
-        500..=599 => GenError::new(ErrorKind::Server, "The service had a temporary problem."),
-        _ => GenError::new(ErrorKind::Unknown, format!("The service answered with an unexpected status ({status}).")),
-    }
-}
-
 pub fn clip(text: &str, max: usize) -> String {
     let count = text.chars().count();
     if count <= max {
@@ -184,18 +164,6 @@ mod tests {
         let other = classify_browser_error("weird\nsecond line", "Open");
         assert_eq!(other.kind, ErrorKind::NoImage);
         assert_eq!(other.message, "Open: weird");
-    }
-
-    #[test]
-    fn http_statuses_map_to_kinds() {
-        assert_eq!(classify_http_status(429, "").kind, ErrorKind::RateLimit);
-        assert_eq!(classify_http_status(401, "").kind, ErrorKind::Auth);
-        assert_eq!(classify_http_status(400, "API key not valid. Please pass a valid API key.").kind, ErrorKind::Auth);
-        assert_eq!(classify_http_status(400, "blocked by safety settings").kind, ErrorKind::Blocked);
-        assert_eq!(classify_http_status(400, "bad field").kind, ErrorKind::BadRequest);
-        assert_eq!(classify_http_status(404, "").kind, ErrorKind::BadRequest);
-        assert_eq!(classify_http_status(503, "").kind, ErrorKind::Server);
-        assert_eq!(classify_http_status(418, "").kind, ErrorKind::Unknown);
     }
 
     #[test]

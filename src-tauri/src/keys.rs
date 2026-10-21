@@ -15,8 +15,6 @@ const MAX_KEY_LENGTH: usize = 512;
 pub enum Provider {
     Groq,
     Gemini,
-    /// Cloudflare Workers AI token (the Image Generator's API engine).
-    Cloudflare,
 }
 
 impl Provider {
@@ -25,7 +23,6 @@ impl Provider {
         match self {
             Provider::Groq => "groq-api-key",
             Provider::Gemini => "gemini-api-key",
-            Provider::Cloudflare => "cloudflare-api-token",
         }
     }
 }

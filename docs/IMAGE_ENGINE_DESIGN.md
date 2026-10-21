@@ -5,8 +5,8 @@ How the Image Generator page makes pictures. Study of the reference tool: `docs/
 ## Engines
 
 - **Free**: the shared Gemini image tool, opened in the person's own Chrome/Edge/Brave/Chromium with their own Google account (one browser profile per account). The app types one prompt per request and reads the finished `data:image` out of the page.
-- **API**: Gemini image model with the Gemini key (model name editable in Settings), or Cloudflare Workers AI FLUX (account id in Settings, token in the keychain).
-- **Fallback**: with "If Free fails or all accounts hit their limit, continue with API" on, a job whose free attempts are used up (or when no account can work) is made with the API.
+- The API engines (Gemini image key, Cloudflare FLUX) and the fallback were removed: Google accounts are the only engine.
+- **Only images mode**: jobs can also live in any folder (`imagegen_start_folder`, ids `I001`, files `Image 001.png`, saved to `<folder>/media`), without a project.
 
 ## Browser control: the path chosen
 

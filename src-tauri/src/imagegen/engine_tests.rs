@@ -10,9 +10,9 @@ use serde_json::Value;
 
 use super::engine::{BoxFuture, Engine, Generators, Picture, Sink, Tuning};
 use super::errors::{ErrorKind, GenError};
-use super::queue::{Job, NewJob, Status, Via};
+use super::queue::{Job, NewJob, Status};
 use super::save::tiny_png;
-use super::settings::{Engine as Mode, ImageGenSettings};
+use super::settings::ImageGenSettings;
 use super::testserver::temp_dir;
 
 type Handler = dyn Fn(&Call) -> Picture + Send + Sync;
@@ -20,7 +20,6 @@ type Handler = dyn Fn(&Call) -> Picture + Send + Sync;
 #[derive(Debug, Clone)]
 struct Call {
     account: Option<String>,
-    via: Via,
     scene: String,
     nth: usize,
 }
@@ -29,7 +28,6 @@ struct Fake {
     handler: Mutex<Box<Handler>>,
     delay_ms: u64,
     calls: Mutex<Vec<Call>>,
-    api_ready: bool,
     counts: Mutex<HashMap<String, usize>>,
     window_switches: AtomicUsize,
     can_switch: bool,
@@ -37,16 +35,16 @@ struct Fake {
 
 impl Fake {
     fn new(handler: impl Fn(&Call) -> Picture + Send + Sync + 'static) -> Arc<Self> {
-        Arc::new(Self { handler: Mutex::new(Box::new(handler)), delay_ms: 20, calls: Mutex::new(Vec::new()), api_ready: true, counts: Mutex::new(HashMap::new()), window_switches: AtomicUsize::new(0), can_switch: true })
+        Arc::new(Self { handler: Mutex::new(Box::new(handler)), delay_ms: 20, calls: Mutex::new(Vec::new()), counts: Mutex::new(HashMap::new()), window_switches: AtomicUsize::new(0), can_switch: true })
     }
-    fn run(self: &Arc<Self>, account: Option<String>, via: Via, job: &Job) -> BoxFuture<Picture> {
+    fn run(self: &Arc<Self>, account: Option<String>, job: &Job) -> BoxFuture<Picture> {
         let nth = {
             let mut counts = self.counts.lock().unwrap();
             let count = counts.entry(job.id.clone()).or_default();
             *count += 1;
             *count
         };
-        let call = Call { account, via, scene: job.id.clone(), nth };
+        let call = Call { account, scene: job.id.clone(), nth };
         self.calls.lock().unwrap().push(call.clone());
         let fake = self.clone();
         Box::pin(async move {
@@ -63,13 +61,7 @@ struct Wrapper(Arc<Fake>);
 
 impl Generators for Wrapper {
     fn free(&self, account_id: &str, job: &Job, _: &ImageGenSettings) -> BoxFuture<Picture> {
-        self.0.run(Some(account_id.to_string()), Via::Free, job)
-    }
-    fn api(&self, job: &Job, _: &ImageGenSettings) -> BoxFuture<Picture> {
-        self.0.run(None, Via::Gemini, job)
-    }
-    fn api_ready(&self, _: &ImageGenSettings) -> bool {
-        self.0.api_ready
+        self.0.run(Some(account_id.to_string()), job)
     }
     fn switch_to_window(&self, _: &str) -> BoxFuture<bool> {
         let fake = self.0.clone();
@@ -188,7 +180,7 @@ async fn a_usage_limit_pauses_only_that_account_and_the_job_moves_on_for_free() 
 }
 
 #[tokio::test]
-async fn when_every_account_is_limited_and_no_fallback_is_on_the_jobs_wait() {
+async fn when_every_account_is_limited_the_jobs_wait() {
     let fake = Fake::new(|_| Err(GenError::new(ErrorKind::RateLimit, "limit")));
     let s = setup("wait", fake, |_| {});
     account(&s.engine, "A");
@@ -201,34 +193,11 @@ async fn when_every_account_is_limited_and_no_fallback_is_on_the_jobs_wait() {
 }
 
 #[tokio::test]
-async fn with_the_fallback_on_the_api_takes_over_when_all_accounts_are_limited() {
-    let fake = Fake::new(|call| if call.via == Via::Free { Err(GenError::new(ErrorKind::RateLimit, "limit")) } else { ok() });
-    let s = setup("fallback", fake, |settings| settings.fallback_to_api = true);
-    account(&s.engine, "A");
-    s.engine.start(&s.project, scenes(4), false, true).unwrap();
-    wait_for(&s.engine, "all completed", |snap| snap.stats.completed == 4).await;
-    assert!(s.fake.calls().iter().any(|c| c.via == Via::Gemini));
-    assert_eq!(files(&s.project).len(), 4);
-}
-
-#[tokio::test]
-async fn without_any_account_the_fallback_still_works_and_without_it_nothing_runs() {
-    let s = setup("noacc", Fake::new(|_| ok()), |settings| settings.fallback_to_api = true);
-    s.engine.start(&s.project, scenes(2), false, true).unwrap();
-    wait_for(&s.engine, "done via api", |snap| snap.stats.completed == 2).await;
-
-    let t = setup("noacc2", Fake::new(|_| ok()), |_| {});
+async fn without_any_account_nothing_runs_and_the_page_says_why() {
+    let t = setup("noacc", Fake::new(|_| ok()), |_| {});
     t.engine.start(&t.project, scenes(1), false, true).unwrap();
     wait_for(&t.engine, "notice", |snap| snap.notice.as_ref().is_some_and(|n| n.kind == "no_account")).await;
     assert!(t.fake.calls().is_empty());
-}
-
-#[tokio::test]
-async fn the_api_engine_works_alone() {
-    let s = setup("api", Fake::new(|_| ok()), |settings| settings.engine = Mode::Api);
-    s.engine.start(&s.project, scenes(3), false, true).unwrap();
-    wait_for(&s.engine, "all completed", |snap| snap.stats.completed == 3).await;
-    assert!(s.fake.calls().iter().all(|c| c.via == Via::Gemini));
 }
 
 #[tokio::test]
@@ -252,18 +221,6 @@ async fn timeouts_retry_with_a_delay_and_stop_after_the_maximum() {
     wait_for(&s.engine, "failed after 3 attempts", |snap| snap.stats.failed == 1 && snap.stats.completed == 1).await;
     assert_eq!(s.fake.calls().iter().filter(|c| c.scene == "S01").count(), 3);
     assert_eq!(s.engine.snapshot().jobs[0].attempts, 3);
-}
-
-#[tokio::test]
-async fn when_the_free_engine_gives_up_the_api_gets_the_scene() {
-    let fake = Fake::new(|call| if call.via == Via::Free { Err(GenError::new(ErrorKind::NoImage, "nothing")) } else { ok() });
-    let s = setup("giveup", fake, |settings| settings.fallback_to_api = true);
-    account(&s.engine, "A");
-    s.engine.start(&s.project, scenes(1), false, true).unwrap();
-    wait_for(&s.engine, "completed by api", |snap| snap.stats.completed == 1).await;
-    let calls = s.fake.calls();
-    assert_eq!(calls.iter().filter(|c| c.via == Via::Free).count(), 3);
-    assert_eq!(calls.last().unwrap().via, Via::Gemini);
 }
 
 #[tokio::test]

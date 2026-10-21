@@ -36,8 +36,38 @@ fn bad(message: &str, details: String) -> AppError {
 
 /// Checks every scene and returns them (prompts tidied). One bad scene refuses the whole list.
 pub fn check_jobs(jobs: Vec<NewJob>) -> Result<Vec<NewJob>, AppError> {
+    check_with(jobs, Kind::Scenes)
+}
+
+/// Checks prompts for the "Only images" mode (no project): ids `I001`, names `Image 001.png`.
+pub fn check_free_jobs(jobs: Vec<NewJob>) -> Result<Vec<NewJob>, AppError> {
+    check_with(jobs, Kind::Free)
+}
+
+#[derive(Clone, Copy)]
+enum Kind {
+    Scenes,
+    Free,
+}
+
+/// `I001`, `I012`.
+pub fn valid_free_id(id: &str) -> bool {
+    let digits = id.strip_prefix('I').unwrap_or("");
+    (2..=6).contains(&digits.len()) && digits.chars().all(|c| c.is_ascii_digit())
+}
+
+/// `Image 001.png` for `I001`.
+pub fn valid_free_file_name(id: &str, name: &str) -> bool {
+    valid_free_id(id) && name == format!("Image {}.png", &id[1..])
+}
+
+fn check_with(jobs: Vec<NewJob>, kind: Kind) -> Result<Vec<NewJob>, AppError> {
+    let (id_ok, name_ok): (fn(&str) -> bool, fn(&str, &str) -> bool) = match kind {
+        Kind::Scenes => (valid_scene_id, valid_file_name),
+        Kind::Free => (valid_free_id, valid_free_file_name),
+    };
     if jobs.is_empty() {
-        return Err(bad("There are no scenes to make pictures for.", "empty list".into()));
+        return Err(bad("There is nothing to make pictures for.", "empty list".into()));
     }
     if jobs.len() > MAX_SCENES {
         return Err(bad("There are too many scenes for one run.", format!("{} scenes", jobs.len())));
@@ -45,18 +75,18 @@ pub fn check_jobs(jobs: Vec<NewJob>) -> Result<Vec<NewJob>, AppError> {
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::with_capacity(jobs.len());
     for mut job in jobs {
-        if !valid_scene_id(&job.scene_id) {
+        if !id_ok(&job.scene_id) {
             return Err(bad("A scene has an id the app does not understand.", format!("scene id {:?}", job.scene_id)));
         }
         if !seen.insert(job.scene_id.clone()) {
             return Err(bad("The same scene appears twice.", format!("duplicate {}", job.scene_id)));
         }
-        if !valid_file_name(&job.scene_id, &job.file_name) {
+        if !name_ok(&job.scene_id, &job.file_name) {
             return Err(bad("A scene has no valid time code for its picture name.", format!("{} -> {:?}", job.scene_id, job.file_name)));
         }
         job.prompt = job.prompt.trim().to_string();
         if job.prompt.is_empty() {
-            return Err(bad(&format!("Scene {} has no prompt yet. Make the prompts first.", job.scene_id), "empty prompt".into()));
+            return Err(bad(&format!("{} has no prompt yet. Make the prompts first.", job.scene_id), "empty prompt".into()));
         }
         if job.prompt.chars().count() > MAX_PROMPT_CHARS {
             return Err(bad(&format!("The prompt of scene {} is too long.", job.scene_id), format!("{} characters", job.prompt.chars().count())));
@@ -107,5 +137,21 @@ mod tests {
         assert!(check_jobs(vec![job("S01", "evil.png", "x", "16:9")]).is_err());
         assert!(check_jobs(vec![job("S01", "S01_000.0-005.1.png", "x", "16:9"), job("S01", "S01_000.0-005.1.png", "y", "16:9")]).is_err());
         assert!(check_jobs(vec![job("S01", "S01_000.0-005.1.png", &"x".repeat(MAX_PROMPT_CHARS + 1), "16:9")]).is_err());
+    }
+
+    #[test]
+    fn only_images_mode_has_its_own_names() {
+        assert!(valid_free_id("I001") && valid_free_id("I1234"));
+        for bad in ["I1", "S001", "i001", "I00a", "I", "I0001234"] {
+            assert!(!valid_free_id(bad), "{bad}");
+        }
+        assert!(valid_free_file_name("I012", "Image 012.png"));
+        for bad in ["Image 013.png", "Image 012.jpg", "../Image 012.png", "Image 012.png/x", "S01_000.0-001.0.png"] {
+            assert!(!valid_free_file_name("I012", bad), "{bad}");
+        }
+        let list = check_free_jobs(vec![job("I001", "Image 001.png", " a cat ", "1:1")]).unwrap();
+        assert_eq!(list[0].prompt, "a cat");
+        assert!(check_free_jobs(vec![job("S01", "S01_000.0-005.1.png", "x", "16:9")]).is_err());
+        assert!(check_jobs(vec![job("I001", "Image 001.png", "x", "16:9")]).is_err());
     }
 }

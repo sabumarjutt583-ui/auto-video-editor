@@ -1,23 +1,9 @@
 //! The Image Generator's own settings (`imagegen/settings.json` in the app data folder). Nothing
-//! secret is here: keys are in the OS keychain, Google sign-ins live in the browser profile folders.
+//! secret is here: Google sign-ins live in the browser profile folders.
 
 use serde::{Deserialize, Serialize};
 
 use crate::commands::error::AppError;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Engine {
-    Free,
-    Api,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ApiProvider {
-    Gemini,
-    Cloudflare,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -38,13 +24,6 @@ pub struct Consent {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ImageGenSettings {
-    pub engine: Engine,
-    pub api_provider: ApiProvider,
-    pub gemini_image_model: String,
-    pub cloudflare_account_id: String,
-    pub cloudflare_model: String,
-    /// "If Free fails or all accounts hit their limit, continue with API".
-    pub fallback_to_api: bool,
     /// Pictures made at the same time, 1 to 8.
     pub parallel: u32,
     pub max_attempts: u32,
@@ -57,18 +36,9 @@ pub struct ImageGenSettings {
     pub consent: Option<Consent>,
 }
 
-pub const DEFAULT_GEMINI_IMAGE_MODEL: &str = "gemini-2.5-flash-image";
-pub const DEFAULT_CLOUDFLARE_MODEL: &str = "@cf/black-forest-labs/flux-1-schnell";
-
 impl Default for ImageGenSettings {
     fn default() -> Self {
         Self {
-            engine: Engine::Free,
-            api_provider: ApiProvider::Gemini,
-            gemini_image_model: DEFAULT_GEMINI_IMAGE_MODEL.to_string(),
-            cloudflare_account_id: String::new(),
-            cloudflare_model: DEFAULT_CLOUDFLARE_MODEL.to_string(),
-            fallback_to_api: false,
             parallel: 3,
             max_attempts: 3,
             timeout_sec: 300,
@@ -80,31 +50,13 @@ impl Default for ImageGenSettings {
     }
 }
 
-fn model_ok(model: &str, allow_at_and_slash: bool) -> bool {
-    !model.is_empty()
-        && model.len() <= 120
-        && model.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ':') || (allow_at_and_slash && matches!(c, '@' | '/')))
-}
-
 impl ImageGenSettings {
-    /// Tidies the values (limits, trimmed names) and rejects ones that cannot work.
+    /// Tidies the values (limits, trimmed names).
     pub fn validated(mut self) -> Result<Self, AppError> {
         self.parallel = self.parallel.clamp(1, 8);
         self.max_attempts = self.max_attempts.clamp(1, 10);
         self.timeout_sec = self.timeout_sec.clamp(30, 1800);
-        self.gemini_image_model = self.gemini_image_model.trim().to_string();
-        self.cloudflare_model = self.cloudflare_model.trim().to_string();
-        self.cloudflare_account_id = self.cloudflare_account_id.trim().to_string();
         self.browser_path = self.browser_path.trim().to_string();
-        if !model_ok(&self.gemini_image_model, false) {
-            return Err(AppError::new("That Gemini image model name is not valid.", format!("gemini image model: {}", self.gemini_image_model)));
-        }
-        if !model_ok(&self.cloudflare_model, true) {
-            return Err(AppError::new("That Cloudflare model name is not valid.", format!("cloudflare model: {}", self.cloudflare_model)));
-        }
-        if !self.cloudflare_account_id.is_empty() && !self.cloudflare_account_id.chars().all(|c| c.is_ascii_alphanumeric()) {
-            return Err(AppError::new("The Cloudflare account id should only have letters and numbers.", "cloudflare account id has other characters"));
-        }
         Ok(self)
     }
 
@@ -121,17 +73,14 @@ mod tests {
     #[test]
     fn defaults_are_safe() {
         let s = ImageGenSettings::default();
-        assert_eq!((s.engine, s.parallel, s.fallback_to_api), (Engine::Free, 3, false));
+        assert_eq!(s.parallel, 3);
         assert!(s.consent.is_none());
     }
 
     #[test]
-    fn limits_are_applied_and_bad_names_are_rejected() {
-        let s = ImageGenSettings { parallel: 99, max_attempts: 0, timeout_sec: 1, gemini_image_model: "  my-model ".into(), ..Default::default() }.validated().unwrap();
-        assert_eq!((s.parallel, s.max_attempts, s.timeout_sec, s.gemini_image_model.as_str()), (8, 1, 30, "my-model"));
-        assert!(ImageGenSettings { gemini_image_model: "a b".into(), ..Default::default() }.validated().is_err());
-        assert!(ImageGenSettings { gemini_image_model: "../x".into(), ..Default::default() }.validated().is_err());
-        assert!(ImageGenSettings { cloudflare_account_id: "ab-c".into(), ..Default::default() }.validated().is_err());
+    fn limits_are_applied() {
+        let s = ImageGenSettings { parallel: 99, max_attempts: 0, timeout_sec: 1, browser_path: "  /x/chrome ".into(), ..Default::default() }.validated().unwrap();
+        assert_eq!((s.parallel, s.max_attempts, s.timeout_sec, s.browser_path.as_str()), (8, 1, 30, "/x/chrome"));
         assert!(ImageGenSettings::default().validated().is_ok());
     }
 
@@ -145,8 +94,8 @@ mod tests {
     }
 
     #[test]
-    fn a_partial_file_gets_defaults() {
-        let s: ImageGenSettings = serde_json::from_str("{\"engine\":\"api\",\"parallel\":5}").unwrap();
-        assert_eq!((s.engine, s.parallel, s.max_attempts), (Engine::Api, 5, 3));
+    fn a_partial_file_gets_defaults_and_old_api_fields_are_ignored() {
+        let s: ImageGenSettings = serde_json::from_str("{\"engine\":\"api\",\"cloudflareAccountId\":\"x\",\"parallel\":5}").unwrap();
+        assert_eq!((s.parallel, s.max_attempts), (5, 3));
     }
 }

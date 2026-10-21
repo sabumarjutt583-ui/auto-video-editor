@@ -8,9 +8,11 @@ interface PromptEditModalProps {
   /** Saves the new prompt; `regenerate` also makes a new picture with it. */
   onSave: (prompt: string, regenerate: boolean) => void;
   onClose: () => void;
+  /** Hide "Save prompt" when saving always means making a new picture. */
+  saveOnly?: boolean;
 }
 
-export function PromptEditModal({ sceneId, prompt, onSave, onClose }: PromptEditModalProps) {
+export function PromptEditModal({ sceneId, prompt, onSave, onClose, saveOnly = true }: PromptEditModalProps) {
   const [text, setText] = useState(prompt);
   const empty = text.trim() === "";
   return (
@@ -24,9 +26,11 @@ export function PromptEditModal({ sceneId, prompt, onSave, onClose }: PromptEdit
       />
       <div className="flex justify-end gap-2">
         <Button onClick={onClose}>Cancel</Button>
-        <Button disabled={empty} onClick={() => onSave(text.trim(), false)}>
-          Save prompt
-        </Button>
+        {saveOnly && (
+          <Button disabled={empty} onClick={() => onSave(text.trim(), false)}>
+            Save prompt
+          </Button>
+        )}
         <Button variant="primary" disabled={empty} onClick={() => onSave(text.trim(), true)}>
           Save and make a new picture
         </Button>

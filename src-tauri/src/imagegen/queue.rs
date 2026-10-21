@@ -29,15 +29,6 @@ pub enum Status {
     Failed,
 }
 
-/// Which way of making images produced (or is producing) a job.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Via {
-    Free,
-    Gemini,
-    Cloudflare,
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Job {
@@ -52,7 +43,6 @@ pub struct Job {
     pub status: Status,
     pub attempts: u32,
     pub account_id: Option<String>,
-    pub via: Option<Via>,
     pub lease: Option<String>,
     /// The file name chosen when the job was claimed (the wanted name, or `name (2).png` when taken).
     pub target: Option<String>,
@@ -60,8 +50,6 @@ pub struct Job {
     pub file: Option<String>,
     pub error: String,
     pub error_kind: Option<ErrorKind>,
-    /// The free engine gave up on this job: it goes to the API.
-    pub force_api: bool,
     /// A new picture was asked for although one exists.
     pub regenerate: bool,
     pub next_attempt_at: u64,
@@ -82,13 +70,11 @@ impl Default for Job {
             status: Status::Queued,
             attempts: 0,
             account_id: None,
-            via: None,
             lease: None,
             target: None,
             file: None,
             error: String::new(),
             error_kind: None,
-            force_api: false,
             regenerate: false,
             next_attempt_at: 0,
             created_at: 0,
@@ -136,7 +122,6 @@ pub struct RequeueOptions {
     pub delay_ms: u64,
     pub error: String,
     pub error_kind: Option<ErrorKind>,
-    pub force_api: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -189,8 +174,10 @@ impl Queue {
     /// state is never disturbed) unless `force` asks for a new picture of a finished scene.
     pub fn add_jobs(&mut self, wanted: Vec<NewJob>, force: bool, now: u64) -> AddReport {
         let mut report = AddReport::default();
+        // New pictures go after the ones already in the queue, so adding more prompts later keeps the order.
+        let base = self.jobs.iter().map(|j| j.order.saturating_add(1)).max().unwrap_or(0);
         for (index, item) in wanted.into_iter().enumerate() {
-            let order = u32::try_from(index).unwrap_or(u32::MAX);
+            let order = base.saturating_add(u32::try_from(index).unwrap_or(u32::MAX));
             match self.get_mut(&item.scene_id) {
                 None => {
                     self.jobs.push(Job {
@@ -211,7 +198,6 @@ impl Queue {
                         job.file_name = item.file_name;
                         job.prompt = item.prompt;
                         job.aspect = item.aspect;
-                        job.order = order;
                         job.updated_at = now;
                         report.skipped += 1;
                     }
@@ -219,7 +205,6 @@ impl Queue {
                         job.file_name = item.file_name;
                         job.prompt = item.prompt;
                         job.aspect = item.aspect;
-                        job.order = order;
                         reset_for_retry(job, now);
                         report.added += 1;
                     }
@@ -227,7 +212,6 @@ impl Queue {
                         job.file_name = item.file_name;
                         job.prompt = item.prompt;
                         job.aspect = item.aspect;
-                        job.order = order;
                         reset_for_retry(job, now);
                         job.regenerate = true;
                         report.regenerating += 1;
@@ -240,14 +224,12 @@ impl Queue {
         report
     }
 
-    /// Takes the next job that is ready and accepted by `wants` (for example "not forced to the API").
-    /// The job becomes `generating` with a new lease and the file name it will be saved under.
-    pub fn claim_next(&mut self, now: u64, via: Via, account_id: Option<&str>, wants: &dyn Fn(&Job) -> bool, taken: &dyn Fn(&str) -> bool) -> Option<Job> {
-        let job = self.jobs.iter_mut().find(|j| j.status == Status::Queued && j.next_attempt_at <= now && wants(j))?;
+    /// Takes the next job that is ready. It becomes `generating` with a new lease and the file name it will be saved under.
+    pub fn claim_next(&mut self, now: u64, account_id: Option<&str>, taken: &dyn Fn(&str) -> bool) -> Option<Job> {
+        let job = self.jobs.iter_mut().find(|j| j.status == Status::Queued && j.next_attempt_at <= now)?;
         job.status = Status::Generating;
         job.lease = Some(new_lease(now));
         job.account_id = account_id.map(str::to_string);
-        job.via = Some(via);
         job.target = Some(unique_target(&job.file_name, taken));
         job.started_at = now;
         job.updated_at = now;
@@ -273,7 +255,6 @@ impl Queue {
         job.target = None;
         job.error.clear();
         job.error_kind = None;
-        job.force_api = false;
         job.regenerate = false;
         job.finished_at = now;
         job.updated_at = now;
@@ -297,11 +278,9 @@ impl Queue {
         job.lease = None;
         job.target = None;
         job.account_id = None;
-        job.via = None;
         job.error = options.error;
         job.error_kind = options.error_kind;
         job.next_attempt_at = if options.delay_ms > 0 { now + options.delay_ms } else { 0 };
-        job.force_api = job.force_api || options.force_api;
         job.updated_at = now;
         Requeued::Queued
     }
@@ -365,10 +344,8 @@ fn reset_for_retry(job: &mut Job, now: u64) {
     job.lease = None;
     job.target = None;
     job.account_id = None;
-    job.via = None;
     job.error.clear();
     job.error_kind = None;
-    job.force_api = false;
     job.regenerate = false;
     job.next_attempt_at = 0;
     job.updated_at = now;
@@ -379,7 +356,6 @@ fn finish_failed(job: &mut Job, error: String, kind: Option<ErrorKind>, now: u64
     job.lease = None;
     job.target = None;
     job.account_id = None;
-    job.via = None;
     job.error = if error.is_empty() { "Unknown error".to_string() } else { error };
     job.error_kind = kind;
     job.finished_at = now;
@@ -401,12 +377,8 @@ mod tests {
         false
     }
 
-    fn any(_: &Job) -> bool {
-        true
-    }
-
     fn claim(queue: &mut Queue, now: u64) -> Option<Job> {
-        queue.claim_next(now, Via::Free, Some("a1"), &any, &nothing_taken)
+        queue.claim_next(now, Some("a1"), &nothing_taken)
     }
 
     #[test]
@@ -516,7 +488,7 @@ mod tests {
         let mut queue = Queue::default();
         queue.add_jobs(wanted(&["S01"]), false, 0);
         let taken = |name: &str| name == "S01_000.0-005.0.png" || name == "S01_000.0-005.0 (2).png";
-        let job = queue.claim_next(1, Via::Free, None, &any, &taken).unwrap();
+        let job = queue.claim_next(1, None, &taken).unwrap();
         assert_eq!(job.target.as_deref(), Some("S01_000.0-005.0 (3).png"));
         assert_eq!(unique_target("a.png", &|n| n == "a.png"), "a (2).png");
         assert_eq!(unique_target("noext", &|n| n == "noext"), "noext (2)");
@@ -565,17 +537,6 @@ mod tests {
         assert_eq!((job.status, job.attempts, job.error.as_str()), (Status::Queued, 0, ""));
     }
 
-    #[test]
-    fn jobs_for_the_api_are_picked_by_the_filter() {
-        let mut queue = Queue::default();
-        queue.add_jobs(wanted(&["S01", "S02"]), false, 0);
-        let lease = claim(&mut queue, 1).unwrap().lease.unwrap();
-        queue.requeue("S01", &lease, RequeueOptions { force_api: true, ..RequeueOptions::default() }, 2);
-        let only_forced = |j: &Job| j.force_api;
-        let job = queue.claim_next(3, Via::Gemini, None, &only_forced, &nothing_taken).unwrap();
-        assert_eq!((job.id.as_str(), job.via), ("S01", Some(Via::Gemini)));
-        assert!(queue.claim_next(3, Via::Gemini, None, &only_forced, &nothing_taken).is_none());
-    }
 
     #[test]
     fn the_queue_survives_a_round_trip_through_json() {
@@ -585,5 +546,18 @@ mod tests {
         let text = serde_json::to_string(&queue).unwrap();
         assert_eq!(serde_json::from_str::<Queue>(&text).unwrap(), queue);
         assert!(text.contains("\"fileName\""), "camelCase for the page");
+    }
+
+    #[test]
+    fn prompts_added_later_go_after_the_earlier_ones() {
+        let mut queue = Queue::default();
+        queue.add_jobs(wanted(&["I001", "I002"]), false, 1);
+        queue.add_jobs(wanted(&["I003", "I004"]), false, 2);
+        let order: Vec<&str> = queue.jobs.iter().map(|j| j.id.as_str()).collect();
+        assert_eq!(order, ["I001", "I002", "I003", "I004"]);
+        // Asking again for one of the first scenes does not move it behind the others.
+        queue.add_jobs(wanted(&["I002"]), false, 3);
+        let order: Vec<&str> = queue.jobs.iter().map(|j| j.id.as_str()).collect();
+        assert_eq!(order, ["I001", "I002", "I003", "I004"]);
     }
 }

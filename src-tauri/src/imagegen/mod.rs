@@ -1,9 +1,9 @@
-//! Image Generator: makes the scene pictures. Two engines: the free one drives the user's own
-//! browser signed in to their Google account, the API one calls Gemini or Cloudflare with the user's key.
+//! Image Generator: makes the scene pictures. The engine drives the user's own
+//! browser, signed in to their Google account.
+
 //! See docs/IMAGE_ENGINE_NOTES.md and docs/IMAGE_ENGINE_DESIGN.md.
 
 pub mod accounts;
-pub mod api_engines;
 pub mod browser;
 pub mod config;
 pub mod engine;

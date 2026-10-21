@@ -88,15 +88,15 @@ A graphics card (NVIDIA, Intel, AMD, Apple) is used automatically when it works,
 
 Open **Image Generator** after you wrote the prompts. It makes one picture per scene and puts it in the project with the right name, so the **Auto Editor** shows it at once.
 
-1. Choose the engine.
-   - **Free (Google account)**: uses the image tool of Gemini through your own Google account. Read the notice that appears the first time. We recommend a separate Google account, not your YouTube channel account.
-   - **API (your key)**: uses your Gemini key (or a Cloudflare token, see Settings).
-2. For the free engine, **Add account**, press **Sign in**, sign in in the browser window that opens, then press **I have signed in** (Windows closes the window for you). Press **Verify**, and **Test image** to make one picture. Add more accounts to make more pictures before a limit is reached.
+The page has two modes. **Project scenes** makes one picture per scene of the open project. **Only images** needs no project: choose a folder, paste your own prompts (`Prompt 1: ...` blocks or one prompt per line), pick the shape and press **Add and generate**. The pictures are saved in the `media` folder inside your folder as `Image 001.png`, `Image 002.png`...
+
+1. Pictures are made with your own Google account. Read the notice that appears the first time. We recommend a separate Google account, not your YouTube channel account.
+2. In **Settings → Google accounts** (or on this page) **Add account**, press **Sign in**, sign in in the browser window that opens, then press **I have signed in** (Windows closes the window for you). Press **Verify**, and **Test image** to make one picture. Add more accounts to make more pictures before a limit is reached.
 3. Press **Generate all scenes**. The counters show queued, generating, completed and failed. **Pause** and **Resume** are always possible; closing the app in the middle is safe.
 4. **Retry failed** tries the failed ones again. Tick scenes and press **Regenerate selected**, or use the arrows on a scene. The pencil edits that scene's prompt.
 5. **Open in Auto Editor** when you are happy.
 
-If an account reaches its daily limit, only that account waits (the time is shown); the others continue. If you ticked "If Free fails or all accounts hit their limit, continue with API", the API takes over. If Google asks you to check something (captcha, "unusual activity"), the account is paused and you see the message: open the account's browser, do the check yourself, then Verify.
+If an account reaches its daily limit, only that account waits (the time is shown); the others continue. If Google asks you to check something (captcha, "unusual activity"), the account is paused and you see the message: open the account's browser, do the check yourself, then Verify.
 
 ## SFX Library
 

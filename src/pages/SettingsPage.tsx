@@ -61,13 +61,6 @@ export function SettingsPage() {
         testModel={settings?.geminiModel}
       />
 
-      <ApiKeyCard
-        provider="cloudflare"
-        title="Pictures (Cloudflare)"
-        description="Optional. Makes pictures with the FLUX model of Cloudflare Workers AI."
-        linkLabel="Create a Cloudflare token"
-        link="cloudflare_tokens"
-      />
       <ImageGeneratorCard />
 
       {settings ? (

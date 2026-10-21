@@ -33,7 +33,6 @@ pub fn recover(queue: &mut Queue, exists: &dyn Fn(&str) -> bool, retry_failed: b
                     job.error.clear();
                     job.error_kind = None;
                     job.regenerate = false;
-                    job.force_api = false;
                     job.finished_at = now;
                     report.salvaged += 1;
                 } else {
@@ -43,7 +42,6 @@ pub fn recover(queue: &mut Queue, exists: &dyn Fn(&str) -> bool, retry_failed: b
                 job.lease = None;
                 job.target = None;
                 job.account_id = None;
-                job.via = None;
                 job.updated_at = now;
             }
             Status::Failed if retry_failed && job.error_kind != Some(ErrorKind::Blocked) && job.error_kind != Some(ErrorKind::BadRequest) => {
@@ -51,7 +49,6 @@ pub fn recover(queue: &mut Queue, exists: &dyn Fn(&str) -> bool, retry_failed: b
                 job.attempts = 0;
                 job.error.clear();
                 job.error_kind = None;
-                job.force_api = false;
                 job.updated_at = now;
                 report.retried_failed += 1;
             }
@@ -67,16 +64,12 @@ pub fn recover(queue: &mut Queue, exists: &dyn Fn(&str) -> bool, retry_failed: b
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::imagegen::queue::{Job, NewJob, Via};
+    use crate::imagegen::queue::NewJob;
 
     fn queue_with(ids: &[&str]) -> Queue {
         let mut queue = Queue::default();
         queue.add_jobs(ids.iter().map(|id| NewJob { scene_id: (*id).into(), file_name: format!("{id}_000.0-005.0.png"), prompt: "p".into(), aspect: "16:9".into() }).collect(), false, 1);
         queue
-    }
-
-    fn any(_: &Job) -> bool {
-        true
     }
 
     fn never(_: &str) -> bool {
@@ -86,7 +79,7 @@ mod tests {
     #[test]
     fn an_interrupted_job_without_a_file_is_queued_again_for_free() {
         let mut queue = queue_with(&["S01"]);
-        queue.claim_next(2, Via::Free, Some("a"), &any, &never).unwrap();
+        queue.claim_next(2, Some("a"), &never).unwrap();
         let report = recover(&mut queue, &|_| false, false, 10);
         assert_eq!(report, Report { requeued: 1, ..Report::default() });
         let job = queue.get("S01").unwrap();
@@ -96,8 +89,8 @@ mod tests {
     #[test]
     fn a_job_whose_file_was_already_written_is_completed_not_generated_again() {
         let mut queue = queue_with(&["S01", "S02"]);
-        queue.claim_next(2, Via::Free, Some("a"), &any, &never).unwrap();
-        queue.claim_next(2, Via::Free, Some("a"), &any, &never).unwrap();
+        queue.claim_next(2, Some("a"), &never).unwrap();
+        queue.claim_next(2, Some("a"), &never).unwrap();
         // The crash: S01's picture reached the disk, S02's did not.
         let report = recover(&mut queue, &|path| path == "media/S01_000.0-005.0.png", false, 10);
         assert_eq!((report.salvaged, report.requeued), (1, 1));
@@ -110,9 +103,9 @@ mod tests {
     fn a_crash_in_the_middle_of_a_run_makes_no_duplicates() {
         let mut queue = queue_with(&["S01", "S02", "S03"]);
         let saved: std::collections::HashSet<String> = ["media/S01_000.0-005.0.png".to_string()].into();
-        let first = queue.claim_next(2, Via::Free, Some("a"), &any, &never).unwrap();
+        let first = queue.claim_next(2, Some("a"), &never).unwrap();
         queue.complete("S01", first.lease.as_deref().unwrap(), "media/S01_000.0-005.0.png", 3);
-        queue.claim_next(3, Via::Free, Some("a"), &any, &never).unwrap(); // S02 in flight when the app dies
+        queue.claim_next(3, Some("a"), &never).unwrap(); // S02 in flight when the app dies
         // Restart: the queue is read back from disk.
         let mut restored: Queue = serde_json::from_str(&serde_json::to_string(&queue).unwrap()).unwrap();
         recover(&mut restored, &|p| saved.contains(p), false, 20);
@@ -130,8 +123,8 @@ mod tests {
     #[test]
     fn failed_jobs_are_retried_except_refusals() {
         let mut queue = queue_with(&["S01", "S02"]);
-        let a = queue.claim_next(2, Via::Free, None, &any, &never).unwrap();
-        let b = queue.claim_next(2, Via::Free, None, &any, &never).unwrap();
+        let a = queue.claim_next(2, None, &never).unwrap();
+        let b = queue.claim_next(2, None, &never).unwrap();
         queue.fail(&a.id, a.lease.as_deref().unwrap(), "no image".into(), Some(ErrorKind::NoImage), 3);
         queue.fail(&b.id, b.lease.as_deref().unwrap(), "refused".into(), Some(ErrorKind::Blocked), 3);
         let report = recover(&mut queue, &|_| false, true, 10);
@@ -145,10 +138,10 @@ mod tests {
     #[test]
     fn old_delays_are_forgotten_and_finished_jobs_are_left_alone() {
         let mut queue = queue_with(&["S01", "S02"]);
-        let a = queue.claim_next(2, Via::Free, None, &any, &never).unwrap();
+        let a = queue.claim_next(2, None, &never).unwrap();
         queue.requeue(&a.id, a.lease.as_deref().unwrap(), crate::imagegen::queue::RequeueOptions { delay_ms: 60_000, ..Default::default() }, 3);
-        let b = queue.claim_next(3, Via::Free, None, &any, &never).unwrap();
-        queue.claim_next(3, Via::Free, None, &any, &never);
+        let b = queue.claim_next(3, None, &never).unwrap();
+        queue.claim_next(3, None, &never);
         queue.complete(&b.id, b.lease.as_deref().unwrap(), "media/gone.png", 4);
         recover(&mut queue, &|_| false, false, 10);
         assert_eq!(queue.get("S01").unwrap().next_attempt_at, 0);

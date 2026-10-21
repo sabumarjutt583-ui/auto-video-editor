@@ -1,4 +1,4 @@
-//! Commands of the Image Generator page. Heavy work (browsers, API calls, saving) runs in Rust;
+//! Commands of the Image Generator page. Heavy work (browsers, saving) runs in Rust;
 //! the page only sends scenes and shows the state it receives as `imagegen-state` events.
 
 use std::path::PathBuf;
@@ -12,7 +12,7 @@ use crate::commands::projects::project_folder;
 use crate::imagegen::browser::locator;
 use crate::imagegen::config::EngineConfig;
 use crate::imagegen::engine::{Sink, Snapshot};
-use crate::imagegen::mapping::check_jobs;
+use crate::imagegen::mapping::{check_free_jobs, check_jobs};
 use crate::imagegen::ops::{ImageGen, TestImage};
 use crate::imagegen::queue::{AddReport, NewJob};
 use crate::imagegen::settings::ImageGenSettings;
@@ -144,10 +144,57 @@ pub async fn imagegen_show_browser(ig: Ig<'_>, id: String) -> Result<bool, AppEr
 /// scenes that already have one.
 #[tauri::command]
 pub async fn imagegen_start(app: AppHandle, ig: Ig<'_>, project_id: String, jobs: Vec<NewJob>, force: bool, start: bool) -> Result<AddReport, AppError> {
-    let jobs = check_jobs(jobs)?;
+    // An empty list only opens the project's queue (the page does that when it is shown).
+    let jobs = if jobs.is_empty() { jobs } else { check_jobs(jobs)? };
     let dir = project_folder(&app, &project_id)?;
     let engine = ig.engine.clone();
     crate::commands::blocking::run_blocking(move || engine.start(&dir, jobs, force, start)).await
+}
+
+/// A folder the person picked for "Only images": it must exist and be a real folder.
+fn checked_folder(folder: &str) -> Result<PathBuf, AppError> {
+    let path = PathBuf::from(folder.trim());
+    if !path.is_absolute() || !path.is_dir() {
+        return Err(AppError::new("Please choose a folder that exists on this computer.", format!("not a folder: {folder}")));
+    }
+    Ok(path)
+}
+
+/// "Only images": prompts typed or pasted by the person, saved in `<folder>/media`. Same queue, accounts and
+/// crash safety as the scene pictures. An empty list only opens the folder's queue.
+#[tauri::command]
+pub async fn imagegen_start_folder(ig: Ig<'_>, folder: String, jobs: Vec<NewJob>, force: bool, start: bool) -> Result<AddReport, AppError> {
+    let jobs = if jobs.is_empty() { jobs } else { check_free_jobs(jobs)? };
+    let dir = checked_folder(&folder)?;
+    let engine = ig.engine.clone();
+    crate::commands::blocking::run_blocking(move || engine.start(&dir, jobs, force, start)).await
+}
+
+/// A small preview (WebP, as a data address) of a picture in the folder that the queue is working on.
+/// Only files of the open queue's `media` folder can be read, so the page cannot ask for other files.
+#[tauri::command]
+pub async fn imagegen_preview(ig: Ig<'_>, folder: String, path: String, width: u32) -> Result<Option<String>, AppError> {
+    let plain = path.strip_prefix("media/").is_some_and(|name| !name.is_empty() && !name.contains(['/', '\\']) && !name.starts_with('.'));
+    let current = ig.engine.snapshot().project_dir;
+    if !plain || current.as_deref() != Some(folder.trim()) {
+        return Ok(None);
+    }
+    let file = PathBuf::from(folder.trim()).join(&path);
+    if !file.is_file() {
+        return Ok(None);
+    }
+    let mut command = crate::ffmpeg::command(crate::ffmpeg::Tool::Ffmpeg).map_err(|e| AppError::new("The video engine (FFmpeg) is missing or could not start.", e))?;
+    command
+        .args(["-hide_banner", "-nostdin", "-v", "error", "-i"])
+        .arg(&file)
+        .args(["-vf", &format!("scale={}:-2", width.clamp(64, 640)), "-frames:v", "1", "-c:v", "libwebp", "-quality", "70", "-f", "webp", "pipe:1"])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
+    let output = command.output().await.map_err(|e| AppError::new("A preview picture could not be made.", e.to_string()))?;
+    if !output.status.success() || output.stdout.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(format!("data:image/webp;base64,{}", crate::api::base64::encode(&output.stdout))))
 }
 
 #[tauri::command]
