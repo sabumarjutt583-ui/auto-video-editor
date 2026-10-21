@@ -98,6 +98,10 @@ The page has two modes. **Project scenes** makes one picture per scene of the op
 
 If an account reaches its daily limit, only that account waits (the time is shown); the others continue. If Google asks you to check something (captcha, "unusual activity"), the account is paused and you see the message: open the account's browser, do the check yourself, then Verify.
 
+## Motion graphics (free, written by the AI)
+
+In the Auto Editor, open the **Motion** tab, pick a scene and press **Make a motion graphic**. You can write what it should show (for example "a bar falling from 100 to 50") or leave it empty and the AI chooses what fits the words. It takes about a minute. It uses the Google accounts from Settings > Image Generator, so add at least one. Use the arrows to make it again, the slider to move it in time, and the tick to switch it off. It is added on top of the video when you render (not in the small preview). Graphics keep the shape of the video they were made for: a 16:9 graphic is not used in a Shorts (9:16) render.
+
 ## SFX Library
 
 Open **SFX Library** in the left menu. Sounds are grouped by kind (whoosh, hit, pop, riser, ambience, soft swell, click, transition). You can:
@@ -110,6 +114,8 @@ Open **SFX Library** in the left menu. Sounds are grouped by kind (whoosh, hit, 
 At the bottom, **Check for library update** downloads new sounds and styles if the publisher put some online. The app checks automatically when it starts. If a new package is damaged, nothing changes. **Go back to the version before** undoes an update.
 
 ## Settings
+
+**Text engine.** Scene groups, characters and prompts are written by Gemini. Choose *Gemini API key* (fast, daily limit) or *Web chat (free)*, which uses the Google accounts of the Image Generator and needs no key.
 
 - **API keys**: paste, **Save**, **Test Key**, **Delete**. Keys are kept only in your computer's secure keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service). They are never written to files or logs.
 - **Models**, **defaults** (aspect ratio, quality, export folder), **Video encoding**, **Library updates**, **Updates**, **Help and logs**.

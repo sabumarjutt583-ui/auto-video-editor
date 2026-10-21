@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
@@ -5,6 +7,8 @@ use crate::api::error::ApiError;
 use crate::api::{gemini, groq};
 use crate::commands::blocking::run_blocking;
 use crate::commands::error::AppError;
+use crate::imagegen::chat::json_from_reply;
+use crate::imagegen::ops::ImageGen;
 use crate::jobs::{event_sink, JobRegistry};
 use crate::keys::{self, KeyStatus, Provider};
 use crate::settings;
@@ -23,6 +27,7 @@ pub struct TextAnswer {
 pub async fn generate_text(
     app: AppHandle,
     jobs: State<'_, JobRegistry>,
+    ig: State<'_, Arc<ImageGen>>,
     system: Option<String>,
     prompt: String,
     json: bool,
@@ -31,6 +36,16 @@ pub async fn generate_text(
     let job = jobs.begin(&job_id, "ai", event_sink(app.clone()))?;
     let app_for_settings = app.clone();
     let settings = run_blocking(move || settings::load(&app_for_settings)).await?;
+    if settings.text_via_chat {
+        job.progress("Asking Gemini in the web chat", 5.0);
+        let question = chat_question(system.as_deref(), &prompt, json);
+        let reply = tokio::select! {
+            () = job.cancelled() => return Err(AppError::cancelled()),
+            reply = ig.chat_ask(&question) => reply?,
+        };
+        let text = if json { json_from_reply(&reply).unwrap_or(reply.text) } else { reply.text };
+        return Ok(TextAnswer { text, provider: "chat".into() });
+    }
     let gemini_key = run_blocking(|| keys::require(Provider::Gemini)).await;
     let system = system.as_deref();
     let gemini_key = match gemini_key {
@@ -47,6 +62,21 @@ pub async fn generate_text(
         Ok(text) => Ok(TextAnswer { text, provider: "gemini".into() }),
         Err(error) => fallback_or(error.into(), &settings, &job, system, &prompt).await,
     }
+}
+
+/// The chat has no separate "system instruction" or "JSON mode", so both go into the question.
+pub fn chat_question(system: Option<&str>, prompt: &str, json: bool) -> String {
+    let mut out = String::new();
+    if let Some(system) = system.filter(|s| !s.trim().is_empty()) {
+        out.push_str("INSTRUCTIONS (follow them exactly):\n");
+        out.push_str(system.trim());
+        out.push_str("\n\nTASK:\n");
+    }
+    out.push_str(prompt.trim());
+    if json {
+        out.push_str("\n\nAnswer with the JSON only, inside one ```json code block. No other text.");
+    }
+    out
 }
 
 async fn fallback_or(
@@ -70,5 +100,19 @@ async fn fallback_or(
         Ok(text) => Ok(TextAnswer { text, provider: "groq".into() }),
         // Show the first problem (Gemini's), with the backup's problem in the details.
         Err(second) => Err(AppError::new(error.message.clone(), format!("{} | Groq backup also failed: {}", error.details, second.details()))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::chat_question;
+
+    #[test]
+    fn the_chat_question_carries_instructions_task_and_json_rule() {
+        let q = chat_question(Some(" Be short. "), " Split this. ", true);
+        assert!(q.starts_with("INSTRUCTIONS (follow them exactly):\nBe short.\n\nTASK:\nSplit this."));
+        assert!(q.ends_with("```json code block. No other text."));
+        assert_eq!(chat_question(None, "Hi", false), "Hi");
+        assert_eq!(chat_question(Some("  "), "Hi", false), "Hi");
     }
 }

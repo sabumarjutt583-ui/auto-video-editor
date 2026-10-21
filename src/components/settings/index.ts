@@ -2,6 +2,7 @@ export { ApiKeyCard } from "./ApiKeyCard";
 export { DefaultsCard } from "./DefaultsCard";
 export { EncodingCard } from "./EncodingCard";
 export { FallbackCard } from "./FallbackCard";
+export { TextEngineCard } from "./TextEngineCard";
 export { KeyStatusBadge } from "./KeyStatusBadge";
 export { ModelPicker } from "./ModelPicker";
 export { ImageGeneratorCard } from "./ImageGeneratorCard";

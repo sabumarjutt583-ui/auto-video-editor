@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+- Web chat engine: Gemini's chat in the browser, through the same Google accounts as the Image Generator. No API key. Accounts that reach a limit rest, the question moves to the next account. Settings > Text engine switches scene groups, characters and prompts between the Gemini API key and the web chat.
+- AI motion graphics (Auto Editor > Motion): Gemini writes a new animation for a scene (any kind of graphic, nothing is a fixed template). It is checked in a hidden offline browser (errors, empty, covers the screen, does not move; up to 3 tries), drawn to transparent frames at 1080p / 30 fps and laid over the video when you render, below the captions.
+
 ### Changed
 - Release workflow: a manual run builds Windows only by default (choose `all` for every platform).
 

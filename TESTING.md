@@ -109,3 +109,12 @@ Not tested here: Windows installer and a clean Windows PC, GPU encoders, real Gr
 - Batch 4 sample prompts (docs/style-tests/batch4.txt) also still need Admin > Style Test.
 - Batch 5 sample prompts (docs/style-tests/batch5.txt) still need Admin > Style Test.
 - Styles package: `STYLES_PACKAGE_OUT=<folder> cargo test --features admin the_shipped_styles_make` builds styles-package-<version>.zip + manifest from resources/styles and installs it into a temp user folder (51 styles load).
+
+### Web chat + motion graphics run (2026-10-21, Linux sandbox)
+
+`cargo test` 382 passed (`--features admin` builds without warnings); `npm run test:ts` 243 passed; `tsc` clean; user bundle has no admin code. Real Chromium against a fake Gemini chat page: answers, code blocks, fresh chat per question, usage limit -> rate limit, answer that never starts, stable-text fallback. Motion: CSS and `renderFrame` graphics drawn frame by frame with transparency, blank / screen-covering / static / throwing / not-animated graphics rejected with a reason, retry feeds the reason back, three failures give a friendly error. Render: an overlay appears at its start time, is gone after its last frame (pixel checks).
+
+Manual checks on a computer with a Google account:
+- Settings > Text engine > Web chat, then Prompt Generator "Generate prompts": answers arrive without a Gemini key. If nothing is typed or the answer is never read, the Gemini page changed: update the `chat` selectors in resources/image-engine/config.json (library package `image_engine`).
+- Auto Editor > Motion > Make a motion graphic; check the preview, render, and that the graphic sits over the picture and under the captions.
+- Not tested: the real Gemini page (selectors come from a DOM capture), the real "limit reached" text, the small production FFmpeg (all parts the overlay needs are in scripts/ci/ffmpeg-components.sh).

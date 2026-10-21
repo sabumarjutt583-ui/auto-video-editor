@@ -47,6 +47,8 @@ pub struct Settings {
     pub groq_whisper_model: String,
     pub fallback_to_groq: bool,
     pub groq_text_model: String,
+    /// Write texts with Gemini's web chat (the Google accounts of the Image Generator) instead of the Gemini API key.
+    pub text_via_chat: bool,
     /// Empty means "not chosen yet".
     pub export_folder: String,
     pub default_aspect_ratio: AspectRatio,
@@ -80,6 +82,7 @@ impl Default for Settings {
             groq_whisper_model: DEFAULT_WHISPER_MODEL.to_string(),
             fallback_to_groq: false,
             groq_text_model: DEFAULT_GROQ_TEXT_MODEL.to_string(),
+            text_via_chat: false,
             export_folder: String::new(),
             default_aspect_ratio: AspectRatio::Landscape,
             default_quality: Quality::P1080,
@@ -237,6 +240,7 @@ mod tests {
         assert_eq!(settings.gemini_model, "gemini-3.8-flash");
         assert_eq!(settings.groq_whisper_model, "whisper-large-v3-turbo");
         assert!(!settings.fallback_to_groq);
+        assert!(!settings.text_via_chat, "the API key is the default");
         assert_eq!(settings.default_aspect_ratio, AspectRatio::Landscape);
         assert_eq!(settings.default_quality, Quality::P1080);
         assert_eq!(settings.export_folder, "");

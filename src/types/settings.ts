@@ -7,6 +7,8 @@ export interface AppSettings {
   groqWhisperModel: string;
   fallbackToGroq: boolean;
   groqTextModel: string;
+  /** Write texts with Gemini's web chat (Google accounts) instead of the Gemini API key. */
+  textViaChat: boolean;
   /** Empty when no folder has been chosen yet. */
   exportFolder: string;
   defaultAspectRatio: AspectRatio;

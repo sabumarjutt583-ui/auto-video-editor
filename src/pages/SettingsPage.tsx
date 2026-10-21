@@ -7,6 +7,7 @@ import {
   DefaultsCard,
   EncodingCard,
   FallbackCard,
+  TextEngineCard,
   ImageGeneratorCard,
   ModelsCard,
   SaveIndicator,
@@ -66,6 +67,7 @@ export function SettingsPage() {
       {settings ? (
         <>
           <ModelsCard settings={settings} onChange={update} />
+          <TextEngineCard settings={settings} onChange={update} />
           <FallbackCard settings={settings} onChange={update} />
           <DefaultsCard settings={settings} onChange={update} />
           <EncodingCard settings={settings} onChange={update} />
