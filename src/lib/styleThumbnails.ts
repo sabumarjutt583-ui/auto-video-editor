@@ -1,8 +1,7 @@
 import type { StyleProfile } from "../types/style.ts";
 import { byPopularity, CATEGORIES, isComplete } from "./styleModel.ts";
 
-/** The same subject for every style, so the pictures can be compared fairly. */
-export const THUMBNAIL_SUBJECT = "an elderly man sitting alone at a kitchen table at night, holding a cup of tea, warm window behind him";
+import { thumbnailSubject } from "./styleThumbnailSubjects.ts";
 
 /** "C:\\pics\\Noir.PNG" becomes "noir": the file name without folders and extension, in lower case. */
 export function fileStem(path: string): string {
@@ -47,9 +46,9 @@ export function matchThumbnailFiles(files: readonly string[], ids: readonly stri
   return result;
 }
 
-/** One line for an image generator: `<id>.png | <prompt>`. */
+/** One line for an image generator (each style has a subject that suits it): `<id>.png | <prompt>`. */
 export function thumbnailPromptLine(style: StyleProfile): string {
-  return `${style.id}.png | ${THUMBNAIL_SUBJECT}, ${style.style_lock}, clean image without any text or watermark, 4:3`;
+  return `${style.id}.png | ${thumbnailSubject(style.id)}, ${style.style_lock}, clean image without any text or watermark, 4:3`;
 }
 
 /** The text of docs/thumbnail-prompts.txt: one line for every complete style, in picker order. */

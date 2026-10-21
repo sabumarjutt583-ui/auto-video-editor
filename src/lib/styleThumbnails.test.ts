@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { blankStyle, REQUIRED_FIELDS } from "./styleModel.ts";
-import { fileStem, matchThumbnailFiles, placeholderColors, THUMBNAIL_SUBJECT, thumbnailPromptLine, thumbnailPromptsText, thumbnailView, thumbnailWarnings } from "./styleThumbnails.ts";
+import { THUMBNAIL_SUBJECTS } from "./styleThumbnailSubjects.ts";
+import { fileStem, matchThumbnailFiles, placeholderColors, thumbnailPromptLine, thumbnailPromptsText, thumbnailView, thumbnailWarnings } from "./styleThumbnails.ts";
 
 const ids = ["noir", "oil_painting", "japanese_ukiyo_e"];
 const toUrl = (path: string) => `asset://${path}`;
@@ -33,10 +34,10 @@ test("placeholder colours come from the palette, or are neutral", () => {
   assert.notEqual(placeholderColors("deep navy and gold")[0], neutral[0]);
 });
 
-test("thumbnail prompts use one subject, the style lock and 4:3", () => {
+test("thumbnail prompts use the style\'s own subject, the style lock and 4:3", () => {
   const style = { ...blankStyle(), id: "noir", name: "Noir", category: "Cinematic & Film", style_lock: "classic film noir still, black and white only" };
   const line = thumbnailPromptLine(style);
-  assert.ok(line.startsWith(`noir.png | ${THUMBNAIL_SUBJECT}, classic film noir still`));
+  assert.ok(line.startsWith(`noir.png | ${THUMBNAIL_SUBJECTS.noir}, classic film noir still`));
   assert.ok(line.endsWith("clean image without any text or watermark, 4:3"));
   const incomplete = { ...blankStyle(), id: "x", name: "X", category: "Painting" };
   assert.equal(thumbnailPromptsText([incomplete]), "\n");
@@ -50,4 +51,12 @@ test("missing thumbnails are warnings", () => {
   assert.equal(warnings.length, 2);
   assert.ok(warnings[0]?.includes("b, c"));
   assert.ok(warnings[1]?.includes("c:"));
+});
+
+test("every shipped style has its own subject, and no two subjects are the same", async () => {
+  const { readdirSync } = await import("node:fs");
+  const ids = readdirSync(new URL("../../resources/styles/", import.meta.url)).filter((n) => n.endsWith(".json") && n !== "package.json").map((n) => n.slice(0, -5));
+  for (const id of ids) assert.ok(THUMBNAIL_SUBJECTS[id], `no subject for ${id}`);
+  assert.equal(Object.keys(THUMBNAIL_SUBJECTS).length, ids.length, "a subject belongs to a style that does not exist");
+  assert.equal(new Set(Object.values(THUMBNAIL_SUBJECTS)).size, ids.length);
 });
