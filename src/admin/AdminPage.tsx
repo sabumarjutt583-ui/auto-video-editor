@@ -1,5 +1,6 @@
 import { ErrorNotice } from "../components/ErrorNotice";
 import { BuildCard } from "./BuildCard";
+import { EngineConfigCard } from "./EngineConfigCard";
 import { KeyCard } from "./KeyCard";
 import { LibraryCard } from "./LibraryCard";
 import { SearchCard } from "./SearchCard";
@@ -26,6 +27,7 @@ export default function AdminPage() {
           <StylesCard overview={overview} act={act} />
           <StyleTestCard />
           <ThumbnailsCard />
+          <EngineConfigCard />
           <BuildCard overview={overview} act={act} />
         </>
       ) : (

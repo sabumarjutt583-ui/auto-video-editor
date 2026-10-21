@@ -78,3 +78,22 @@ export type {
   Transition,
   VideoFit,
 } from "./editor";
+export type {
+  AccountStatus,
+  AccountView,
+  AddReport,
+  ApiProvider,
+  BrowserMode,
+  GenEngine,
+  GenErrorKind,
+  ImageGenSettings,
+  ImageGenSnapshot,
+  ImageJob,
+  JobStatus,
+  MediaInfo,
+  NewImageJob,
+  Notice,
+  PictureAspect,
+  SavedImage,
+  TestImage,
+} from "./imagegen";

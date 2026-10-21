@@ -10,10 +10,11 @@ This guide is for people who make narration videos (with pictures or clips and a
 
 The first time you open the app, three short screens explain this and let you add the keys or press **Skip for now**. You can add them later in **Settings**.
 
-## The two parts
+## The parts
 
 1. **Prompt Generator**: voice-over + script → scenes → prompts for your picture/video tool.
-2. **Auto Editor**: your pictures/clips → finished video.
+2. **Image Generator** (optional): makes the pictures for you from those prompts.
+3. **Auto Editor**: your pictures/clips → finished video.
 
 Everything is saved automatically in your **Projects**.
 
@@ -82,6 +83,20 @@ Files are saved in your project's `exports` folder (and in your export folder fr
 **Render Shorts version (9:16)** (a button in the same window) makes a vertical video from the same project, with the captions placed for tall screens.
 
 A graphics card (NVIDIA, Intel, AMD, Apple) is used automatically when it works, which is much faster. In **Settings → Video encoding** you can force the CPU instead.
+
+## Image Generator
+
+Open **Image Generator** after you wrote the prompts. It makes one picture per scene and puts it in the project with the right name, so the **Auto Editor** shows it at once.
+
+1. Choose the engine.
+   - **Free (Google account)**: uses the image tool of Gemini through your own Google account. Read the notice that appears the first time. We recommend a separate Google account, not your YouTube channel account.
+   - **API (your key)**: uses your Gemini key (or a Cloudflare token, see Settings).
+2. For the free engine, **Add account**, press **Sign in**, sign in in the browser window that opens, then press **I have signed in** (Windows closes the window for you). Press **Verify**, and **Test image** to make one picture. Add more accounts to make more pictures before a limit is reached.
+3. Press **Generate all scenes**. The counters show queued, generating, completed and failed. **Pause** and **Resume** are always possible; closing the app in the middle is safe.
+4. **Retry failed** tries the failed ones again. Tick scenes and press **Regenerate selected**, or use the arrows on a scene. The pencil edits that scene's prompt.
+5. **Open in Auto Editor** when you are happy.
+
+If an account reaches its daily limit, only that account waits (the time is shown); the others continue. If you ticked "If Free fails or all accounts hit their limit, continue with API", the API takes over. If Google asks you to check something (captcha, "unusual activity"), the account is paused and you see the message: open the account's browser, do the check yourself, then Verify.
 
 ## SFX Library
 

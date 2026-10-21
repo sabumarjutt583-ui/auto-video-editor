@@ -15,6 +15,8 @@ use crate::commands::error::AppError;
 pub enum Kind {
     Sfx,
     Styles,
+    /// The image engine's settings file (selectors, texts, address of the shared tool).
+    ImageEngine,
 }
 
 impl Kind {
@@ -23,6 +25,7 @@ impl Kind {
         match self {
             Kind::Sfx => "sfx-library",
             Kind::Styles => "styles-package",
+            Kind::ImageEngine => "image-engine-config",
         }
     }
 
@@ -31,6 +34,7 @@ impl Kind {
         match self {
             Kind::Sfx => "sfx",
             Kind::Styles => "styles",
+            Kind::ImageEngine => "image-engine",
         }
     }
 
@@ -38,6 +42,7 @@ impl Kind {
         match self {
             Kind::Sfx => "manifest.json",
             Kind::Styles => "styles-manifest.json",
+            Kind::ImageEngine => "image-engine-manifest.json",
         }
     }
 
@@ -51,6 +56,7 @@ impl Kind {
         match self {
             Kind::Sfx => "sound effects",
             Kind::Styles => "styles",
+            Kind::ImageEngine => "image engine settings",
         }
     }
 }

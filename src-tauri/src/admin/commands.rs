@@ -15,6 +15,8 @@ use crate::commands::library::library_root;
 use crate::commands::sfx::bundled_sfx_folder;
 use crate::commands::styles::bundled_styles_dir;
 use crate::jobs::{event_sink, JobRegistry};
+use crate::commands::imagegen::{bundled_image_engine_dir, Ig};
+use crate::imagegen::config::EngineConfig;
 use crate::library::manifest::Kind;
 use crate::library::store;
 use crate::sfx::{load_library, SfxEntry, SfxLibrary};
@@ -32,6 +34,7 @@ pub struct AdminOverview {
     pub packages_dir: String,
     pub next_sfx_version: u64,
     pub next_styles_version: u64,
+    pub next_image_engine_version: u64,
     pub sounds: SfxLibrary,
     pub styles: Vec<StyleRow>,
 }
@@ -57,6 +60,7 @@ fn overview_of(app: &AppHandle) -> Result<AdminOverview, AppError> {
         packages_dir: workspace::packages_dir(&root).to_string_lossy().into_owned(),
         next_sfx_version: workspace::next_version(&root, Kind::Sfx, installed(Kind::Sfx, &bundled_sfx_folder(app))),
         next_styles_version: workspace::next_version(&root, Kind::Styles, installed(Kind::Styles, &bundled_styles_dir(app))),
+        next_image_engine_version: workspace::next_version(&root, Kind::ImageEngine, installed(Kind::ImageEngine, &crate::commands::imagegen::bundled_image_engine_dir(app))),
         sounds: if workspace::sfx_dir(&root).join("index.json").exists() { load_library(&workspace::sfx_dir(&root)) } else { SfxLibrary::default() },
         styles: style_rows(&root),
     })
@@ -216,10 +220,18 @@ pub async fn admin_remove_style(app: AppHandle, id: String) -> Result<(), AppErr
 pub async fn admin_build_package(app: AppHandle, kind: Kind, out_dir: Option<String>) -> Result<BuiltPackage, AppError> {
     let overview = overview_of(&app)?;
     let root = root(&app)?;
+    let bundled_config = bundled_image_engine_dir(&app).join("config.json");
     run_blocking(move || {
+        // The first image-engine package starts from the built-in settings file.
+        let working = workspace::image_engine_dir(&root);
+        if kind == Kind::ImageEngine && !working.join("config.json").is_file() {
+            std::fs::create_dir_all(&working).map_err(|e| AppError::new("The admin folder could not be created.", e.to_string()))?;
+            std::fs::copy(&bundled_config, working.join("config.json")).map_err(|e| AppError::new("The built-in engine settings could not be copied.", e.to_string()))?;
+        }
         let (source, version) = match kind {
             Kind::Sfx => (workspace::sfx_dir(&root), overview.next_sfx_version),
             Kind::Styles => (workspace::styles_dir(&root), overview.next_styles_version),
+            Kind::ImageEngine => (workspace::image_engine_dir(&root), overview.next_image_engine_version),
         };
         let out = out_dir.filter(|d| !d.trim().is_empty()).map(PathBuf::from).unwrap_or_else(|| workspace::packages_dir(&root));
         let built = package::build(kind, &source, &out, version, &package::today())?;
@@ -266,4 +278,35 @@ pub async fn admin_import_thumbnails(app: AppHandle, items: Vec<ThumbnailItem>) 
     }
     let missing = run_blocking(move || Ok(crate::thumbnails::missing_in(&primary))).await?;
     Ok(ThumbnailReport { imported: report.imported, failed: report.failed, missing })
+}
+
+/// The engine settings text to edit: the admin working copy, or the built-in file the first time.
+#[tauri::command]
+pub async fn admin_read_engine_config(app: AppHandle) -> Result<String, AppError> {
+    let working = workspace::image_engine_dir(&root(&app)?).join("config.json");
+    let bundled = bundled_image_engine_dir(&app).join("config.json");
+    run_blocking(move || {
+        let path = if working.is_file() { working } else { bundled };
+        std::fs::read_to_string(&path).map_err(|e| AppError::new("The engine settings could not be read.", format!("{}: {e}", path.display())))
+    })
+    .await
+}
+
+/// Checks and saves the engine settings in the working copy (they go into the next package).
+/// With `use_now` the running app uses them at once, so "Test free engine" tries the new values.
+#[tauri::command]
+pub async fn admin_save_engine_config(app: AppHandle, ig: Ig<'_>, text: String, use_now: bool) -> Result<String, AppError> {
+    let config = EngineConfig::parse(&text)?;
+    let dir = workspace::image_engine_dir(&root(&app)?);
+    let to_write = text.clone();
+    run_blocking(move || {
+        std::fs::create_dir_all(&dir).map_err(|e| AppError::new("The admin folder could not be created.", e.to_string()))?;
+        std::fs::write(dir.join("config.json"), to_write).map_err(|e| AppError::new("The engine settings could not be saved.", e.to_string()))
+    })
+    .await?;
+    let version = config.config_version.clone();
+    if use_now {
+        ig.set_config(config).await;
+    }
+    Ok(version)
 }

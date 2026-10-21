@@ -21,7 +21,7 @@ interface KeyState {
 // This store only ever holds "set" / "not_set". A key being typed lives in the input's
 // own state and is cleared right after it is saved.
 export const useKeyStore = create<KeyState>((set, get) => ({
-  status: { groq: "unknown", gemini: "unknown" },
+  status: { groq: "unknown", gemini: "unknown", cloudflare: "unknown" },
   error: null,
 
   refresh: async (provider) => {
@@ -37,7 +37,7 @@ export const useKeyStore = create<KeyState>((set, get) => ({
   },
 
   refreshAll: async () => {
-    await Promise.all([get().refresh("groq"), get().refresh("gemini")]);
+    await Promise.all([get().refresh("groq"), get().refresh("gemini"), get().refresh("cloudflare")]);
   },
 
   save: async (provider, key) => {

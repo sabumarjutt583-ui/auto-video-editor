@@ -1,4 +1,4 @@
-import { AudioLines, Clapperboard, FolderOpen, Settings, ShieldCheck, Sparkles, type LucideIcon } from "lucide-react";
+import { AudioLines, Clapperboard, ImagePlus, FolderOpen, Settings, ShieldCheck, Sparkles, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   path: string;
@@ -9,6 +9,7 @@ export interface NavItem {
 export const NAV_ITEMS: readonly NavItem[] = [
   { path: "/projects", label: "Projects", icon: FolderOpen },
   { path: "/prompt-generator", label: "Prompt Generator", icon: Sparkles },
+  { path: "/image-generator", label: "Image Generator", icon: ImagePlus },
   { path: "/auto-editor", label: "Auto Editor", icon: Clapperboard },
   { path: "/sfx-library", label: "SFX Library", icon: AudioLines },
   { path: "/settings", label: "Settings", icon: Settings },

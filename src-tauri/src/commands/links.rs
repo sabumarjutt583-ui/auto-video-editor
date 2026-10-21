@@ -13,6 +13,7 @@ use crate::commands::error::AppError;
 pub enum ExternalLink {
     GroqKeys,
     GeminiKeys,
+    CloudflareTokens,
 }
 
 impl ExternalLink {
@@ -20,6 +21,7 @@ impl ExternalLink {
         match self {
             ExternalLink::GroqKeys => "https://console.groq.com/keys",
             ExternalLink::GeminiKeys => "https://aistudio.google.com/apikey",
+            ExternalLink::CloudflareTokens => "https://dash.cloudflare.com/profile/api-tokens",
         }
     }
 }
@@ -70,9 +72,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_the_two_key_pages_can_be_opened() {
+    fn only_the_listed_key_pages_can_be_opened() {
         assert_eq!(ExternalLink::GroqKeys.url(), "https://console.groq.com/keys");
         assert_eq!(ExternalLink::GeminiKeys.url(), "https://aistudio.google.com/apikey");
+        assert_eq!(ExternalLink::CloudflareTokens.url(), "https://dash.cloudflare.com/profile/api-tokens");
     }
 
     #[test]

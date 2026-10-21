@@ -10,6 +10,7 @@ mod clock;
 mod commands;
 mod ffmpeg;
 mod ffmpeg_job;
+mod imagegen;
 mod jobs;
 mod keys;
 mod library;
@@ -84,6 +85,26 @@ macro_rules! handler {
             commands::render::list_encoders,
             commands::render::render_video,
             commands::render::show_in_folder,
+            commands::imagegen::imagegen_state,
+            commands::imagegen::imagegen_set_settings,
+            commands::imagegen::imagegen_accept_consent,
+            commands::imagegen::imagegen_detect_browser,
+            commands::imagegen::imagegen_add_account,
+            commands::imagegen::imagegen_update_account,
+            commands::imagegen::imagegen_remove_account,
+            commands::imagegen::imagegen_sign_in,
+            commands::imagegen::imagegen_finish_sign_in,
+            commands::imagegen::imagegen_verify,
+            commands::imagegen::imagegen_test_image,
+            commands::imagegen::imagegen_background_snapshot,
+            commands::imagegen::imagegen_show_browser,
+            commands::imagegen::imagegen_start,
+            commands::imagegen::imagegen_pause,
+            commands::imagegen::imagegen_resume,
+            commands::imagegen::imagegen_retry_failed,
+            commands::imagegen::imagegen_remove_jobs,
+            commands::imagegen::imagegen_reload_config,
+            commands::imagegen::imagegen_media_info,
         ]
     };
 }
@@ -145,6 +166,26 @@ macro_rules! handler {
             commands::render::list_encoders,
             commands::render::render_video,
             commands::render::show_in_folder,
+            commands::imagegen::imagegen_state,
+            commands::imagegen::imagegen_set_settings,
+            commands::imagegen::imagegen_accept_consent,
+            commands::imagegen::imagegen_detect_browser,
+            commands::imagegen::imagegen_add_account,
+            commands::imagegen::imagegen_update_account,
+            commands::imagegen::imagegen_remove_account,
+            commands::imagegen::imagegen_sign_in,
+            commands::imagegen::imagegen_finish_sign_in,
+            commands::imagegen::imagegen_verify,
+            commands::imagegen::imagegen_test_image,
+            commands::imagegen::imagegen_background_snapshot,
+            commands::imagegen::imagegen_show_browser,
+            commands::imagegen::imagegen_start,
+            commands::imagegen::imagegen_pause,
+            commands::imagegen::imagegen_resume,
+            commands::imagegen::imagegen_retry_failed,
+            commands::imagegen::imagegen_remove_jobs,
+            commands::imagegen::imagegen_reload_config,
+            commands::imagegen::imagegen_media_info,
             admin::commands::admin_overview,
             admin::commands::admin_save_key,
             admin::commands::admin_delete_key,
@@ -158,6 +199,8 @@ macro_rules! handler {
             admin::commands::admin_remove_style,
             admin::commands::admin_build_package,
             admin::commands::admin_import_thumbnails,
+            admin::commands::admin_read_engine_config,
+            admin::commands::admin_save_engine_config,
         ]
     };
 }
@@ -186,11 +229,19 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            use tauri::Manager;
             start_logging(app.handle());
             // Find out which encoders work while the app starts, so the first render does not wait.
             tauri::async_runtime::spawn(async {
                 let _ = render::encoder::available().await;
             });
+            match commands::imagegen::create(app.handle()) {
+                Ok(engine) => {
+                    engine.start_background();
+                    app.manage(engine);
+                }
+                Err(error) => logging::error("imagegen", &error.details),
+            }
             Ok(())
         })
         .invoke_handler(handler!())

@@ -7,6 +7,7 @@ import {
   DefaultsCard,
   EncodingCard,
   FallbackCard,
+  ImageGeneratorCard,
   ModelsCard,
   SaveIndicator,
 } from "../components/settings";
@@ -59,6 +60,15 @@ export function SettingsPage() {
         link="gemini_keys"
         testModel={settings?.geminiModel}
       />
+
+      <ApiKeyCard
+        provider="cloudflare"
+        title="Pictures (Cloudflare)"
+        description="Optional. Makes pictures with the FLUX model of Cloudflare Workers AI."
+        linkLabel="Create a Cloudflare token"
+        link="cloudflare_tokens"
+      />
+      <ImageGeneratorCard />
 
       {settings ? (
         <>

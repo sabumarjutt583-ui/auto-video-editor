@@ -1,0 +1,90 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Tool (test)</title></head>
+<body>
+<!-- Local imitation of the shared image tool: same element ids and card layout the engine reads. -->
+<div>
+  <button id="tabPrompts">Prompts</button>
+  <label>Parallel images <input id="parallelRange" type="range" min="1" max="8" value="3"></label>
+  <button class="ratio-btn active" data-ratio="16:9">16:9</button>
+  <button class="ratio-btn" data-ratio="1:1">1:1</button>
+  <button class="ratio-btn" data-ratio="9:16">9:16</button>
+  <textarea id="rawPromptsInput" rows="3"></textarea>
+  <button id="addQueueAndGenBtn">Add to queue &amp; generate</button>
+  <button class="filter-chip active" data-filter="all">All</button>
+  <input id="searchInput" type="text">
+  <button id="clearBatchBtn">Clear batch</button>
+  <span>Total <b id="cntTotal">0</b> Queued <b id="cntQueued">0</b> Generating <b id="cntGenerating">0</b></span>
+</div>
+<div id="resultsGrid"></div>
+<script>
+(function () {
+  var items = [];           // {n, text, status, error, src}
+  var inFlight = 0;
+  function ratio() { var b = document.querySelector('.ratio-btn.active'); return b ? b.getAttribute('data-ratio') : '16:9'; }
+  document.querySelectorAll('.ratio-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.ratio-btn').forEach(function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+    });
+  });
+  function png(w, h, n) {
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var g = c.getContext('2d');
+    for (var i = 0; i < 40; i++) { g.fillStyle = 'hsl(' + ((n * 37 + i * 9) % 360) + ',70%,' + (20 + i) + '%)'; g.fillRect(0, i * (h / 40), w, h / 40 + 1); }
+    g.fillStyle = '#fff'; g.font = '20px sans-serif'; g.fillText('Prompt ' + n, 10, h / 2);
+    return c.toDataURL('image/png');
+  }
+  function sizeFor(r) { return r === '1:1' ? [128, 128] : r === '9:16' ? [72, 128] : [128, 72]; }
+  function render() {
+    var grid = document.getElementById('resultsGrid');
+    grid.innerHTML = '';
+    var q = (document.getElementById('searchInput').value || '').toLowerCase();
+    items.forEach(function (it) {
+      if (q && it.text.toLowerCase().indexOf(q) < 0) return;
+      var card = document.createElement('div');
+      var head = document.createElement('div');
+      head.textContent = 'Prompt ' + it.n + '  ' + it.status.toUpperCase();
+      card.appendChild(head);
+      var p = document.createElement('p'); p.textContent = it.text; card.appendChild(p);
+      if (it.error) { var e = document.createElement('div'); e.className = 'truncate'; e.textContent = it.error; card.appendChild(e); }
+      if (it.src) { var im = document.createElement('img'); im.src = it.src; card.appendChild(im); }
+      grid.appendChild(card);
+    });
+    document.getElementById('cntTotal').textContent = items.length;
+    document.getElementById('cntQueued').textContent = items.filter(function (i) { return i.status === 'queued'; }).length;
+    document.getElementById('cntGenerating').textContent = items.filter(function (i) { return i.status === 'generating'; }).length;
+  }
+  function pump() {
+    var max = parseInt(document.getElementById('parallelRange').value, 10) || 1;
+    items.forEach(function (it) {
+      if (it.status !== 'queued' || inFlight >= max) return;
+      it.status = 'generating'; inFlight++;
+      var delay = /\[slow\]/.test(it.text) ? 4000 : 400;
+      setTimeout(function () {
+        inFlight--;
+        if (/\[429\]/.test(it.text)) { it.status = 'failed'; it.error = 'API Error 429'; }
+        else if (/\[noimg\]/.test(it.text)) { it.status = 'failed'; it.error = 'No image data returned from Gemini.'; }
+        else if (/\[500\]/.test(it.text)) { it.status = 'failed'; it.error = 'API Error 500'; }
+        else if (/\[400\]/.test(it.text)) { it.status = 'failed'; it.error = 'API Error 400'; }
+        else { var s = sizeFor(ratio()); it.status = 'completed'; it.src = png(s[0], s[1], it.n); }
+        render(); pump();
+      }, delay);
+    });
+    render();
+  }
+  document.getElementById('addQueueAndGenBtn').addEventListener('click', function () {
+    var lines = document.getElementById('rawPromptsInput').value.split(/\r?\n/);
+    lines.forEach(function (l) {
+      l = l.replace(/^\s*Prompt\s*\d+\s*:\s*/i, '').trim();
+      if (!l) return;
+      items.push({ n: items.length + 1, text: l, status: 'queued', error: '', src: '' });
+    });
+    document.getElementById('rawPromptsInput').value = '';
+    pump();
+  });
+  document.getElementById('clearBatchBtn').addEventListener('click', function () { items = []; render(); });
+  document.getElementById('searchInput').addEventListener('input', render);
+  render();
+})();
+</script>
+</body></html>

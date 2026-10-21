@@ -1,0 +1,52 @@
+{
+  "configVersion": "1.0",
+  "toolUrl": "https://share.gemini.google/rqUWVwvowbjG",
+  "signInUrl": "https://accounts.google.com/ServiceLogin?continue={continueUrl}",
+  "signInContinueUrl": "https://gemini.google.com/app",
+  "model": "gemini-3.1-flash-image",
+  "signedInTitle": ["Gemini"],
+  "stillSigningInTitle": ["Sign in", "Google Accounts", "Verify", "Verification", "Choose an account"],
+  "toolAspectRatios": ["16:9", "1:1", "9:16"],
+  "maxParallel": 8,
+  "selectors": {
+    "continueButton": { "css": "mat-dialog-container button, [role=\"dialog\"] button", "text": "^\\s*Continue\\s*$" },
+    "signInLink": "a[href*=\"accounts.google.com/ServiceLogin\"], a[href*=\"accounts.google.com/v3/signin\"]",
+    "accountButton": "a[aria-label^=\"Google Account\"], button[aria-label^=\"Google Account\"]",
+    "promptsTab": "#tabPrompts",
+    "promptInput": "#rawPromptsInput",
+    "submit": "#addQueueAndGenBtn",
+    "parallel": "#parallelRange",
+    "ratioButton": ".ratio-btn[data-ratio=\"{ratio}\"]",
+    "total": "#cntTotal",
+    "queued": "#cntQueued",
+    "generating": "#cntGenerating",
+    "grid": "#resultsGrid",
+    "allFilter": ".filter-chip[data-filter=\"all\"]",
+    "search": "#searchInput",
+    "clearBatch": "#clearBatchBtn",
+    "cardError": "div.truncate"
+  },
+  "timing": {
+    "pollMs": 1500,
+    "pageLoadTimeoutMs": 90000,
+    "submitConfirmMs": 10000,
+    "lostCardMs": 15000,
+    "clearAfterTasks": 30,
+    "signedInSettleMs": 3000
+  },
+  "errorPatterns": [
+    { "contains": ["API Error 429"], "kind": "rate_limit", "message": "Usage limit reached for this Google account." },
+    { "contains": ["API Error 401", "API Error 403"], "kind": "auth", "message": "Google refused the request: the account is signed out." },
+    { "contains": ["API Error 404"], "kind": "access", "message": "The image model is not available to this Google account." },
+    { "contains": ["PROHIBITED_CONTENT", "blocked by safety", "SAFETY", "content policy"], "kind": "blocked", "message": "Google refused this prompt (content rules)." },
+    { "contains": ["API Error 400"], "kind": "bad_request", "message": "Google rejected this prompt." },
+    { "contains": ["API Error 5"], "kind": "server", "message": "Google had a temporary server problem." },
+    { "contains": ["No image data returned"], "kind": "no_image", "message": "Google answered without an image (often a prompt it will not draw)." },
+    { "contains": ["Failed to fetch", "NetworkError", "network"], "kind": "network", "message": "Could not reach Google (network problem)." }
+  ],
+  "humanChecks": [
+    { "contains": ["unusual traffic", "unusual activity", "not a robot", "captcha", "suspicious activity"], "kind": "flagged", "message": "Google is asking for a check (captcha or unusual activity). Open this account's browser window and finish it yourself. The account is paused." },
+    { "contains": ["verify it's you", "verify it’s you", "2-step verification", "confirm it's you", "confirm it’s you"], "kind": "auth", "message": "Google wants to check that it is you. Click Sign in and finish the check in the window." },
+    { "contains": ["terms of service", "accept the terms", "before you continue", "age verification"], "kind": "access", "message": "Google is asking you to accept something (terms or an age check). Click Sign in and finish it in the window, then close it." }
+  ]
+}

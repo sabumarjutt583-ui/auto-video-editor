@@ -1,0 +1,20 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Gemini (test)</title></head>
+<body>
+<!-- Local imitation of Gemini's page around the shared tool. Used only by tests. -->
+<div id="header">
+  <!--SIGNED_IN--><a aria-label="Google Account: Test User (test@example.com)" href="#" style="display:none">T</a><!--/SIGNED_IN-->
+  <!--SIGNED_OUT--><a href="https://accounts.google.com/ServiceLogin?x=1">Sign in</a><!--/SIGNED_OUT-->
+</div>
+<div role="dialog" id="notice"><p>This app was created by another person</p><button id="cont">Continue</button></div>
+<div id="host"></div>
+<script>
+  document.getElementById('cont').addEventListener('click', function () {
+    document.getElementById('notice').remove();
+    var f = document.createElement('iframe');
+    f.src = '__TOOL_ORIGIN__/tool';
+    f.style.cssText = 'width:100%;height:700px;border:0';
+    document.getElementById('host').appendChild(f);
+  });
+</script>
+</body></html>

@@ -18,6 +18,7 @@ cargo build --features admin                 # no warnings (admin build)
 cargo test                                   # Rust tests (needs the sidecar for the FFmpeg ones: npm run setup:ffmpeg)
 cargo test smoke_test -- --nocapture         # 5-second project with every feature (CI runs it with the installer FFmpeg)
 cargo test --features admin                  # adds the Admin Edition tests
+cargo test imagegen                          # Image Generator: queue, scheduler, real Chromium against a fake Gemini page (needs Chromium; skips when none is found)
 cargo test --release performance_20_minutes -- --ignored --nocapture   # 20 min, 200 scenes, 1080p (slow)
 ```
 
@@ -60,6 +61,7 @@ Use a short voice file (30 to 120 seconds) and its script. Korean, Japanese, Nep
 | 13: Audio | Add music, build the audio mix. Edit some SFX on the timeline. | The voice stays clear over the music; SFX sit at scene changes and can be moved; the mix measures about -14 LUFS. |
 | 14: Render | Render 2 minutes with music, SFX and transitions at 1080p. Press Cancel in another run. Try Shorts. | Video length equals voice length (±0.1 s); captions burned in; Cancel stops and leaves no temp files; a graphics-card encoder is used when present; Shorts is 9:16. |
 | 15: Library and Admin | User build: no Admin menu (see section 2). Admin build: save a Freesound key, search, add a CC0 sound, build a package. Serve the package folder over HTTPS (or `http://127.0.0.1`), put its address in Settings → Library updates, press Check for library update. Then Go back to the version before. | The package installs (version goes up, sounds appear), a damaged zip is refused, rollback works. |
+| Image Generator | Add a Google account, Sign in, Verify, Test image. Press Generate all scenes on a project with prompts. Kill the app in the middle and start it again. Add a second account and wait for a limit; tick "continue with API" and remove the browser. | S01_...png for every scene appear in the project media folder and in the Auto Editor; after the crash it continues with no duplicate files; a limit pauses only that account; the API makes the rest. **Not tested against real Gemini from the build sandbox: do this row on a real PC.** |
 | 16: Install and release | Build the installers (RELEASE.md). On a clean Windows PC, install the `-setup.exe` and do: new project → voice → timing → scenes → prompts → import media → render. Check the first-run screens, Check for app update, Export logs. | Everything works with nothing else installed. Export logs gives a file without keys. |
 
 ## 4. Performance (20-minute voice, 200 scenes)
@@ -91,6 +93,10 @@ Run date: 2026-10-20 (Linux sandbox, headless) and CI run 39469678995.
 Bugs found and fixed in this run: log redaction swallowed the full stop after a key; the Admin build did not register the logs and app-update commands.
 
 Not tested here: Windows installer and a clean Windows PC, GPU encoders, real Groq/Gemini/Freesound network calls, the updater install path (needs https and signed files), real audio playback, 4K speed.
+
+### Image Generator run (2026-10-21, Linux sandbox)
+
+`cargo test` 358 / `--features admin` 374 passed, no warnings; `npm run test:ts` 231 passed; `tsc` clean. Covered with a real Chromium against a fake Gemini + tool page: cross-process iframe, parallel prompts, aspect (9:16 gives 72x128), 429 / no image / 500 / 400 errors, timeout, lost card, browser death and reopen, signed-out detection. Scheduler: round-robin, per-account 429, API fallback, no duplicates, pause/resume, crash resume, storage pause, parallel limits. Not tested: real Gemini (needs a Google account), Windows sign-in window handling.
 
 ## Style system checks
 - `npm run styles:check`: table with 51 complete and 0 incomplete styles; the 5 style tests pass.

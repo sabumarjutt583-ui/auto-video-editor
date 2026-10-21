@@ -25,6 +25,7 @@ export interface AdminOverview {
   packagesDir: string;
   nextSfxVersion: number;
   nextStylesVersion: number;
+  nextImageEngineVersion: number;
   sounds: { sounds: SfxSound[]; warnings: string[] };
   styles: StyleRow[];
 }
@@ -59,7 +60,7 @@ export const adminImportCurrent = () => invoke<AdminOverview>("admin_import_curr
 export const adminSaveStyle = (text: string) => invoke<string>("admin_save_style", { text });
 export const adminReadStyle = (id: string) => invoke<string>("admin_read_style", { id });
 export const adminRemoveStyle = (id: string) => invoke<void>("admin_remove_style", { id });
-export const adminBuildPackage = (kind: "sfx" | "styles", outDir: string | null) => invoke<BuiltPackage>("admin_build_package", { kind, outDir });
+export const adminBuildPackage = (kind: "sfx" | "styles" | "image_engine", outDir: string | null) => invoke<BuiltPackage>("admin_build_package", { kind, outDir });
 
 export interface ThumbnailImportReport {
   imported: string[];
@@ -69,3 +70,7 @@ export interface ThumbnailImportReport {
   missing: string[];
 }
 export const adminImportThumbnails = (items: { id: string; path: string }[]) => invoke<ThumbnailImportReport>("admin_import_thumbnails", { items });
+
+export const adminReadEngineConfig = () => invoke<string>("admin_read_engine_config");
+/** Checks and saves the settings; with `useNow` the running app uses them at once. Resolves with the config version. */
+export const adminSaveEngineConfig = (text: string, useNow: boolean) => invoke<string>("admin_save_engine_config", { text, useNow });

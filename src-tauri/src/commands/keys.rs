@@ -44,6 +44,7 @@ pub async fn test_key(
             };
             gemini::test_key(&key, &model).await?;
         }
+        Provider::Cloudflare => crate::imagegen::api_engines::verify_cloudflare_token(&key).await?,
     }
     Ok(())
 }

@@ -30,3 +30,6 @@ dist/
 src-tauri/target/
 src-tauri/gen/
 *.map
+
+# Reference code from a third party (read-only, never pushed)
+vendor/

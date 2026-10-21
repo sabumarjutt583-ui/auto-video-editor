@@ -1,3 +1,4 @@
+export { ImageGeneratorPage } from "./ImageGeneratorPage";
 export { AutoEditorPage } from "./AutoEditorPage";
 export { ProjectsPage } from "./ProjectsPage";
 export { PromptGeneratorPage } from "./PromptGeneratorPage";

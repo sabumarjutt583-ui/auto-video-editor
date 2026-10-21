@@ -6,6 +6,7 @@ import { listenJobProgress } from "./lib/jobs";
 import { DEFAULT_PATH } from "./lib/nav";
 import {
   AutoEditorPage,
+  ImageGeneratorPage,
   ProjectsPage,
   PromptGeneratorPage,
   SettingsPage,
@@ -16,6 +17,7 @@ import { useAppUpdateStore } from "./store/appUpdateStore";
 import { useLibraryStore } from "./store/libraryStore";
 import { useJobStore } from "./store/jobStore";
 import { useProjectStore } from "./store/projectStore";
+import { useImageGenStore } from "./store/imagegenStore";
 import { useSettingsStore } from "./store/settingsStore";
 
 // Loaded only in the Admin Edition. In the user build this line becomes `null` and the admin code is not in the bundle.
@@ -61,6 +63,11 @@ export function App() {
     };
   }, []);
 
+  // The Image Generator listens from the start, so pictures made while another page is open reach the project.
+  useEffect(() => {
+    void useImageGenStore.getState().init();
+  }, []);
+
   // Save a pending project change when the window is hidden or closed (best effort).
   useEffect(() => {
     function saveWhenHidden() {
@@ -77,6 +84,7 @@ export function App() {
           <Route index element={<Navigate to={DEFAULT_PATH} replace />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/prompt-generator" element={<PromptGeneratorPage />} />
+          <Route path="/image-generator" element={<ImageGeneratorPage />} />
           <Route path="/auto-editor" element={<AutoEditorPage />} />
           <Route path="/sfx-library" element={<SfxLibraryPage />} />
           <Route path="/settings" element={<SettingsPage />} />

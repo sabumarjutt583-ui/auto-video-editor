@@ -17,6 +17,9 @@ pub fn sfx_dir(root: &Path) -> PathBuf {
 pub fn styles_dir(root: &Path) -> PathBuf {
     root.join("styles")
 }
+pub fn image_engine_dir(root: &Path) -> PathBuf {
+    root.join("image-engine")
+}
 pub fn packages_dir(root: &Path) -> PathBuf {
     root.join("packages")
 }
@@ -48,6 +51,8 @@ pub struct Credit {
 struct State {
     sfx_version: u64,
     styles_version: u64,
+    #[serde(default)]
+    image_engine_version: u64,
 }
 
 fn read_state(root: &Path) -> State {
@@ -60,6 +65,7 @@ pub fn next_version(root: &Path, kind: Kind, installed: u64) -> u64 {
     let last = match kind {
         Kind::Sfx => state.sfx_version,
         Kind::Styles => state.styles_version,
+        Kind::ImageEngine => state.image_engine_version,
     };
     last.max(installed) + 1
 }
@@ -70,6 +76,7 @@ pub fn record_version(root: &Path, kind: Kind, version: u64) -> Result<(), AppEr
     match kind {
         Kind::Sfx => state.sfx_version = state.sfx_version.max(version),
         Kind::Styles => state.styles_version = state.styles_version.max(version),
+        Kind::ImageEngine => state.image_engine_version = state.image_engine_version.max(version),
     }
     write_json(&root.join(STATE_FILE), &state)
 }

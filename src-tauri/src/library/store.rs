@@ -128,6 +128,12 @@ pub fn validate(kind: Kind, dir: &Path) -> Result<usize, AppError> {
             }
             Ok(count)
         }
+        Kind::ImageEngine => {
+            let path = dir.join("config.json");
+            let text = std::fs::read_to_string(&path).map_err(|e| io("The image engine settings could not be read.", e, &path))?;
+            crate::imagegen::config::EngineConfig::parse(&text)?;
+            Ok(1)
+        }
     }
 }
 

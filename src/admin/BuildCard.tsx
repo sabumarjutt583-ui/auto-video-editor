@@ -16,10 +16,11 @@ function size(bytes: number): string {
 /** Builds the zip and manifest to upload to the release location. */
 export function BuildCard({ overview, act }: Props) {
   const [built, setBuilt] = useState<Record<string, BuiltPackage>>({});
-  const build = (kind: "sfx" | "styles") => void act(() => adminBuildPackage(kind, null)).then((p) => p && setBuilt((b) => ({ ...b, [kind]: p })));
+  const build = (kind: "sfx" | "styles" | "image_engine") => void act(() => adminBuildPackage(kind, null)).then((p) => p && setBuilt((b) => ({ ...b, [kind]: p })));
   const rows = [
     { kind: "sfx" as const, label: "Sound effects", version: overview.nextSfxVersion, count: overview.sounds.sounds.length },
     { kind: "styles" as const, label: "Styles", version: overview.nextStylesVersion, count: overview.styles.length },
+    { kind: "image_engine" as const, label: "Image engine settings", version: overview.nextImageEngineVersion, count: 1 },
   ];
   return (
     <Card title="Build packages" description={`Files are written to ${overview.packagesDir}. Upload the zip and its manifest to the update address.`} icon={Package}>

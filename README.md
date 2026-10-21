@@ -55,9 +55,11 @@ The full checklist for every phase is in [TESTING.md](TESTING.md).
 
 ```
 src/                  React app: pages/, components/, store/, lib/ (pure logic + tests), types/, admin/ (Admin Edition only)
+src-tauri/src/imagegen/ Image Generator: browser/ (own DevTools client), queue, scheduler, accounts, save, API engines (docs/IMAGE_ENGINE_DESIGN.md)
 src-tauri/src/        Rust: commands/, api/, audio/, captions/, media/, render/, library/ (updates), admin/ (feature "admin"),
                       jobs.rs, ffmpeg*.rs, keys.rs, settings.rs, logging.rs, styles.rs, sfx.rs, timing.rs, project/
 src-tauri/binaries/   FFmpeg and FFprobe sidecars (downloaded, not in git)
+resources/image-engine/ settings of the free image engine (config.json, updated as a library package)
 resources/styles/     built-in style profiles (JSON)
 resources/sfx/        built-in sound effects + index.json + package.json (made by scripts/make-sfx.mjs)
 resources/fonts/      Noto Sans, CJK (KR, JP, SC), Devanagari, Arabic

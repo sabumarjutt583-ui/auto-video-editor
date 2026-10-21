@@ -19,7 +19,7 @@ pub fn library_root(app: &AppHandle) -> Result<PathBuf, AppError> {
 }
 
 fn bundled_dirs(app: &AppHandle) -> Vec<(Kind, PathBuf)> {
-    vec![(Kind::Sfx, bundled_sfx_folder(app)), (Kind::Styles, bundled_styles_dir(app))]
+    vec![(Kind::Sfx, bundled_sfx_folder(app)), (Kind::Styles, bundled_styles_dir(app)), (Kind::ImageEngine, crate::commands::imagegen::bundled_image_engine_dir(app))]
 }
 
 /// Which version of the sounds and styles is in use, and where it came from.

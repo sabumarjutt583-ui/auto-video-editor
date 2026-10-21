@@ -91,3 +91,11 @@ resources/fonts/: Noto Sans, Noto Sans CJK, Noto Sans Devanagari, Noto Sans Arab
 - New FFmpeg feature in the app? Add the encoder/decoder/muxer/filter to scripts/ci/ffmpeg-components.sh (never GPL parts: boxblur, eq, noise ...). scripts/fetch-ffmpeg.mjs only downloads a big ready-made FFmpeg for local development.
 - EULA: LICENSE-EULA.txt (NSIS licence page via bundle.licenseFile, Settings > About). Release profile: lto, codegen-units 1, panic abort, strip. Public releases repo holds only README.md (text in website/RELEASES_README.md). Sizes: docs/SIZE_REPORT.md.
 - Website snippet: website/download-buttons.html. Docs: RELEASE.md, USER_GUIDE.md ("Install and update"), CHANGELOG.md.
+
+## Image Generator (page between Prompt Generator and Auto Editor)
+- Design + why: docs/IMAGE_ENGINE_DESIGN.md (study of the reference tool: docs/IMAGE_ENGINE_NOTES.md; the reference source is in git-ignored `vendor/`, never commit it).
+- Rust src-tauri/src/imagegen/: browser/ (own CDP client over a hand-written WebSocket: chromiumoxide cannot see cross-site iframes; no new crates), tool_page.rs + worker.rs (one tab per account), accounts.rs, queue.rs/recovery.rs/store.rs (`<project>/imagegen/jobs.json`), engine.rs (scheduler, snapshot, `imagegen-state` event), save.rs (durable PNG save, never overwrite), api_engines.rs (Gemini image, Cloudflare FLUX), ops.rs (sign-in, verify, test image), config.rs; commands/imagegen.rs.
+- Config: resources/image-engine/config.json (`configVersion` major.minor; new major = consent asked again), a library package kind `image_engine`. Admin: src/admin/EngineConfigCard.tsx (editor + "Test free engine").
+- Frontend: src/lib/imagegen/{mapping,register,format,consent,api}.ts (+tests), src/store/imagegenStore.ts (listens to `imagegen-state` and `imagegen-image`, started in App.tsx), src/components/imagegen/, src/pages/ImageGeneratorPage.tsx, Settings card ImageGeneratorCard + Cloudflare key (Provider "cloudflare").
+- The frontend owns project.json: Rust only saves the file and emits `imagegen-image`; `registerImage` sets editor.media, mediaMap and scene.matchedFile (uses `useProjectStore.update`, not `applyEdit`).
+- Rules: no user-agent/webdriver masking; captcha / unusual-activity / terms pages pause the account and show the text; never bypass. Keys only in the keychain. Needs `--no-sandbox` for Chromium tests as root.

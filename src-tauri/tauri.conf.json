@@ -53,7 +53,8 @@
     "resources": {
       "../resources/styles/": "resources/styles/",
       "../resources/sfx/": "resources/sfx/",
-      "../resources/fonts/": "resources/fonts/"
+      "../resources/fonts/": "resources/fonts/",
+      "../resources/image-engine/": "resources/image-engine/"
     },
     "createUpdaterArtifacts": true,
     "licenseFile": "../LICENSE-EULA.txt",

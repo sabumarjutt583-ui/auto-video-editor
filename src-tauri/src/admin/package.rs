@@ -45,6 +45,9 @@ fn collect(kind: Kind, source: &Path) -> Result<Vec<ZipEntry>, AppError> {
                 entries.push(ZipEntry { name: super::workspace::CREDITS_FILE.into(), data: read(&credits)? });
             }
         }
+        Kind::ImageEngine => {
+            entries.push(ZipEntry { name: "config.json".into(), data: read(&source.join("config.json"))? });
+        }
         Kind::Styles => {
             let mut names: Vec<String> = std::fs::read_dir(source)
                 .map_err(|e| io("The styles folder could not be read.", e, source))?

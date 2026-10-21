@@ -6,6 +6,7 @@ pub mod captions;
 pub mod engine;
 pub mod error;
 pub mod files;
+pub mod imagegen;
 pub mod keys;
 pub mod library;
 pub mod logs;
