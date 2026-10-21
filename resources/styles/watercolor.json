@@ -15,6 +15,6 @@
   "negative": "thick opaque paint, digital gradients, hard black outlines, photorealism, airbrush smoothness, oil painting, acrylic flat color, 3D render, CGI look, anime, comic book, neon colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Very slow pans and drifts across the painting, with paint-like soft movement. Colour washes seem to bloom and spread slowly, and light shifts gently as if the sun were moving behind the paper. No hard cuts, no fast moves and no morphing of faces.",
   "style_lock": "transparent watercolour painting, cold-press paper texture, wet-in-wet blooms, pigment granulation, luminous soft washes, white paper highlights, loose suggested details, soft blue and warm ochre palette, rose accents, vignette edges, delicate brushwork, pencil-thin brush accents",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/watercolor.webp",
   "example_prompt": "An elderly man is painted loosely in soft washes, sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A pale yellow lamp wash glows on the table and bleeds into a violet-blue window. transparent watercolour painting, cold-press paper texture, wet-in-wet blooms, pigment granulation, luminous soft washes, white paper highlights, loose suggested details, soft blue and warm ochre palette, rose accents, vignette edges, delicate brushwork, pencil-thin brush accents"
 }

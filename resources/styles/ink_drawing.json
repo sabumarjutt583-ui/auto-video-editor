@@ -15,6 +15,6 @@
   "negative": "color, colour, soft shading, smudges, painterly texture, airbrush gradients, photorealism, watercolor, charcoal, pencil sketch, 3D render, CGI look, anime, cartoon, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow pan across the details of the drawing, with a gentle push-in toward the focal area. Lines may appear to be drawn on gradually, and steam or smoke may curl in line form. Figures stay still. No fast moves, no flashing and no morphing of faces.",
   "style_lock": "pen and black ink illustration, crisp precise line work, varied line weight, stippling, cross-hatching for tone, solid black accents, clean white paper, no soft gradients, detailed line portrait, clear contours, engraved graphic look, detailed background patterns",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/ink_drawing.webp",
   "example_prompt": "A pen and ink illustration of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. Cross-hatching shades his face and the window, and fine stippling textures the wall behind. pen and black ink illustration, crisp precise line work, varied line weight, stippling, cross-hatching for tone, solid black accents, clean white paper, no soft gradients, detailed line portrait, clear contours, engraved graphic look, detailed background patterns"
 }

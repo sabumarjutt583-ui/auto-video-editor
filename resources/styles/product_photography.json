@@ -15,6 +15,6 @@
   "negative": "logos, brand names, clutter, busy background, dirty surfaces, harsh shadows, messy props, cartoon, anime, illustration, painting, 3D render, CGI look, low resolution, motion blur, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow 360 degree rotation of the product, a gentle push-in, and a light sweep that glides across its surface. Steam or droplets may move slightly. Hands move slowly and cleanly. No fast cuts, no shake and no sudden zooms.",
   "style_lock": "professional studio product photograph, softbox lighting, controlled clean reflections, soft shadow under product, true product colours, seamless neutral background, hero product centred, macro lens look, crisp surface detail, minimal props, catalog advertising look, sharp focus",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/product_photography.webp",
   "example_prompt": "A studio product photograph of a ceramic cup of tea held in an elderly man's hands at a plain table at night, the man shown only from the chest down, an empty chair softly visible opposite. Softbox light shines on the glaze, with a soft shadow beneath the cup. professional studio product photograph, softbox lighting, controlled clean reflections, soft shadow under product, true product colours, seamless neutral background, hero product centred, macro lens look, crisp surface detail, minimal props, catalog advertising look, sharp focus"
 }

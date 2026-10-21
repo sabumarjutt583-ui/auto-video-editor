@@ -15,6 +15,6 @@
   "negative": "faded 1970s film look, sepia tone, dull muted colors, modern minimalism, photorealistic gloom, scanlines, VHS noise, cartoon, anime, 3D render, CGI look, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Smooth retro zooms, slow pans and gentle push-ins across the poster-like scene. Sun glows pulse softly, and light streaks and sparkles sweep over surfaces. Hair and clothes move slightly. No scanlines, no glitch effects, no shake and no fast cuts.",
   "style_lock": "1980s retro poster artwork, sunset orange and hot pink palette, teal and purple accents, airbrushed gradients, big setting sun glow, bold geometric shapes, bright rim light, mild print grain, slightly faded saturated colours, 1980s clothing and hair, graphic nostalgic look, slight fade at the edges",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/retro.webp",
   "example_prompt": "A retro poster scene of an elderly man in a knit vest and wide glasses sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A big pink and orange sunset glow fills the window, and a teal wall frames him. 1980s retro poster artwork, sunset orange and hot pink palette, teal and purple accents, airbrushed gradients, big setting sun glow, bold geometric shapes, bright rim light, mild print grain, slightly faded saturated colours, 1980s clothing and hair, graphic nostalgic look, slight fade at the edges"
 }

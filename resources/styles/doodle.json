@@ -15,6 +15,6 @@
   "negative": "realistic shading, photorealism, painting, watercolor, 3D render, CGI look, anime, detailed ink hatching, perfect straight lines, gradients, dark gloomy look, thick brush strokes, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Elements wiggle, pop in and bounce, with a boiling-line effect where the outlines shake slightly from frame to frame. Doodles appear one after another as if drawn quickly. Camera is fixed or makes tiny slides. No smooth realistic motion.",
   "style_lock": "hand-drawn marker doodle on paper, wobbly single-weight black lines, imperfect simple shapes, a few bright marker accent colours, scribbled colour fills, plain white paper, round-head character, dot eyes, simple smile, casual notebook look, flat no shading, quick playful sketch, faint paper fibre",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/doodle.webp",
   "example_prompt": "A marker doodle of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. He has a round head, dot eyes, a small smile, a moustache and a yellow scribbled lamp with little rays above him. hand-drawn marker doodle on paper, wobbly single-weight black lines, imperfect simple shapes, a few bright marker accent colours, scribbled colour fills, plain white paper, round-head character, dot eyes, simple smile, casual notebook look, flat no shading, quick playful sketch, faint paper fibre"
 }

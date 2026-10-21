@@ -15,6 +15,6 @@
   "negative": "brand names, brand logos, cheap look, cluttered scene, flat lighting, bright garish colors, casual snapshot, cartoon, anime, illustration, painting, 3D render, CGI look, low resolution, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow gliding camera moves along the surface, slow-motion details such as tea pouring or silk moving, and light sweeps that pass across gold and glass. Subjects move slowly and with poise. No fast cuts, no shake and no sudden zooms.",
   "style_lock": "premium luxury advertising film still, soft glossy highlights, bright rim light, controlled reflections, dark elegant background, black and gold and deep navy palette, champagne tones, polished marble and glass, silk and gold details, shallow depth of field, refined well-dressed figure, slow glossy light sweeps",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/luxury_commercial.webp",
   "example_prompt": "A luxury commercial still: a distinguished elderly man in a tailored dark suit sits alone at a polished black marble table at night, holding a delicate porcelain cup of tea with gold trim, an empty chair opposite him. A narrow rim light traces his silver hair. premium luxury advertising film still, soft glossy highlights, bright rim light, controlled reflections, dark elegant background, black and gold and deep navy palette, champagne tones, polished marble and glass, silk and gold details, shallow depth of field, refined well-dressed figure, slow glossy light sweeps"
 }

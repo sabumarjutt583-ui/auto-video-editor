@@ -15,6 +15,6 @@
   "negative": "photorealism, soft airbrush gradients, watercolor, oil painting glazing, pencil sketch, anime, cartoon outlines, 3D render, CGI look, muted dull colors, tiny fussy detail, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Gentle pans and slow pushes across the canvas, with a soft colour shimmer where the paint seems to glisten. Brush marks seem to shift subtly and light pulses a little. Figures are almost still. No fast moves, no 3D effects and no morphing of faces.",
   "style_lock": "contemporary acrylic painting, opaque flat colour blocks, vivid saturated palette, strong complementary contrasts, confident visible brush strokes, palette knife marks, simplified planes of the face, flat painted shadows, bold simple shapes, matte canvas finish, matte plastic-like paint finish, dry-brushed edges",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/acrylic_painting.webp",
   "example_prompt": "An elderly man is painted in bold planes, sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A bright orange lamp shape glows against a deep cobalt blue wall, and his face is built from flat ochre and pink planes. contemporary acrylic painting, opaque flat colour blocks, vivid saturated palette, strong complementary contrasts, confident visible brush strokes, palette knife marks, simplified planes of the face, flat painted shadows, bold simple shapes, matte canvas finish, matte plastic-like paint finish, dry-brushed edges"
 }

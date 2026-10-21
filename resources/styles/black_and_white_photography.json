@@ -15,6 +15,6 @@
   "negative": "color, colour, sepia tint, crime mood, venetian blind shadows, hard thriller lighting, harsh high contrast, dutch angle, cartoon, anime, illustration, painting, 3D render, CGI look, digital oversharpening, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Almost still: a very slow drift or a barely perceptible push-in held for a long time. Subjects stay in contemplative stillness with only a breath, a slow blink or a head turn. Natural light shifts gently. No fast moves, no shake and no dramatic effects.",
   "style_lock": "fine-art black-and-white photograph, silver-gelatin print, rich tonal range, deep blacks and clean whites, soft natural light, fine silver grain, sharp micro-detail, medium-format lens look, expressive portrait, visible wrinkles and texture, strong simple shapes, timeless calm mood",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/black_and_white_photography.webp",
   "example_prompt": "An elderly man sits alone at a wooden kitchen table at night, holding a cup of tea in both hands, an empty chair opposite him. Soft light from a single lamp lets every wrinkle on his face and hands show against the dark room. fine-art black-and-white photograph, silver-gelatin print, rich tonal range, deep blacks and clean whites, soft natural light, fine silver grain, sharp micro-detail, medium-format lens look, expressive portrait, visible wrinkles and texture, strong simple shapes, timeless calm mood"
 }

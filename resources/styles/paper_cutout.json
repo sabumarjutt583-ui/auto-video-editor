@@ -15,6 +15,6 @@
   "negative": "photorealism, 3D render, CGI look, glossy plastic, painting, watercolor, pencil sketch, anime, comic book, realistic skin, gradients, harsh shadows, neon colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Layers move in parallax at different speeds as the camera slides sideways or pushes in slowly. Paper flutters slightly in a small breeze, and pieces swing a little on their hinges. Figures make small stiff, stepped movements. No smooth realistic motion and no morphing.",
   "style_lock": "layered cut-paper diorama, solid coloured paper, visible paper fibres, crisp cut edges, small real shadows between layers, limited harmonious palette, matte flat colours, slight layer offsets, simple flat paper figure, minimal dot face, handmade crafty look, soft studio light",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/paper_cutout.webp",
   "example_prompt": "A cut-paper diorama: an elderly man made of cream and navy paper shapes sits alone at a mustard paper kitchen table at night, holding a tiny paper cup of tea, an empty paper chair opposite him. A round paper lamp casts a soft shadow onto the teal wall layer behind. layered cut-paper diorama, solid coloured paper, visible paper fibres, crisp cut edges, small real shadows between layers, limited harmonious palette, matte flat colours, slight layer offsets, simple flat paper figure, minimal dot face, handmade crafty look, soft studio light"
 }

@@ -15,6 +15,6 @@
   "negative": "photorealistic, 3D render, CGI look, anime, manga, realistic shading, soft gradients, painting, watercolor, sketchy lines, thin outlines, muted dull colors, scary look, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Squash and stretch, bouncy exaggerated movement and quick snappy poses held for a beat. Fast comic takes, bouncing walks and wobbling objects, with simple camera pushes for punchlines. No realistic slow motion and no 3D camera moves.",
   "style_lock": "classic 2D TV cartoon frame, thick bold black outlines, flat bright fills, no shading, candy primary colours, big head, rubbery limbs, huge round eyes, exaggerated expression, simple background shapes, cartoon sparkles, squash and stretch pose",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/2d_cartoon.webp",
   "example_prompt": "A grumpy elderly cartoon man with a huge nose and tufty white hair sits alone at a kitchen table at night, holding a cup of tea with a droopy face, an empty chair opposite him. Bright yellow table, blue wall, and a big cartoon moon in the window. classic 2D TV cartoon frame, thick bold black outlines, flat bright fills, no shading, candy primary colours, big head, rubbery limbs, huge round eyes, exaggerated expression, simple background shapes, cartoon sparkles, squash and stretch pose"
 }

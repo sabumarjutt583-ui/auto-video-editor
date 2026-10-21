@@ -15,6 +15,6 @@
   "negative": "photorealistic, 3D render, CGI look, western cartoon, comic book halftone, thick brush painting, rough sketch, rubbery limbs, grotesque proportions, oversaturated neon, muddy colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Smooth limited-animation feel: held poses with small moves, hair and clothes swaying in wind, and gentle camera pans across the painted background. Eyes blink and shine, and light flickers softly. No fast morphing, no 3D camera spins and no shaking.",
   "style_lock": "anime frame, cel-shaded characters, two-tone hard shadows, clean thin outlines, bright rim light, soft bloom on lights, painted background, big layered clouds, saturated harmonious colours, large expressive eyes with highlights, defined hair locks, slim proportions",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/anime.webp",
   "example_prompt": "An elderly man sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. Warm lamp light and a rim of blue moonlight from the window fall on his gentle, lined face and grey hair. anime frame, cel-shaded characters, two-tone hard shadows, clean thin outlines, bright rim light, soft bloom on lights, painted background, big layered clouds, saturated harmonious colours, large expressive eyes with highlights, defined hair locks, slim proportions"
 }

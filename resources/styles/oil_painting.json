@@ -15,6 +15,6 @@
   "negative": "digital smoothness, flat vector colors, photograph, photorealism, anime, cartoon, comic book, watercolor, 3D render, CGI look, neon colors, thin transparent washes, plastic skin, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow push-in toward the face or hands, and a very slow drift across the canvas. Candlelight flickers gently, shifting the highlights and shadows, and dust motes drift in the beam. Figures hold nearly still with a slow breath. No fast moves and no morphing of faces.",
   "style_lock": "classical oil painting on canvas, chiaroscuro lighting, warm directional side light, deep earthy palette, burnt umber shadows, glowing warm highlights, visible brush strokes, impasto highlights, canvas weave, subtle varnish sheen, painterly edges, dignified expressive face",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/oil_painting.webp",
   "example_prompt": "An elderly man sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A single candle at his side lights his lined face and hands in thick glowing strokes, and the room falls into deep umber shadow. classical oil painting on canvas, chiaroscuro lighting, warm directional side light, deep earthy palette, burnt umber shadows, glowing warm highlights, visible brush strokes, impasto highlights, canvas weave, subtle varnish sheen, painterly edges, dignified expressive face"
 }

@@ -15,6 +15,6 @@
   "negative": "cinematic color grade, teal and orange grade, film grain, dramatic shadows, anime, cartoon, illustration, painting, 3D render, CGI look, plastic skin, airbrushed skin, oversaturated colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Steady, minimal camera: a very slight handheld drift or a slow, small push-in, as if shot by a person standing still. Subjects move naturally and in small ways, such as a blink, a breath, turning a head or lifting a cup. No whip pans, no dramatic zooms, no slow motion and no morphing of faces or objects.",
   "style_lock": "photorealistic, unedited digital photograph, natural daylight, neutral white balance, true-to-life colours, moderate saturation, balanced exposure, 35mm lens look, sharp natural detail, visible skin pores, candid expression, ordinary real surroundings",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/photorealistic.webp",
   "example_prompt": "An elderly man sits alone at a kitchen table at night, both hands around a cup of tea, an empty chair opposite him. A ceiling lamp and the dark window give plain, even light on his creased face, a checked tablecloth and a worn cardigan. photorealistic, unedited digital photograph, natural daylight, neutral white balance, true-to-life colours, moderate saturation, balanced exposure, 35mm lens look, sharp natural detail, visible skin pores, candid expression, ordinary real surroundings"
 }

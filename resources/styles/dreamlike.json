@@ -15,6 +15,6 @@
   "negative": "harsh shadows, hard contrast, dark gritty look, horror, surreal bizarre objects, melting objects, cartoon, anime, illustration, 3D render, CGI look, oversaturated colors, neon colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow floating camera that drifts forward or sideways as if weightless. Light particles, petals and mist drift upward and across the frame, while hair and fabric float gently. Gentle slow motion and soft dissolves of light. No fast moves, no shake, no sudden changes and no morphing of faces.",
   "style_lock": "dreamlike ethereal image, hazy glow, soft bloom, backlit sun haze, low contrast, pastel pink and lavender palette, pale gold and misty blue, soft focus, floating light particles, serene face, flowing hair and fabric, creamy bokeh, gentle diffusion",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/dreamlike.webp",
   "example_prompt": "An elderly man sits at a kitchen table in a pale, glowing room at night, holding a cup of tea with his eyes half closed, an empty chair opposite him. Soft lavender haze fills the air, and tiny lights drift past the window behind him. dreamlike ethereal image, hazy glow, soft bloom, backlit sun haze, low contrast, pastel pink and lavender palette, pale gold and misty blue, soft focus, floating light particles, serene face, flowing hair and fabric, creamy bokeh, gentle diffusion"
 }

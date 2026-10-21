@@ -15,6 +15,6 @@
   "negative": "color, colour, sepia tint, bright cheerful lighting, flat lighting, soft low contrast, daylight, cartoon, anime, illustration, painting, 3D render, CGI look, modern clothing, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow dolly or track moving through shadows and along wet streets, with a gradual push-in on a face. Cigarette smoke curls, rain falls steadily and light stripes shift slightly across a face. Subjects move deliberately and little. No fast cuts and no shaking.",
   "style_lock": "classic film noir still, black and white only, extreme contrast, hard directional light, venetian blind shadows, single streetlamp, deep inky blacks, wet reflective streets, drifting smoke, Dutch angle, face half in shadow, trench coat and fedora, 1940s crime mood, visible silver grain",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/noir.webp",
   "example_prompt": "Dutch angle: an elderly man in a worn suit sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. Stripes of light from the blinds cut across his face and the table, and cigarette smoke hangs in the dark air behind him. classic film noir still, black and white only, extreme contrast, hard directional light, venetian blind shadows, single streetlamp, deep inky blacks, wet reflective streets, drifting smoke, Dutch angle, face half in shadow, trench coat and fedora, 1940s crime mood, visible silver grain"
 }

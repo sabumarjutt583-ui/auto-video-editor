@@ -15,6 +15,6 @@
   "negative": "cartoon, anime, illustration, painting, 3D render, CGI look, plastic skin, airbrushed skin, cold teal grade, neon colors, harsh hard light, oversaturated colors, melodramatic screaming, exaggerated crying, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Very slow push-ins that linger on a face or a hand, almost still. Tiny movements carry the shot: a hand trembling, a tear slowly falling, a curtain stirring, steam rising from a cup. No fast moves, no shake and no morphing of faces.",
   "style_lock": "intimate family drama film still, warm amber light, soft window light, gentle backlit hair, soft beige and faded pastel palette, lifted warm blacks, shallow depth of field, tight close-up on face and hands, tears in tired eyes, aged hands, worn knitted clothes, fine film grain, soft diffusion",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/emotional_drama.webp",
   "example_prompt": "Close shot of an elderly man at a kitchen table at night, both hands wrapped around a cup of tea, his tired eyes glistening as he looks at the empty chair opposite him. A warm lamp lights his face; the dark window behind him is soft and out of focus. intimate family drama film still, warm amber light, soft window light, gentle backlit hair, soft beige and faded pastel palette, lifted warm blacks, shallow depth of field, tight close-up on face and hands, tears in tired eyes, aged hands, worn knitted clothes, fine film grain, soft diffusion"
 }

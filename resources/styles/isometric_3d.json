@@ -15,6 +15,6 @@
   "negative": "perspective distortion, photorealism, dramatic shadows, gritty textures, hand-drawn lines, painting, watercolor, anime, cartoon outlines, horror, dark gloomy colors, film grain, wide-angle lens, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Subtle animated details inside the diorama, such as a lamp flickering, steam rising from a cup or a plant swaying, plus a slow smooth rotation of the whole tile. Figures make small movements. Camera stays isometric. No shake and no perspective changes.",
   "style_lock": "isometric 3D diorama render, true isometric angle, orthographic view, floating square tile, cut-away room, soft even studio light, gentle ambient occlusion, clean pastel colours, smooth matte surfaces, tiny props, small rounded cute figure, plain light background",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/isometric_3d.webp",
   "example_prompt": "An isometric diorama of a cut-away kitchen on a floating tile at night: a small rounded elderly man with white hair sits alone at a mint table, holding a tiny cup of tea, an empty chair opposite him. A warm peach lamp glows softly, and a blue window shows stars. isometric 3D diorama render, true isometric angle, orthographic view, floating square tile, cut-away room, soft even studio light, gentle ambient occlusion, clean pastel colours, smooth matte surfaces, tiny props, small rounded cute figure, plain light background"
 }

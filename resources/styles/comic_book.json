@@ -15,6 +15,6 @@
   "negative": "speech bubbles, captions, sound effect words, photorealism, painterly blur, soft gradients, watercolor, anime, manga, 3D render, CGI look, thin delicate lines, muted dull colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Punchy push-ins and quick slides with a panel-like freeze and subtle movement inside the frame. Dust, sparks and light pulses animate, with halftone dots staying fixed. No smooth realistic motion, no blur and no morphing.",
   "style_lock": "western comic book panel, thick inked outlines, flat bold colours, halftone dot shading, solid black shadows, hatching, strong contrast, dramatic foreshortened angle, dynamic pose, heroic anatomy, bright rim light, printed comic page look",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/comic_book.webp",
   "example_prompt": "Dramatic low-angle panel: an elderly man with a heavy brow and deep ink lines sits alone at a kitchen table at night, gripping a cup of tea, an empty chair opposite him. A single lamp throws a hard shadow shape, and halftone dots shade the blue wall. western comic book panel, thick inked outlines, flat bold colours, halftone dot shading, solid black shadows, hatching, strong contrast, dramatic foreshortened angle, dynamic pose, heroic anatomy, bright rim light, printed comic page look"
 }

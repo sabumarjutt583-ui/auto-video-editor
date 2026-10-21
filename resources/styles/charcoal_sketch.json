@@ -15,6 +15,6 @@
   "negative": "color, colour, fine pen lines, clean digital look, smooth airbrush shading, photorealism, painting, watercolor, 3D render, CGI look, anime, cartoon, comic book, tiny precise detail, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow drift across the drawing, with dust-like particles floating through the light. Charcoal smudges seem to breathe slightly, and the darkness pulses gently. Figures stay still. No fast moves, no flashing and no morphing of faces.",
   "style_lock": "charcoal drawing on textured paper, deep velvety blacks, smudged charcoal, finger blending, eraser highlights, rough gestural strokes, charcoal dust, strong contrast, dark masses, paper grain, monochrome smoky greys, emotion over detail",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/charcoal_sketch.webp",
   "example_prompt": "A charcoal drawing of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. His face and hands are lifted from the dark with eraser highlights, and the room is a smudged black mass. charcoal drawing on textured paper, deep velvety blacks, smudged charcoal, finger blending, eraser highlights, rough gestural strokes, charcoal dust, strong contrast, dark masses, paper grain, monochrome smoky greys, emotion over detail"
 }

@@ -15,6 +15,6 @@
   "negative": "color, colour, painted shading, soft gradients, photorealism, 3D render, CGI look, western comic style, speech bubbles, captions, sound effect words, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Panel-like still image with a subtle slow zoom or drift. Speed lines slide across the frame, screentone shimmer is avoided, and a small element such as a falling tear, smoke or a flickering light may move. No fluid full animation and no colour flashes.",
   "style_lock": "Japanese manga panel, black and white ink drawing, grey screentone dots, bold varied ink lines, solid black shadows, speed lines, impact lines, cross-hatching, dramatic angle, large expressive eyes, sweat drops, shadow over the eyes, printed comic page look",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/manga.webp",
   "example_prompt": "Manga panel at a low angle: an elderly man sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A heavy shadow falls over his eyes, a single tear shines on his cheek, and fine speed lines gather around the dark window. Japanese manga panel, black and white ink drawing, grey screentone dots, bold varied ink lines, solid black shadows, speed lines, impact lines, cross-hatching, dramatic angle, large expressive eyes, sweat drops, shadow over the eyes, printed comic page look"
 }

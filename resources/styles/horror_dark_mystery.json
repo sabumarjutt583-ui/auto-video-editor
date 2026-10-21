@@ -15,6 +15,6 @@
   "negative": "gore, blood, wounds, explicit violence, severed limbs, cartoon, anime, illustration, painting, 3D render, CGI look, bright cheerful colors, oversaturated colors, daylight, comedy, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow creeping dolly forward down a corridor or toward a door, or a slow lateral track. Figures stay unnaturally still, with only a slow breath, a head turning an inch or a curtain stirring. Fog drifts and a light flickers faintly. No jump scares, no fast cuts, no shaking and no sudden zoom.",
   "style_lock": "horror film still, very low key lighting, single weak light source, deep black shadows, cold moonlight, desaturated blue-green grade, sickly yellow accents, pale tense faces, large negative space, half hidden figure, drifting fog, damp cracked surfaces, clumpy shadow grain",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/horror_dark_mystery.webp",
   "example_prompt": "Wide shot: an elderly man sits motionless at a kitchen table at night, a cup of tea untouched in his hands, his pale face half lost in darkness. A single weak bulb lights the table, and the empty chair opposite him stands at the edge of the shadow. horror film still, very low key lighting, single weak light source, deep black shadows, cold moonlight, desaturated blue-green grade, sickly yellow accents, pale tense faces, large negative space, half hidden figure, drifting fog, damp cracked surfaces, clumpy shadow grain"
 }

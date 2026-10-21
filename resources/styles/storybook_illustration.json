@@ -15,6 +15,6 @@
   "negative": "photorealism, 3D render, CGI look, anime, comic book, harsh black outlines, scary dark mood, neon colors, flat vector, gritty texture, minimalist, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow storybook pans across the scene, page-like parallax between foreground and background layers, and falling leaves or snowflakes. Lamp and window light glows softly and pulses a little. Characters make tiny moves such as a nod or a blink. No fast moves and no morphing of faces.",
   "style_lock": "classic storybook illustration, gouache brush texture, coloured pencil details, paper grain, warm magical light, glowing windows, golden evening glow, rich forest green and cosy red palette, charming kind faces, detailed clothing patterns, atmospheric layered depth, soft pencil outlines",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/storybook_illustration.webp",
   "example_prompt": "An elderly man with white hair and round spectacles sits alone at a kitchen table at night, holding a cup of tea with a kind, tired smile, an empty chair opposite him. A glowing lantern and a golden window light the patterned tablecloth and his knitted cardigan. classic storybook illustration, gouache brush texture, coloured pencil details, paper grain, warm magical light, glowing windows, golden evening glow, rich forest green and cosy red palette, charming kind faces, detailed clothing patterns, atmospheric layered depth, soft pencil outlines"
 }

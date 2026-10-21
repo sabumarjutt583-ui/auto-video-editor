@@ -15,6 +15,6 @@
   "negative": "realistic lighting, photorealism, 3D render, CGI look, detailed shading, gradients, heavy outlines, painting, watercolor, sketchy lines, anime, comic book, neon colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Elements slide in and pop up with smooth easing, shapes grow from their centre, and layers drift with gentle parallax. Lines and small details animate one by one. Camera is flat with slow slides or scales. No realistic motion, no shake and no 3D camera moves.",
   "style_lock": "modern flat digital illustration, solid colour shapes, limited soft palette, no realistic lighting, one flat shadow shape, simple geometric forms, subtle grain overlay, simplified faceless figure, elongated limbs, layered flat composition, clean editorial look, subtle printed feel",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/flat_illustration.webp",
   "example_prompt": "A flat illustration of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. He is a simple navy and sand shape with no face, beside a coral chair and a mustard lamp shape on a teal wall. modern flat digital illustration, solid colour shapes, limited soft palette, no realistic lighting, one flat shadow shape, simple geometric forms, subtle grain overlay, simplified faceless figure, elongated limbs, layered flat composition, clean editorial look, subtle printed feel"
 }

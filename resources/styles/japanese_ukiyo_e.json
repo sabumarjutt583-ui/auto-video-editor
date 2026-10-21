@@ -15,6 +15,6 @@
   "negative": "3D shading, photorealism, modern objects, anime style, seals with letters, calligraphy characters, soft airbrush gradients, oil painting, watercolor bleeding, thick impasto, neon colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow horizontal scroll-like pan across the print. Waves, clouds and wind lines move gently in patterned rhythms, and leaves or snow drift down. Figures stay almost still, with cloth moving slightly. No fast moves and no 3D camera effects.",
   "style_lock": "traditional Japanese woodblock print, flat colour blocks, bold flowing outlines, indigo blue and muted red, ochre and soft green, aged cream paper, woodblock grain, slight misregistration, stylised clouds and waves, graceful stylised figure, high flat horizon, carved uneven outlines",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/japanese_ukiyo_e.webp",
   "example_prompt": "A woodblock print of an elderly man in a patterned indigo robe sitting alone at a low wooden table at night, holding a small cup of tea, an empty cushion opposite him. A pale moon disc and stylised cloud bands fill the paper window behind him. traditional Japanese woodblock print, flat colour blocks, bold flowing outlines, indigo blue and muted red, ochre and soft green, aged cream paper, woodblock grain, slight misregistration, stylised clouds and waves, graceful stylised figure, high flat horizon, carved uneven outlines"
 }

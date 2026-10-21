@@ -15,6 +15,6 @@
   "negative": "photorealism, smooth surfaces, high-poly detail, realistic textures, painting, watercolor, hand-drawn lines, anime, cartoon outlines, film grain, heavy noise, muddy colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow orbiting camera moves around the faceted scene, with facets catching and releasing light as the angle changes. Pieces drift or rotate slowly, and the background gradient shifts softly. Figures make small angular movements. No shake and no realistic motion blur.",
   "style_lock": "low-polygon 3D render, flat-shaded triangle facets, visible facet edges, directional light on each facet, pastel gradient colour per facet, no textures, crystalline silhouettes, geometric faceted figure, minimal face, smooth background gradient, stylish geometric look, sparkle on edges",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/low_poly.webp",
   "example_prompt": "A low-poly scene of an elderly man built from coral and slate triangles, sitting alone at a faceted kitchen table at night, holding a cup of tea, an empty chair opposite him. A yellow faceted lamp lights the table, and a navy window gradient sits behind. low-polygon 3D render, flat-shaded triangle facets, visible facet edges, directional light on each facet, pastel gradient colour per facet, no textures, crystalline silhouettes, geometric faceted figure, minimal face, smooth background gradient, stylish geometric look, sparkle on edges"
 }

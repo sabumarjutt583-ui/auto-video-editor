@@ -15,6 +15,6 @@
   "negative": "brand logos, casual snapshot, messy background, harsh flat flash, plastic skin, over-retouched skin, cartoon, anime, illustration, painting, 3D render, CGI look, low resolution, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow-motion fabric movement, with hair and silk flowing, and confident subtle poses such as a head turn or a slow step. Camera makes a slow push-in or a slow orbit, and light sweeps across the fabric. No fast cuts, no shake and no sudden zooms.",
   "style_lock": "high-fashion magazine photograph, controlled studio lighting, beauty light on face, sculpted side shadows, rim light, curated bold or monochrome palette, medium-format lens look, strong elegant pose, styled hair and makeup, designer clothing, clean seamless background, crisp fabric detail",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/fashion_editorial.webp",
   "example_prompt": "A fashion editorial photograph: an elegant elderly man with silver hair in a tailored charcoal jacket sits alone at a sleek dark table, holding a porcelain cup of tea, an empty chair opposite him. A large soft light sculpts his cheekbones against a clean deep grey wall. high-fashion magazine photograph, controlled studio lighting, beauty light on face, sculpted side shadows, rim light, curated bold or monochrome palette, medium-format lens look, strong elegant pose, styled hair and makeup, designer clothing, clean seamless background, crisp fabric detail"
 }

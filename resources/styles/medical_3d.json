@@ -15,6 +15,6 @@
   "negative": "gore, blood, graphic surgery, disturbing imagery, text labels, wounds, exposed raw flesh, horror, cartoon, anime, illustration, painting, photograph of real patient, dirty surfaces, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow rotation of the structure, a fly-through of organs or cells with smooth camera motion, and gentle pulsing of tissue or a soft heartbeat glow. Particles drift slowly in fluid. No fast cuts, no shake and no disturbing movements.",
   "style_lock": "medical 3D visualization, semi-translucent tissue, subtle subsurface glow, soft studio light, clean clinical background, soft reds and pinks and blues, smooth glossy membranes, fine cellular detail, calm accurate look, cool blue rim light, centred anatomical subject, gentle pulsing glow",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/medical_3d.webp",
   "example_prompt": "A medical 3D visualization of a calm semi-translucent human figure of an elderly man sitting at a simple table at night, holding a cup of tea, an empty chair opposite him. Soft pink inner glow and a cool blue rim light stand out against a dark blue background. medical 3D visualization, semi-translucent tissue, subtle subsurface glow, soft studio light, clean clinical background, soft reds and pinks and blues, smooth glossy membranes, fine cellular detail, calm accurate look, cool blue rim light, centred anatomical subject, gentle pulsing glow"
 }

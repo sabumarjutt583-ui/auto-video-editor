@@ -15,6 +15,6 @@
   "negative": "text, numbers, labels, equations, charts with letters, photorealistic faces, cartoon, anime, illustration, painting, bright daylight, cluttered background, low resolution, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow orbiting camera moves around the subject, particles flowing along fields, electrons or planets moving in their orbits, and cosmic scale reveals as the camera pulls back. Glows pulse gently. No fast cuts, no shake and no sudden zooms.",
   "style_lock": "scientific 3D visualization, glowing elements on deep space black, volumetric light beams, soft bloom, glowing blue and cyan and violet palette, orange accents, clean luminous particles, energy fields, fine glowing lines, vast cosmic scale, precise elegant look, glowing particle figure",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/scientific_visualization.webp",
   "example_prompt": "A scientific visualization of an elderly man as a small silhouette made of glowing blue particles sitting at a simple table in a vast dark space, holding a cup of tea, an empty chair opposite him. Fine violet energy lines drift around the table. scientific 3D visualization, glowing elements on deep space black, volumetric light beams, soft bloom, glowing blue and cyan and violet palette, orange accents, clean luminous particles, energy fields, fine glowing lines, vast cosmic scale, precise elegant look, glowing particle figure"
 }

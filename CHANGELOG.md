@@ -10,6 +10,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Free engine: Gemini's image tool through your own Google accounts (any number, taken in turn, each with its own usage-limit pause), with a one-time notice. The browser is driven by a small built-in DevTools client (no extra download).
 - API engine: Gemini image model (editable name) or Cloudflare FLUX, also as automatic fallback.
 - Crash-safe queue: pictures are never made twice, a limit on one account pauses only that account.
+- Style gallery now shows a picture for every one of the 51 styles (styles package version 7).
 - Engine settings are a library package (`resources/image-engine/config.json`); the Admin Edition can edit and test them.
 
 ## [0.1.2] - 2026-10-20

@@ -15,6 +15,6 @@
   "negative": "color, colour, ink, heavy black fills, digital look, smooth airbrush shading, photorealism, painting, watercolor, 3D render, CGI look, anime, cartoon, comic book, thick marker lines, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Very subtle camera drift over the paper, as if the drawing was made moments ago. Faint graphite dust or a slow light shift across the page may move, and a few strokes may appear to settle. No fast moves, no flashing and no morphing of faces.",
   "style_lock": "graphite pencil drawing on sketchbook paper, fine hatching and cross-hatching, smudged soft shading, visible construction lines, paper tooth, grey graphite tones on off-white paper, delicate varied line weight, soft shading on face, carefully observed study, light eraser marks, gentle contour lines, quiet intimate mood",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/pencil_sketch.webp",
   "example_prompt": "A pencil study of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. Soft hatched shadows fall across his face and hands, and light construction lines mark the table and chair. graphite pencil drawing on sketchbook paper, fine hatching and cross-hatching, smudged soft shading, visible construction lines, paper tooth, grey graphite tones on off-white paper, delicate varied line weight, soft shading on face, carefully observed study, light eraser marks, gentle contour lines, quiet intimate mood"
 }

@@ -15,6 +15,6 @@
   "negative": "speech bubbles, captions, text, letters, photorealism, 3D render, CGI look, bright cheerful colors, flat cartoon, anime, manga, superhero comic style, halftone pop art, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Slow cinematic drift or gentle push-in on an essentially still illustration. Rain streaks, smoke, steam and mist move slowly, and lamp light flickers faintly. Figures barely move, only a breath or a slow blink. No fast moves and no flashy effects.",
   "style_lock": "mature graphic novel illustration, expressive ink linework, varied line weight, cross-hatching, watercolour colour washes, one dominant muted tone, chiaroscuro lighting, solid ink shadows, realistic proportions, weary emotional face, cinematic framing, paper grain",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/graphic_novel.webp",
   "example_prompt": "An elderly man sits alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. A single lamp lights his weary, deeply lined face in dusty ochre wash, while the rest of the room fades into dense hatched shadow. mature graphic novel illustration, expressive ink linework, varied line weight, cross-hatching, watercolour colour washes, one dominant muted tone, chiaroscuro lighting, solid ink shadows, realistic proportions, weary emotional face, cinematic framing, paper grain"
 }

@@ -15,6 +15,6 @@
   "negative": "photorealism, 3D render, CGI look, painting, watercolor, sketchy lines, rough texture, film grain, noise, pixelated edges, blurry gradients, charcoal, anime, comic book, muted dull colors, text, letters, watermark, logo, signature, extra fingers, distorted hands, deformed face, duplicate people, blurry",
   "motion_rules": "Smooth transform animations: shapes morph, scale and slide with clean easing, and elements draw on along their outlines. Clean zooms and pans move across the art. Light gradients shift gently. No shake, no noisy effects and no realistic motion blur.",
   "style_lock": "crisp vector illustration, clean solid fills, smooth gradients, perfect curves, uniform outlines, bright polished colours, sharp shape edges, no texture, clear facial features, smooth rounded shapes, clean highlight and shadow shapes, scalable graphic look",
-  "thumbnail": "",
+  "thumbnail": "thumbnails/vector_illustration.webp",
   "example_prompt": "A vector illustration of an elderly man sitting alone at a kitchen table at night, holding a cup of tea, an empty chair opposite him. Smooth orange lamp gradients glow on his friendly face, and a deep navy window with a crisp moon shape sits behind. crisp vector illustration, clean solid fills, smooth gradients, perfect curves, uniform outlines, bright polished colours, sharp shape edges, no texture, clear facial features, smooth rounded shapes, clean highlight and shadow shapes, scalable graphic look"
 }
