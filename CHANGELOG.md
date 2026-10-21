@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-21
+
 ### Changed
 - Image Generator now uses Google accounts only. The Gemini image API and Cloudflare FLUX engines (and the fallback) were removed; the Gemini key stays for scenes and prompts.
 - Google accounts (add, sign in, verify, test) are also in Settings.
