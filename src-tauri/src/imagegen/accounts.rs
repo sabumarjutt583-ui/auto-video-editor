@@ -80,6 +80,10 @@ pub enum Phase {
 
 #[derive(Debug, Clone, Default)]
 struct Runtime {
+    /// Chat questions in flight, and the pause after a chat limit (separate from the image limits).
+    chat_active: u32,
+    chat_cooldown_until: u64,
+    chat_limit_level: u32,
     active: u32,
     cooldown_until: u64,
     cooldown_reason: String,
@@ -143,6 +147,7 @@ pub struct Accounts {
     pub file: AccountsFile,
     runtime: HashMap<String, Runtime>,
     next_start: usize,
+    chat_next: usize,
 }
 
 const BACKOFF_FIRST_MS: u64 = 5_000;
@@ -324,6 +329,62 @@ impl Accounts {
         None
     }
 
+    /// The account that should answer the next chat question: usable, not resting after a chat limit,
+    /// and with the fewest questions in flight (ties go round-robin).
+    pub fn claim_chat(&mut self, now: u64) -> Option<String> {
+        let count = self.file.accounts.len();
+        let mut best: Option<(u32, usize)> = None;
+        for step in 0..count {
+            let index = (self.chat_next + step) % count;
+            let account = &self.file.accounts[index];
+            if !Self::can_take_work(account) {
+                continue;
+            }
+            let rt = self.runtime.get(&account.id);
+            if rt.is_some_and(|r| r.phase.is_some() || r.chat_cooldown_until > now) {
+                continue;
+            }
+            let active = rt.map_or(0, |r| r.chat_active);
+            if best.map_or(true, |(fewest, _)| active < fewest) {
+                best = Some((active, index));
+            }
+        }
+        let (_, index) = best?;
+        let id = self.file.accounts[index].id.clone();
+        self.rt(&id).chat_active += 1;
+        self.chat_next = (index + 1) % count;
+        Some(id)
+    }
+
+    pub fn release_chat(&mut self, id: &str, ok: bool) {
+        let rt = self.rt(id);
+        rt.chat_active = rt.chat_active.saturating_sub(1);
+        if ok {
+            rt.chat_limit_level = 0;
+        }
+    }
+
+    /// A chat usage limit: the account rests 1, 2, 4, 8, 16 and then 30 minutes. Returns the wait in ms.
+    pub fn chat_limit(&mut self, id: &str, now: u64) -> u64 {
+        let rt = self.rt(id);
+        rt.chat_limit_level = (rt.chat_limit_level + 1).min(6);
+        let wait = [1u64, 2, 4, 8, 16, 30][(rt.chat_limit_level - 1) as usize] * 60_000;
+        rt.chat_cooldown_until = rt.chat_cooldown_until.max(now + wait);
+        wait
+    }
+
+    /// When the first account comes back from a chat limit (0 when none rests).
+    pub fn next_chat_end(&self, now: u64) -> u64 {
+        self.file
+            .accounts
+            .iter()
+            .filter(|a| Self::can_take_work(a))
+            .filter_map(|a| self.runtime.get(&a.id).map(|r| r.chat_cooldown_until))
+            .filter(|until| *until > now)
+            .min()
+            .unwrap_or(0)
+    }
+
     pub fn release_slot(&mut self, id: &str) {
         let rt = self.rt(id);
         rt.active = rt.active.saturating_sub(1);
@@ -448,6 +509,59 @@ impl Accounts {
                 }
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod chat_tests {
+    use super::*;
+
+    fn two() -> (Accounts, String, String) {
+        let mut accounts = Accounts::new(AccountsFile::default());
+        let a = accounts.add("A", 1);
+        let b = accounts.add("B", 1);
+        for id in [&a, &b] {
+            accounts.set_connected(id, &format!("{id}@x.com"));
+        }
+        (accounts, a, b)
+    }
+
+    #[test]
+    fn chat_questions_share_the_accounts_evenly() {
+        let (mut accounts, a, b) = two();
+        let first = accounts.claim_chat(10).unwrap();
+        let second = accounts.claim_chat(10).unwrap();
+        assert_ne!(first, second, "the second question goes to the account with nothing in flight");
+        accounts.release_chat(&first, true);
+        accounts.release_chat(&second, true);
+        assert!([&a, &b].contains(&&accounts.claim_chat(10).unwrap()));
+    }
+
+    #[test]
+    fn a_chat_limit_rests_only_that_account_for_chat() {
+        let (mut accounts, a, b) = two();
+        let id = accounts.claim_chat(10).unwrap();
+        accounts.release_chat(&id, false);
+        assert_eq!(accounts.chat_limit(&id, 10), 60_000);
+        for _ in 0..3 {
+            let next = accounts.claim_chat(20).unwrap();
+            assert_ne!(next, id, "the resting account is skipped");
+            accounts.release_chat(&next, true);
+        }
+        assert_eq!(accounts.next_chat_end(20), 10 + 60_000);
+        assert_eq!(accounts.chat_limit(&id, 20), 120_000, "repeated limits rest longer");
+        assert!(accounts.claim_chat(10 + 120_001 + 20).is_some());
+        let _ = (a, b);
+    }
+
+    #[test]
+    fn no_account_means_no_chat() {
+        let mut empty = Accounts::new(AccountsFile::default());
+        assert_eq!(empty.claim_chat(1), None);
+        let (mut accounts, a, _) = two();
+        accounts.update(&a, None, Some(false));
+        let only = accounts.claim_chat(1).unwrap();
+        assert_ne!(only, a, "a paused account is never used");
     }
 }
 

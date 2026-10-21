@@ -1,0 +1,47 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Gemini</title></head>
+<body>
+<a aria-label="Google Account: Test (test@example.com)" href="#">Account</a>
+<main id="chat"></main>
+<rich-textarea><div class="ql-editor" role="textbox" contenteditable="true" aria-label="Enter a prompt for Gemini"></div></rich-textarea>
+<button aria-label="Send message" id="send">Send</button>
+<script>
+  var input = document.querySelector('.ql-editor');
+  var chat = document.getElementById('chat');
+  document.getElementById('send').addEventListener('click', function () {
+    var prompt = input.innerText.trim();
+    if (!prompt) return;
+    input.innerText = '';
+    var response = document.createElement('model-response');
+    var content = document.createElement('message-content');
+    response.appendChild(content);
+    chat.appendChild(response);
+    if (prompt.indexOf('[limit]') >= 0) {
+      content.innerText = "You've reached your limit for today.";
+      return;
+    }
+    if (prompt.indexOf('[never]') >= 0) { response.remove(); return; }
+    var full = prompt.indexOf('[code]') >= 0 ? 'Here you go:' : 'Echo: ' + prompt;
+    var i = 0;
+    var timer = setInterval(function () {
+      i += 6;
+      content.innerText = full.slice(0, i);
+      if (i >= full.length) {
+        clearInterval(timer);
+        if (prompt.indexOf('[code]') >= 0) {
+          var block = document.createElement('code-block');
+          var pre = document.createElement('pre');
+          pre.textContent = '<div id="a">hi</div>\nline two';
+          block.appendChild(pre);
+          content.appendChild(block);
+        }
+        if (prompt.indexOf('[nodone]') < 0) {
+          var good = document.createElement('button');
+          good.setAttribute('aria-label', 'Good response');
+          response.appendChild(good);
+        }
+      }
+    }, 120);
+  });
+</script>
+</body></html>

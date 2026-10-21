@@ -16,6 +16,7 @@ mod keys;
 mod library;
 mod logging;
 mod media;
+mod motion;
 mod probe;
 mod project;
 mod render;
@@ -96,6 +97,8 @@ macro_rules! handler {
             commands::imagegen::imagegen_finish_sign_in,
             commands::imagegen::imagegen_verify,
             commands::imagegen::imagegen_test_image,
+            commands::imagegen::imagegen_chat_ask,
+            commands::motion::motion_generate,
             commands::imagegen::imagegen_background_snapshot,
             commands::imagegen::imagegen_show_browser,
             commands::imagegen::imagegen_start,
@@ -179,6 +182,8 @@ macro_rules! handler {
             commands::imagegen::imagegen_finish_sign_in,
             commands::imagegen::imagegen_verify,
             commands::imagegen::imagegen_test_image,
+            commands::imagegen::imagegen_chat_ask,
+            commands::motion::motion_generate,
             commands::imagegen::imagegen_background_snapshot,
             commands::imagegen::imagegen_show_browser,
             commands::imagegen::imagegen_start,

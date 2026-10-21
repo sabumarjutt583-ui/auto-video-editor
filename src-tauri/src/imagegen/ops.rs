@@ -11,6 +11,7 @@ use tokio::sync::Notify;
 use super::accounts::Phase;
 use super::browser::locator;
 use super::browser::signin::{PlainWindow, WindowState};
+use super::chat::ChatReply;
 use super::config::EngineConfig;
 use super::engine::{Engine, Generators, Sink};
 use super::errors::{ErrorKind, GenError};
@@ -75,6 +76,69 @@ impl ImageGen {
             self.real.close_all().await;
         }
         Ok(())
+    }
+
+    /// The browser program used for private jobs that need no account (motion graphics).
+    pub fn browser_exe(&self) -> Result<PathBuf, AppError> {
+        let settings = self.engine.settings();
+        crate::imagegen::browser::locator::find(Some(&settings.browser_path)).ok_or_else(|| AppError::new("No Chrome, Edge, Brave or Chromium browser was found. Please install one (Chrome is best) or choose a browser in Settings.", "browser not found"))
+    }
+
+    /// Extra browser switches (tests only).
+    pub fn browser_args(&self) -> Vec<String> {
+        self.real.extra_args.clone()
+    }
+
+    /// Asks Gemini's chat one question with the next free Google account. Accounts that hit a limit rest
+    /// and the question moves on to the next one, so several accounts share the work.
+    pub async fn chat_ask(&self, prompt: &str) -> Result<ChatReply, AppError> {
+        let settings = self.engine.settings();
+        let config = self.engine.config();
+        if !settings.consent_given(config.major().unwrap_or(1)) {
+            return Err(AppError::new("Please read and accept the Google account notice first (Settings, Image Generator).", "consent not accepted"));
+        }
+        let timeout = Duration::from_secs(u64::from(settings.timeout_sec).max(120));
+        let attempts = self.engine.read_accounts(|accounts| accounts.file.accounts.len()).max(1);
+        let mut last: Option<GenError> = None;
+        for _ in 0..attempts {
+            let Some(id) = self.engine.with_accounts(|accounts, now| accounts.claim_chat(now)) else { break };
+            let result = match self.real.worker(&id, &settings) {
+                Ok(worker) => worker.chat(prompt, timeout).await,
+                Err(error) => Err(error),
+            };
+            let error = match result {
+                Ok(reply) => {
+                    self.engine.with_accounts(|accounts, _| accounts.release_chat(&id, true));
+                    return Ok(reply);
+                }
+                Err(error) => error,
+            };
+            self.engine.with_accounts(|accounts, now| {
+                accounts.release_chat(&id, false);
+                match error.kind {
+                    ErrorKind::RateLimit => {
+                        accounts.chat_limit(&id, now);
+                    }
+                    ErrorKind::Auth => accounts.mark_auth_error(&id, &error.message),
+                    ErrorKind::Flagged => accounts.mark_flagged(&id, &error.message, now),
+                    _ => {}
+                }
+            });
+            if matches!(error.kind, ErrorKind::RateLimit | ErrorKind::Auth | ErrorKind::Flagged | ErrorKind::Session | ErrorKind::Network | ErrorKind::Aborted) {
+                last = Some(error);
+            } else {
+                return Err(to_app_error(&error));
+            }
+        }
+        if let Some(error) = last {
+            return Err(to_app_error(&error));
+        }
+        let wait = self.engine.read_accounts(|accounts| accounts.next_chat_end(super::engine::now_ms()));
+        if wait > 0 {
+            let minutes = wait.saturating_sub(super::engine::now_ms()).div_ceil(60_000).max(1);
+            return Err(AppError::new(format!("Every Google account is resting after a usage limit. Try again in about {minutes} minute(s)."), "chat limit"));
+        }
+        Err(AppError::new("No Google account is ready. Add one in Settings, Google accounts, and press Sign in.", "no account for chat"))
     }
 
     pub fn add_account(&self, name: &str) -> String {

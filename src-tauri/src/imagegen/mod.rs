@@ -5,6 +5,7 @@
 
 pub mod accounts;
 pub mod browser;
+pub mod chat;
 pub mod config;
 pub mod engine;
 #[cfg(test)]

@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::{oneshot, Mutex};
 
 use super::browser::session::{Frame, Launch, Mode, Session};
+use super::chat::{self, ChatReply};
 use super::config::EngineConfig;
 use super::errors::{classify_browser_error, ErrorKind, GenError};
 use super::tool_page::{self, CardStatus};
@@ -48,6 +49,9 @@ struct Inner {
     ready: Mutex<Option<Ready>>,
     open_lock: Mutex<()>,
     submit_lock: Mutex<()>,
+    /// One chat question at a time per account (each has its own tab).
+    chat_lock: Mutex<()>,
+    chat_busy: AtomicU32,
     tickets: StdMutex<HashMap<u32, Ticket>>,
     poller_running: AtomicBool,
     finished_since_clear: AtomicU32,
@@ -67,6 +71,8 @@ impl FreeWorker {
                 ready: Mutex::new(None),
                 open_lock: Mutex::new(()),
                 submit_lock: Mutex::new(()),
+                chat_lock: Mutex::new(()),
+                chat_busy: AtomicU32::new(0),
                 tickets: StdMutex::new(HashMap::new()),
                 poller_running: AtomicBool::new(false),
                 finished_since_clear: AtomicU32::new(0),
@@ -84,7 +90,7 @@ impl FreeWorker {
     }
 
     pub fn idle_for(&self) -> Duration {
-        let busy = self.inner.tickets.lock().map(|t| !t.is_empty()).unwrap_or(false);
+        let busy = self.inner.tickets.lock().map(|t| !t.is_empty()).unwrap_or(false) || self.inner.chat_busy.load(Ordering::SeqCst) > 0;
         if busy {
             return Duration::ZERO;
         }
@@ -170,6 +176,21 @@ impl FreeWorker {
             Ok(Err(_)) => Err(GenError::aborted()),
             Err(_) => Err(GenError::new(ErrorKind::Timeout, "The picture took too long.")),
         }
+    }
+
+    /// Asks Gemini's chat one question (a fresh chat in an extra tab of this account's browser).
+    pub async fn chat(&self, prompt: &str, timeout: Duration) -> Result<ChatReply, GenError> {
+        self.inner.chat_busy.fetch_add(1, Ordering::SeqCst);
+        let result = self.chat_inner(prompt, timeout).await;
+        self.inner.chat_busy.fetch_sub(1, Ordering::SeqCst);
+        self.touch();
+        result
+    }
+
+    async fn chat_inner(&self, prompt: &str, timeout: Duration) -> Result<ChatReply, GenError> {
+        let (session, _, _) = self.ready().await?;
+        let _turn = self.inner.chat_lock.lock().await;
+        chat::ask(&session, &self.config().engine, prompt, timeout).await
     }
 
     fn start_poller(&self) {

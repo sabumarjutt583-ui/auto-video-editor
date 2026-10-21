@@ -62,6 +62,80 @@ pub struct HumanCheck {
     pub message: String,
 }
 
+/// Where things are on Gemini's chat page. Defaults are the page as captured on 2026-10-21.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChatSelectors {
+    /// The message box (a rich text editor).
+    pub input: String,
+    pub send: String,
+    /// One element per answer.
+    pub response: String,
+    /// The text of an answer, inside `response`.
+    pub response_text: String,
+    /// Every code block of an answer, inside `response`.
+    pub code_block: String,
+    /// Appears under an answer only when it is finished.
+    pub done: String,
+}
+
+impl Default for ChatSelectors {
+    fn default() -> Self {
+        Self {
+            input: "div.ql-editor[role=\"textbox\"]".into(),
+            send: "button[aria-label=\"Send message\"]".into(),
+            response: "model-response".into(),
+            response_text: "message-content".into(),
+            code_block: "code-block pre".into(),
+            done: "button[aria-label=\"Good response\"]".into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChatTiming {
+    pub page_ready_ms: u64,
+    pub send_enable_ms: u64,
+    /// How long to wait for the answer to start after Send.
+    pub reply_start_ms: u64,
+    pub poll_ms: u64,
+    /// Fallback: an answer that did not change for this long counts as finished.
+    pub stable_ms: u64,
+}
+
+impl Default for ChatTiming {
+    fn default() -> Self {
+        Self { page_ready_ms: 30_000, send_enable_ms: 8_000, reply_start_ms: 25_000, poll_ms: 700, stable_ms: 9_000 }
+    }
+}
+
+/// The chat (text) side of the engine: the same Google accounts, Gemini's normal chat page.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChatConfig {
+    pub url: String,
+    pub selectors: ChatSelectors,
+    pub timing: ChatTiming,
+    /// Words in a short answer that mean the usage limit was reached.
+    pub limit_texts: Vec<String>,
+    /// Words in a short answer that mean Gemini failed.
+    pub error_texts: Vec<String>,
+}
+
+impl Default for ChatConfig {
+    fn default() -> Self {
+        let words = |list: &[&str]| list.iter().map(|w| (*w).to_string()).collect();
+        Self {
+            url: "https://gemini.google.com/app".into(),
+            selectors: ChatSelectors::default(),
+            timing: ChatTiming::default(),
+            limit_texts: words(&["reached your limit", "usage limit", "limit for today", "try again tomorrow", "come back later", "reached the limit"]),
+            error_texts: words(&["something went wrong", "i'm having trouble", "couldn't complete"]),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineConfig {
@@ -79,6 +153,8 @@ pub struct EngineConfig {
     pub timing: Timing,
     pub error_patterns: Vec<ErrorPattern>,
     pub human_checks: Vec<HumanCheck>,
+    #[serde(default)]
+    pub chat: ChatConfig,
 }
 
 fn bad(message: &str, details: impl Into<String>) -> AppError {
@@ -116,6 +192,9 @@ impl EngineConfig {
         }
         if self.tool_aspect_ratios.is_empty() || self.max_parallel == 0 || self.max_parallel > 16 {
             return Err(bad("The image engine settings are not valid, so they were not used.", "toolAspectRatios or maxParallel is wrong"));
+        }
+        if !self.chat.url.starts_with("https://") || self.chat.timing.poll_ms < 200 {
+            return Err(bad("The image engine settings are not valid, so they were not used.", "chat.url must start with https:// and chat.timing.pollMs must be at least 200"));
         }
         if self.timing.poll_ms < 200 || self.timing.page_load_timeout_ms < 5_000 {
             return Err(bad("The image engine settings are not valid, so they were not used.", "timing values are too small"));
@@ -209,8 +288,22 @@ mod tests {
         assert!(EngineConfig::parse("not json").is_err());
         let no_ratio = BUNDLED_JSON.replace("{ratio}", "16-9");
         assert!(EngineConfig::parse(&no_ratio).is_err());
-        let bad_version = BUNDLED_JSON.replace("\"1.0\"", "\"x\"");
+        let bad_version = BUNDLED_JSON.replace("\"1.1\"", "\"x\"");
         assert!(EngineConfig::parse(&bad_version).is_err());
+    }
+
+    #[test]
+    fn the_chat_settings_have_defaults_and_must_be_https() {
+        let config = EngineConfig::bundled();
+        assert_eq!(config.chat, ChatConfig::default(), "the bundled file and the built-in defaults agree");
+        let without_chat = {
+            let mut value: serde_json::Value = serde_json::from_str(BUNDLED_JSON).unwrap();
+            value.as_object_mut().unwrap().remove("chat");
+            value.to_string()
+        };
+        assert_eq!(EngineConfig::parse(&without_chat).unwrap().chat.selectors.send, "button[aria-label=\"Send message\"]", "an older settings package still works");
+        let http = BUNDLED_JSON.replace("https://gemini.google.com/app\",\n    \"selectors", "http://gemini.google.com/app\",\n    \"selectors");
+        assert!(EngineConfig::parse(&http).is_err());
     }
 
     #[test]

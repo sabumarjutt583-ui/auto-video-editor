@@ -210,3 +210,52 @@ async fn a_signed_out_account_gets_an_auth_error_and_no_browser_is_left_open() {
     assert!(worker.snapshot().await.is_none());
     let _ = std::fs::remove_dir_all(dir);
 }
+
+// ---- the chat (text answers) ----
+
+#[tokio::test]
+async fn the_chat_returns_a_finished_answer_and_its_code() {
+    let Some((worker, _server, dir)) = worker("chat-ok").await else { return };
+    let plain = worker.chat("Say hello\nin two lines", Duration::from_secs(30)).await.expect("plain answer");
+    assert!(plain.text.starts_with("Echo: Say hello"), "{plain:?}");
+    assert!(plain.code.is_empty());
+
+    let with_code = worker.chat("[code] a page", Duration::from_secs(30)).await.expect("answer with code");
+    assert_eq!(with_code.code, vec!["<div id=\"a\">hi</div>\nline two".to_string()]);
+    assert_eq!(with_code.first_code_or_text(), "<div id=\"a\">hi</div>\nline two");
+    worker.close().await;
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test]
+async fn several_chat_questions_in_a_row_each_get_their_own_fresh_chat() {
+    let Some((worker, _server, dir)) = worker("chat-many").await else { return };
+    for n in 1..=3 {
+        let reply = worker.chat(&format!("question {n}"), Duration::from_secs(30)).await.expect("answer");
+        assert_eq!(reply.text, format!("Echo: question {n}"), "a fresh chat has no earlier answers");
+    }
+    worker.close().await;
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test]
+async fn a_usage_limit_message_is_a_rate_limit_error() {
+    let Some((worker, _server, dir)) = worker("chat-limit").await else { return };
+    let error = worker.chat("[limit] please", Duration::from_secs(30)).await.expect_err("limit");
+    assert_eq!(error.kind, ErrorKind::RateLimit, "{error}");
+    worker.close().await;
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test]
+async fn an_answer_that_never_starts_is_an_error_and_a_missing_done_marker_falls_back_to_stable_text() {
+    let Some((worker, _server, dir)) = worker("chat-edge").await else { return };
+    let error = worker.chat("[never] nothing", Duration::from_secs(30)).await.expect_err("no answer");
+    assert_ne!(error.kind, ErrorKind::RateLimit);
+    let reply = worker.chat("[nodone] still counts", Duration::from_secs(30)).await.expect("stable text is finished");
+    assert_eq!(reply.text, "Echo: [nodone] still counts");
+    let empty = worker.chat("   ", Duration::from_secs(5)).await.expect_err("empty prompt");
+    assert_eq!(empty.kind, ErrorKind::BadRequest);
+    worker.close().await;
+    let _ = std::fs::remove_dir_all(dir);
+}

@@ -54,12 +54,18 @@ pub fn parse_sign_state(value: &Value) -> SignState {
 }
 
 pub async fn sign_state(session: &Session, config: &EngineConfig) -> Result<SignState, GenError> {
+    let frame = Frame { session: session.page_session.clone(), context_id: None };
+    sign_state_in(session, &frame, config).await
+}
+
+/// Like `sign_state`, for any tab of the browser (the chat tab).
+pub async fn sign_state_in(session: &Session, frame: &Frame, config: &EngineConfig) -> Result<SignState, GenError> {
     let expression = format!(
         "(function () {{ var account = document.querySelector({account}); var visible = Array.prototype.some.call(document.querySelectorAll({link}), function (e) {{ return e.getClientRects().length > 0; }}); var label = account ? (account.getAttribute('aria-label') || '') : ''; var match = label.match(/\\(([^)]+@[^)]+)\\)/); return {{ signedIn: !!account, signInVisible: visible && !account, email: match ? match[1] : '', title: document.title, text: (document.body ? document.body.innerText : '').slice(0, 6000) }}; }})()",
         account = js(&config.selectors.account_button),
         link = js(&config.selectors.sign_in_link),
     );
-    session.eval(&expression).await.map(|v| parse_sign_state(&v)).map_err(|e| from_cdp(&e, "Reading the Google page"))
+    session.eval_in(frame, &expression).await.map(|v| parse_sign_state(&v)).map_err(|e| from_cdp(&e, "Reading the Google page"))
 }
 
 /// The error for a page that needs the user, if the text shows one.

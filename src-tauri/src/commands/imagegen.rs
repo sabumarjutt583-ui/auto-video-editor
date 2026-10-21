@@ -125,6 +125,21 @@ pub async fn imagegen_verify(ig: Ig<'_>, id: String) -> Result<(), AppError> {
     ig.verify(&id).await
 }
 
+/// The finished answer of a chat question.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatAnswer {
+    pub text: String,
+    pub code: Vec<String>,
+}
+
+/// Asks Gemini's chat one question through the Google accounts (no API key, no quota of the API).
+#[tauri::command]
+pub async fn imagegen_chat_ask(ig: Ig<'_>, prompt: String) -> Result<ChatAnswer, AppError> {
+    let reply = ig.chat_ask(&prompt).await?;
+    Ok(ChatAnswer { text: reply.text, code: reply.code })
+}
+
 #[tauri::command]
 pub async fn imagegen_test_image(ig: Ig<'_>, id: String) -> Result<TestImage, AppError> {
     ig.test_image(&id).await

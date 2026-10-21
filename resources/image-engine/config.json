@@ -1,5 +1,5 @@
 {
-  "configVersion": "1.0",
+  "configVersion": "1.1",
   "toolUrl": "https://share.gemini.google/rqUWVwvowbjG",
   "signInUrl": "https://accounts.google.com/ServiceLogin?continue={continueUrl}",
   "signInContinueUrl": "https://gemini.google.com/app",
@@ -33,6 +33,20 @@
     "lostCardMs": 15000,
     "clearAfterTasks": 30,
     "signedInSettleMs": 3000
+  },
+  "chat": {
+    "url": "https://gemini.google.com/app",
+    "selectors": {
+      "input": "div.ql-editor[role=\"textbox\"]",
+      "send": "button[aria-label=\"Send message\"]",
+      "response": "model-response",
+      "responseText": "message-content",
+      "codeBlock": "code-block pre",
+      "done": "button[aria-label=\"Good response\"]"
+    },
+    "timing": { "pageReadyMs": 30000, "sendEnableMs": 8000, "replyStartMs": 25000, "pollMs": 700, "stableMs": 9000 },
+    "limitTexts": ["reached your limit", "usage limit", "limit for today", "try again tomorrow", "come back later", "reached the limit"],
+    "errorTexts": ["something went wrong", "i'm having trouble", "couldn't complete"]
   },
   "errorPatterns": [
     { "contains": ["API Error 429"], "kind": "rate_limit", "message": "Usage limit reached for this Google account." },

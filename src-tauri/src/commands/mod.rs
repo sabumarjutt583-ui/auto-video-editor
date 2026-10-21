@@ -13,6 +13,7 @@ pub mod logs;
 pub mod links;
 pub mod mix;
 pub mod media;
+pub mod motion;
 pub mod music;
 pub mod projects;
 pub mod render;

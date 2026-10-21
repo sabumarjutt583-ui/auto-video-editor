@@ -12,6 +12,7 @@ use super::config::EngineConfig;
 
 const GEMINI: &str = include_str!("testdata/gemini_page.html");
 const TOOL: &str = include_str!("testdata/tool_page.html");
+const CHAT: &str = include_str!("testdata/gemini_chat.html");
 
 pub struct TestServer {
     pub port: u16,
@@ -53,6 +54,7 @@ impl TestServer {
                             ("200 OK", page.replace("__TOOL_ORIGIN__", &format!("http://localhost:{port}")))
                         }
                         "/tool" => ("200 OK", TOOL.to_string()),
+                        "/chat" => ("200 OK", CHAT.to_string()),
                         "/favicon.ico" => ("404 Not Found", String::new()),
                         _ => ("404 Not Found", "not found".to_string()),
                     };
@@ -78,6 +80,11 @@ impl TestServer {
         config.timing.page_load_timeout_ms = 30_000;
         config.timing.submit_confirm_ms = 5_000;
         config.timing.lost_card_ms = 4_000;
+        config.chat.url = format!("http://127.0.0.1:{}/chat", self.port);
+        config.chat.timing.poll_ms = 250;
+        config.chat.timing.page_ready_ms = 15_000;
+        config.chat.timing.reply_start_ms = 4_000;
+        config.chat.timing.stable_ms = 2_500;
         config
     }
 }

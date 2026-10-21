@@ -40,6 +40,13 @@ pub struct Frame {
     pub context_id: Option<i64>,
 }
 
+/// An extra tab (its own DevTools session) in the account's browser.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Tab {
+    pub target: String,
+    pub frame: Frame,
+}
+
 pub struct Session {
     pub cdp: Cdp,
     child: Mutex<Option<Child>>,
@@ -156,13 +163,35 @@ impl Session {
 
     /// Goes to `url` and waits until the document is loaded (or `timeout` passes).
     pub async fn navigate(&self, url: &str, timeout: Duration) -> Result<(), CdpError> {
-        let result = self.cdp.call_with_timeout("Page.navigate", json!({ "url": url }), Some(&self.page_session), timeout).await?;
+        self.navigate_on(&self.page_session, url, timeout).await
+    }
+
+    /// Opens an extra tab in the same browser (the chat uses one, so the image tool page stays untouched).
+    pub async fn open_tab(&self) -> Result<Tab, CdpError> {
+        let created = self.cdp.call("Target.createTarget", json!({ "url": "about:blank" }), None).await?;
+        let target = created["targetId"].as_str().ok_or_else(|| session_error("the browser opened no tab"))?.to_string();
+        let attached = self.cdp.call("Target.attachToTarget", json!({ "targetId": target, "flatten": true }), None).await?;
+        let session = attached["sessionId"].as_str().ok_or_else(|| session_error("the browser gave no tab session"))?.to_string();
+        self.cdp.call("Page.enable", json!({}), Some(&session)).await?;
+        Ok(Tab { target, frame: Frame { session, context_id: None } })
+    }
+
+    pub async fn close_tab(&self, tab: &Tab) {
+        let _ = self.cdp.call("Target.closeTarget", json!({ "targetId": tab.target }), None).await;
+    }
+
+    pub async fn navigate_tab(&self, tab: &Tab, url: &str, timeout: Duration) -> Result<(), CdpError> {
+        self.navigate_on(&tab.frame.session, url, timeout).await
+    }
+
+    async fn navigate_on(&self, session: &str, url: &str, timeout: Duration) -> Result<(), CdpError> {
+        let result = self.cdp.call_with_timeout("Page.navigate", json!({ "url": url }), Some(session), timeout).await?;
         if let Some(error) = result["errorText"].as_str().filter(|e| !e.is_empty()) {
             return Err(CdpError::Other(error.to_string()));
         }
         let deadline = tokio::time::Instant::now() + timeout;
         loop {
-            let state = self.cdp.evaluate(&self.page_session, "document.readyState").await.unwrap_or(Value::Null);
+            let state = self.cdp.evaluate(session, "document.readyState").await.unwrap_or(Value::Null);
             if state == "complete" || state == "interactive" {
                 return Ok(());
             }
