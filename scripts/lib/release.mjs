@@ -121,28 +121,47 @@ export function classifyFiles(names) {
   };
 }
 
-/** Names of the files that must exist before a release may be published. */
-export function missingFiles(found) {
-  const need = ["windowsSetup", "windowsSetupSig", "windowsMsi", "macDmg", "macUpdate", "macUpdateSig", "linuxAppImage", "linuxAppImageSig", "linuxDeb"];
-  return need.filter((key) => !found[key]);
+export const ALL_PLATFORMS = ["windows", "mac", "linux"];
+
+const NEEDED_FILES = {
+  windows: ["windowsSetup", "windowsSetupSig", "windowsMsi"],
+  mac: ["macDmg", "macUpdate", "macUpdateSig"],
+  linux: ["linuxAppImage", "linuxAppImageSig", "linuxDeb"],
+};
+
+/** "windows" or "windows,mac" or "all" as a list of platforms (anything unknown is an error). */
+export function parsePlatforms(text) {
+  const value = (text ?? "").trim().toLowerCase();
+  if (value === "" || value === "all") return [...ALL_PLATFORMS];
+  const list = value.split(/[\s,]+/).filter(Boolean);
+  const bad = list.filter((p) => !ALL_PLATFORMS.includes(p));
+  if (bad.length > 0 || list.length === 0) throw new Error(`Unknown platform: ${bad.join(", ") || value}`);
+  return ALL_PLATFORMS.filter((p) => list.includes(p));
+}
+
+/** Names of the files that must exist before a release may be published (for the chosen platforms). */
+export function missingFiles(found, platforms = ALL_PLATFORMS) {
+  return platforms.flatMap((p) => NEEDED_FILES[p]).filter((key) => !found[key]);
+}
+
+/** The keys of the files that belong to the chosen platforms. */
+export function filesOf(platforms = ALL_PLATFORMS) {
+  return platforms.flatMap((p) => NEEDED_FILES[p]);
 }
 
 /** The latest.json of the Tauri updater. `signatures` maps a platform to the text inside its .sig file. */
-export function buildLatestJson({ version, notes, pubDate, repo, tag, found, signatures }) {
+export function buildLatestJson({ version, notes, pubDate, repo, tag, found, signatures, platforms = ALL_PLATFORMS }) {
   const base = `https://github.com/${repo}/releases/download/${tag}`;
   const url = (name) => `${base}/${encodeURIComponent(assetName(name))}`;
-  const mac = { signature: signatures.mac, url: url(found.macUpdate) };
-  return {
-    version,
-    notes,
-    pub_date: pubDate,
-    platforms: {
-      "windows-x86_64": { signature: signatures.windows, url: url(found.windowsSetup) },
-      "darwin-aarch64": mac,
-      "darwin-x86_64": { ...mac },
-      "linux-x86_64": { signature: signatures.linux, url: url(found.linuxAppImage) },
-    },
-  };
+  const entries = {};
+  if (platforms.includes("windows")) entries["windows-x86_64"] = { signature: signatures.windows, url: url(found.windowsSetup) };
+  if (platforms.includes("mac")) {
+    const mac = { signature: signatures.mac, url: url(found.macUpdate) };
+    entries["darwin-aarch64"] = mac;
+    entries["darwin-x86_64"] = { ...mac };
+  }
+  if (platforms.includes("linux")) entries["linux-x86_64"] = { signature: signatures.linux, url: url(found.linuxAppImage) };
+  return { version, notes, pub_date: pubDate, platforms: entries };
 }
 
 /** Checks that a value looks like owner/name. */

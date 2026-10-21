@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  addChangelogSection, assetName, buildLatestJson, bumpVersion, cargoTomlVersion, changelogSection, classifyFiles, missingFiles,
+  addChangelogSection, assetName, buildLatestJson, bumpVersion, cargoTomlVersion, changelogSection, classifyFiles, missingFiles, parsePlatforms,
   NEW_CHANGELOG, notesToMarkdown, setCargoLockVersion, setCargoTomlVersion, unreleasedNotes, validRepo,
 } from "./lib/release.mjs";
 
@@ -77,4 +77,16 @@ test("notes under Unreleased can be read", () => {
   const log = "# Changelog\n\n## [Unreleased]\n\n### Fixed\n- A bug\n\n## [0.1.0] - 2026-01-01\n\n- Old\n";
   assert.equal(unreleasedNotes(log), "### Fixed\n- A bug");
   assert.equal(unreleasedNotes(NEW_CHANGELOG), "");
+});
+
+test("a Windows-only release needs only the Windows files and lists only Windows in latest.json", () => {
+  assert.deepEqual(parsePlatforms("windows"), ["windows"]);
+  assert.deepEqual(parsePlatforms(""), ["windows", "mac", "linux"]);
+  assert.deepEqual(parsePlatforms("all"), ["windows", "mac", "linux"]);
+  assert.throws(() => parsePlatforms("amiga"));
+  const found = classifyFiles(["App_0.3.0_x64-setup.exe", "App_0.3.0_x64-setup.exe.sig", "App_0.3.0_x64_en-US.msi"]);
+  assert.deepEqual(missingFiles(found, ["windows"]), []);
+  assert.ok(missingFiles(found).length > 0, "all platforms still need every file");
+  const json = buildLatestJson({ version: "0.3.0", notes: "n", pubDate: "d", repo: "o/r", tag: "v0.3.0", found, signatures: { windows: "sig", mac: "", linux: "" }, platforms: ["windows"] });
+  assert.deepEqual(Object.keys(json.platforms), ["windows-x86_64"]);
 });

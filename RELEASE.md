@@ -75,7 +75,7 @@ What the workflow does:
 | Build macOS | Smoke test, then one universal app (Intel + Apple Silicon): `.dmg` and the update bundle, also looked into |
 | Publish the release | **Only if all builds worked:** creates a hidden draft in the releases repo, uploads every installer and the five fixed-name copies, uploads `latest.json` **last**, then publishes it as the latest release |
 
-If any build fails, nothing is published. A manual run is also possible: Actions → Release → **Run workflow** (it releases the version that is in the files).
+If any build fails, nothing is published. A manual run is also possible: Actions → Release → **Run workflow** (it releases the version that is in the files). The **platforms** choice is `windows` (default, much faster: no macOS or Linux build) or `all`. A tag push always builds all three. A Windows-only release puts only the Windows installers and a `latest.json` with only Windows in the release, so Mac and Linux users see no update from it.
 
 When it is done, the release is at `https://github.com/myname/autoeditor-releases/releases`, the download links below give the new version, and installed apps show the update banner the next time they check.
 

@@ -1,13 +1,20 @@
 name: Release
 
-# Builds the installers for Windows, macOS and Linux and publishes ONE release in the PUBLIC releases
-# repository (variable RELEASES_REPO). The source repository itself never gets a release.
-# Nothing is published unless all three platforms were built successfully.
+# Builds the installers and publishes ONE release in the PUBLIC releases repository (variable
+# RELEASES_REPO). The source repository itself never gets a release.
+# Run by hand: choose "windows" (default, fast) or "all". A version tag always builds all three.
+# Nothing is published unless every chosen platform was built successfully.
 
 on:
   push:
     tags: ["v*.*.*"]
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Which installers to build. Windows only is much faster."
+        type: choice
+        options: [windows, all]
+        default: windows
 
 concurrency:
   group: release-${{ github.ref }}
@@ -18,6 +25,8 @@ permissions:
 
 env:
   RELEASES_REPO: ${{ vars.RELEASES_REPO }}
+  # "windows" or "all" (a tag push has no input, so it builds all).
+  PLATFORMS: ${{ inputs.platforms || 'all' }}
 
 jobs:
   # 1. Stop early, with a clear message, when a setting is missing.
@@ -56,6 +65,7 @@ jobs:
   ffmpeg-macos:
     name: FFmpeg for macOS (${{ matrix.arch }})
     needs: preflight
+    if: ${{ (inputs.platforms || 'all') == 'all' }}
     strategy:
       fail-fast: true
       matrix:
@@ -97,13 +107,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: Linux
-            target: linux
-            triple: x86_64-unknown-linux-gnu
-          - name: Windows
-            target: windows
-            triple: x86_64-pc-windows-msvc
+        include: ${{ fromJSON((inputs.platforms || 'all') == 'all' && '[{"name":"Linux","target":"linux","triple":"x86_64-unknown-linux-gnu"},{"name":"Windows","target":"windows","triple":"x86_64-pc-windows-msvc"}]' || '[{"name":"Windows","target":"windows","triple":"x86_64-pc-windows-msvc"}]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Cache the FFmpeg build
@@ -146,15 +150,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: Windows
-            os: windows-latest
-            key: windows
-            triple: x86_64-pc-windows-msvc
-          - name: Linux
-            os: ubuntu-22.04
-            key: linux
-            triple: x86_64-unknown-linux-gnu
+        include: ${{ fromJSON((inputs.platforms || 'all') == 'all' && '[{"name":"Windows","os":"windows-latest","key":"windows","triple":"x86_64-pc-windows-msvc"},{"name":"Linux","os":"ubuntu-22.04","key":"linux","triple":"x86_64-unknown-linux-gnu"}]' || '[{"name":"Windows","os":"windows-latest","key":"windows","triple":"x86_64-pc-windows-msvc"}]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -189,7 +185,7 @@ jobs:
         shell: bash
         run: node scripts/ci/prepare.mjs "$RUNNER_TEMP/notes.md"
       - name: The user build must not contain admin code
-        if: matrix.key == 'linux'
+        shell: bash
         run: |
           npm run build
           if grep -rIl -e "Style thumbnails" -e "Style Test" -e "admin-page" dist; then echo "::error::Admin code is in the user bundle."; exit 1; fi
@@ -260,6 +256,7 @@ jobs:
   build-macos:
     name: Build macOS
     needs: [preflight, ffmpeg-macos]
+    if: ${{ (inputs.platforms || 'all') == 'all' }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -350,10 +347,13 @@ jobs:
   publish:
     name: Publish the release
     needs: [preflight, build-desktop, build-macos]
+    # build-macos is skipped on a Windows-only run; everything that did run must have succeeded.
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.build-desktop.result == 'success' && (needs.build-macos.result == 'success' || (needs.build-macos.result == 'skipped' && (inputs.platforms || 'all') != 'all')) }}
     runs-on: ubuntu-22.04
     env:
       GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
       VERSION: ${{ needs.preflight.outputs.version }}
+      PLATFORMS: ${{ inputs.platforms || 'all' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -406,7 +406,7 @@ jobs:
           {
             echo "### Released v$VERSION"
             echo "https://github.com/$RELEASES_REPO/releases/tag/v$VERSION"
-            for f in AutoEditor-windows-x64-setup.exe AutoEditor-windows-x64.msi AutoEditor-macos-universal.dmg AutoEditor-linux-x64.AppImage AutoEditor-linux-x64.deb; do
+            for f in $(ls release-files | grep '^AutoEditor-.*-x64\|^AutoEditor-macos-universal'); do
               echo "- https://github.com/$RELEASES_REPO/releases/latest/download/$f"
             done
           } >> "$GITHUB_STEP_SUMMARY"

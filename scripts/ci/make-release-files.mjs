@@ -7,7 +7,7 @@
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { assetName, buildLatestJson, classifyFiles, FIXED_NAMES, missingFiles } from "../lib/release.mjs";
+import { assetName, buildLatestJson, classifyFiles, filesOf, FIXED_NAMES, missingFiles, parsePlatforms } from "../lib/release.mjs";
 
 const [buildsDir, outDir, latestDir, notesFile, version, repo] = process.argv.slice(2);
 
@@ -18,10 +18,11 @@ function walk(dir) {
   });
 }
 
+const platforms = parsePlatforms(process.env.PLATFORMS);
 const files = walk(buildsDir);
 const byName = new Map(files.map((f) => [basename(f), f]));
 const found = classifyFiles([...byName.keys()]);
-const missing = missingFiles(found);
+const missing = missingFiles(found, platforms);
 if (missing.length > 0) {
   console.error(`::error::These installers are missing, so nothing is published: ${missing.join(", ")}`);
   process.exit(1);
@@ -29,9 +30,8 @@ if (missing.length > 0) {
 
 mkdirSync(outDir, { recursive: true });
 mkdirSync(latestDir, { recursive: true });
-const wanted = ["windowsSetup", "windowsSetupSig", "windowsMsi", "macDmg", "macUpdate", "macUpdateSig", "linuxAppImage", "linuxAppImageSig", "linuxDeb"];
-for (const key of wanted) copyFileSync(byName.get(found[key]), join(outDir, assetName(found[key])));
-for (const key of Object.keys(FIXED_NAMES)) copyFileSync(byName.get(found[key]), join(outDir, FIXED_NAMES[key]));
+for (const key of filesOf(platforms)) copyFileSync(byName.get(found[key]), join(outDir, assetName(found[key])));
+for (const key of Object.keys(FIXED_NAMES).filter((k) => found[k] && filesOf(platforms).includes(k))) copyFileSync(byName.get(found[key]), join(outDir, FIXED_NAMES[key]));
 
 const sig = (name) => readFileSync(byName.get(name), "utf8").trim();
 const latest = buildLatestJson({
@@ -41,7 +41,12 @@ const latest = buildLatestJson({
   repo,
   tag: `v${version}`,
   found,
-  signatures: { windows: sig(found.windowsSetupSig), mac: sig(found.macUpdateSig), linux: sig(found.linuxAppImageSig) },
+  platforms,
+  signatures: {
+    windows: platforms.includes("windows") ? sig(found.windowsSetupSig) : "",
+    mac: platforms.includes("mac") ? sig(found.macUpdateSig) : "",
+    linux: platforms.includes("linux") ? sig(found.linuxAppImageSig) : "",
+  },
 });
 writeFileSync(join(latestDir, "latest.json"), `${JSON.stringify(latest, null, 2)}\n`);
 console.log(`Prepared ${readdirSync(outDir).length} files and latest.json for v${version}.`);
