@@ -1,4 +1,4 @@
-import type { EditorData, KenBurns, MediaFile, Placeholder, SceneOverride, TimeChoice, Transition, VideoFit } from "../../types/editor.ts";
+import type { EditorData, KenBurns, MotionGraphic, MediaFile, Placeholder, SceneOverride, TimeChoice, Transition, VideoFit } from "../../types/editor.ts";
 import type { Project } from "../../types/project.ts";
 import { readAudio } from "../audio/read.ts";
 import { readRender } from "../render/read.ts";
@@ -59,6 +59,26 @@ function readMedia(value: unknown): MediaFile | null {
   };
 }
 
+function readMotion(value: unknown): MotionGraphic | null {
+  if (!isObject(value) || typeof value.id !== "string" || typeof value.sceneId !== "string" || typeof value.framesDir !== "string") return null;
+  const framesDir = value.framesDir;
+  if (framesDir === "" || framesDir.startsWith("/") || framesDir.includes("..") || framesDir.includes("\\")) return null;
+  return {
+    id: value.id,
+    sceneId: value.sceneId,
+    start: Math.max(0, finite(value.start, 0)),
+    duration: Math.max(0, finite(value.duration, 0)),
+    idea: text(value.idea, "") ?? "",
+    framesDir,
+    htmlPath: text(value.htmlPath, "") ?? "",
+    fps: Math.min(60, Math.max(12, Math.round(finite(value.fps, 30)))),
+    frames: Math.max(0, Math.round(finite(value.frames, 0))),
+    width: Math.max(0, Math.round(finite(value.width, 0))),
+    height: Math.max(0, Math.round(finite(value.height, 0))),
+    enabled: value.enabled !== false,
+  };
+}
+
 /** The editor data of a project, with every missing or damaged part replaced by its default. */
 export function readEditor(project: Pick<Project, "editor">): EditorData {
   const raw = isObject(project.editor) ? project.editor : {};
@@ -73,7 +93,8 @@ export function readEditor(project: Pick<Project, "editor">): EditorData {
   if (isObject(raw.overrides)) {
     for (const [id, value] of Object.entries(raw.overrides)) overrides[id] = readOverride(value);
   }
-  return { media, timeChoices, placeholder: pick(raw.placeholder, PLACEHOLDERS, "hold"), overrides, captions: readCaptions(raw.captions), audio: readAudio(raw.audio), render: readRender(raw.render) };
+  const motion = Array.isArray(raw.motion) ? raw.motion.map(readMotion).filter((g): g is MotionGraphic => g !== null) : [];
+  return { media, motion, timeChoices, placeholder: pick(raw.placeholder, PLACEHOLDERS, "hold"), overrides, captions: readCaptions(raw.captions), audio: readAudio(raw.audio), render: readRender(raw.render) };
 }
 
 /** The override of a scene (the defaults when it has none). */

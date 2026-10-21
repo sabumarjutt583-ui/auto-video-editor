@@ -1,5 +1,5 @@
 import type { AspectRatio, Quality } from "../../types/settings.ts";
-import type { CaptionLine, CaptionStyle, EditorData, KenBurns, MediaFile, SceneOverride, SfxCue, VideoFit } from "../../types/editor.ts";
+import type { CaptionLine, MotionGraphic, CaptionStyle, EditorData, KenBurns, MediaFile, SceneOverride, SfxCue, VideoFit } from "../../types/editor.ts";
 import type { Project, Scene } from "../../types/project.ts";
 import { buildMixRequest, type MixRequest } from "../audio/mixRequest.ts";
 import { buildAssRequest, type AssRequest } from "../captions/assRequest.ts";
@@ -32,6 +32,20 @@ export interface RenderScene {
   transition: { kind: TransitionKind; seconds: number };
 }
 
+export interface RenderOverlay {
+  framesDir: string;
+  start: number;
+  fps: number;
+}
+
+/** The motion graphics that are on and fit the picture shape (a 16:9 graphic is not stretched into a 9:16 video). */
+export function buildOverlays(motion: readonly MotionGraphic[], width: number, height: number, duration: number): RenderOverlay[] {
+  const shape = width / height;
+  return motion
+    .filter((g) => g.enabled && g.frames > 0 && g.width > 0 && g.height > 0 && Math.abs(g.width / g.height - shape) < 0.02 && g.start < duration)
+    .map((g) => ({ framesDir: g.framesDir, start: g.start, fps: g.fps }));
+}
+
 /** What the Rust renderer needs (see src-tauri/src/render/model.rs). */
 export interface RenderRequest {
   projectName: string;
@@ -44,6 +58,7 @@ export interface RenderRequest {
   captions: AssRequest | null;
   srt: string | null;
   mix: MixRequest;
+  overlays: RenderOverlay[];
   aspectLabel: string;
   suffix: string | null;
   date: string;
@@ -123,6 +138,7 @@ export function buildRenderRequest(input: RenderInput): RenderRequest {
     captions: captionsOn ? buildAssRequest(aspect, quality, input.captionStyle, input.font, input.captionLines) : null,
     srt: input.captionLines.length > 0 ? toSrt(input.captionLines) : null,
     mix: buildMixRequest(editor.audio, project.voicePath ?? "", project.voiceDuration, input.cues),
+    overlays: buildOverlays(editor.motion, width, height, project.voiceDuration),
     aspectLabel: aspectLabel(aspect),
     suffix: input.suffix,
     date: input.date,

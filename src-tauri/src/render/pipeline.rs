@@ -162,9 +162,25 @@ pub async fn render(job: &Job, env: &RenderEnv, request: &RenderRequest) -> Resu
     }
     filter.push_str("format=yuv420p");
 
+    // Motion graphics: each one is a folder of transparent frames, read as one more input.
+    let mut graph = Graph { inputs: Vec::new(), filter: vec!["-vf".into(), filter.clone()], maps: vec!["-map".into(), "0:v:0".into(), "-map".into(), "1:a:0".into()] };
+    if !request.overlays.is_empty() {
+        let mut starts = Vec::new();
+        for overlay in &request.overlays {
+            let dir = env.project_dir.join(&overlay.frames_dir);
+            if !dir.join("00000.png").is_file() {
+                return Err(AppError::new("A motion graphic is missing. Please make it again.", format!("no frames in {}", dir.display())));
+            }
+            graph.inputs.extend(["-framerate".into(), overlay.fps.to_string(), "-start_number".into(), "0".into(), "-i".into(), arg(&dir.join("%05d.png"))]);
+            starts.push(overlay.start);
+        }
+        graph.filter = vec!["-filter_complex".into(), plan::overlay_graph(&starts, request.width, request.height, &filter)];
+        graph.maps = vec!["-map".into(), "[vout]".into(), "-map".into(), "1:a:0".into()];
+    }
+
     job.set_range(60.0, 98.0);
     let encoded = tmp.join("video.mp4");
-    let used = encode(job, request, &list, &audio, &filter, &encoded, total_frames, &chosen, usable).await?;
+    let used = encode(job, request, &list, &audio, &graph, &encoded, total_frames, &chosen, usable).await?;
 
     // 5. Save and check
     job.set_range(98.0, 100.0);
@@ -226,12 +242,22 @@ pub async fn render(job: &Job, env: &RenderEnv, request: &RenderRequest) -> Resu
     })
 }
 
+/// The extra inputs, the filter and the stream choice of the final encode.
+struct Graph {
+    inputs: Vec<String>,
+    filter: Vec<String>,
+    maps: Vec<String>,
+}
+
 /// The last step. If a graphics-card encoder fails in the middle (a driver problem), the CPU encoder takes over.
 #[allow(clippy::too_many_arguments)]
-async fn encode(job: &Job, request: &RenderRequest, list: &Path, audio: &Path, filter: &str, output: &Path, total_frames: i64, first: &EncoderInfo, usable: &[EncoderInfo]) -> Result<EncoderInfo, AppError> {
+async fn encode(job: &Job, request: &RenderRequest, list: &Path, audio: &Path, graph: &Graph, output: &Path, total_frames: i64, first: &EncoderInfo, usable: &[EncoderInfo]) -> Result<EncoderInfo, AppError> {
     let mut attempt = first.clone();
     loop {
-        let mut args: Vec<String> = vec!["-f".into(), "concat".into(), "-safe".into(), "0".into(), "-i".into(), arg(list), "-i".into(), arg(audio), "-map".into(), "0:v:0".into(), "-map".into(), "1:a:0".into(), "-vf".into(), filter.to_string()];
+        let mut args: Vec<String> = vec!["-f".into(), "concat".into(), "-safe".into(), "0".into(), "-i".into(), arg(list), "-i".into(), arg(audio)];
+        args.extend(graph.inputs.iter().cloned());
+        args.extend(graph.filter.iter().cloned());
+        args.extend(graph.maps.iter().cloned());
         args.extend(encoder::encoder_args(&attempt.id, request.width, request.height, request.fps));
         args.extend(["-r", &request.fps.to_string(), "-fps_mode", "cfr", "-frames:v", &total_frames.to_string(), "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-t", &format!("{:.3}", request.duration), "-movflags", "+faststart"].map(String::from));
         args.push(arg(output));
@@ -335,6 +361,64 @@ mod tests {
         assert!(percents.windows(2).all(|w| w[1] >= w[0] - 0.01), "progress never goes back: {percents:?}");
         assert!(percents.last().copied().unwrap_or(0.0) >= 99.9);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    async fn pixel_at(video: &Path, seconds: f64) -> [u8; 3] {
+        let mut cmd = command(Tool::Ffmpeg).unwrap();
+        cmd.args(["-hide_banner", "-v", "error", "-ss", &seconds.to_string(), "-i"]).arg(video).args(["-frames:v", "1", "-vf", "scale=1:1", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]);
+        let out = cmd.output().await.unwrap();
+        assert_eq!(out.stdout.len(), 3, "{}", String::from_utf8_lossy(&out.stderr));
+        [out.stdout[0], out.stdout[1], out.stdout[2]]
+    }
+
+    #[tokio::test]
+    async fn a_motion_graphic_appears_at_its_start_time_and_goes_away_after_its_last_frame() {
+        if !sidecars_for_tests() {
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("ave-render-overlay-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        for sub in ["audio", "exports", "motion/m1/frames"] {
+            std::fs::create_dir_all(dir.join(sub)).unwrap();
+        }
+        let p = |name: &str| dir.join(name).to_string_lossy().into_owned();
+        ffmpeg(&["-f", "lavfi", "-i", "sine=frequency=300:duration=4", &p("audio/voice.wav")]).await;
+        // 12 opaque red frames (1 second at 12 fps).
+        ffmpeg(&["-f", "lavfi", "-i", "color=c=red:s=640x360:r=12:d=1,format=rgba", "-start_number", "0", &p("motion/m1/frames/%05d.png")]).await;
+        let request = request(serde_json::json!({
+            "projectName": "Overlay", "width": 640, "height": 360, "fps": 30, "duration": 4.0,
+            "scenes": [scene("S01", 0.0, 4.0, serde_json::json!({"kind": "black"}), "none", "cut")],
+            "kenBurns": false,
+            "overlays": [{"framesDir": "motion/m1/frames", "start": 1.5, "fps": 12}],
+            "mix": {"duration": 4.0, "voicePath": "audio/voice.wav", "music": {"tracks": [], "volume": 0.2, "fadeIn": 2, "fadeOut": 3, "mode": "loop", "ducking": "normal"}, "sfx": [], "normalize": false},
+            "aspectLabel": "16x9", "suffix": null, "date": "2026-10-18"
+        }));
+        request.validate().unwrap();
+        let env = RenderEnv { project_dir: dir.clone(), fonts_dir: dir.clone(), sfx_dir: dir.clone(), export_folder: None, force_cpu: true };
+        let registry = JobRegistry::default();
+        let (job, _) = test_job(&registry, "overlay");
+        let result = render(&job, &env, &request).await.unwrap();
+        assert!(result.duration_ok, "{:.3}", result.duration);
+        let video = Path::new(&result.path);
+        let red = |px: [u8; 3]| px[0] > 150 && px[1] < 90 && px[2] < 90;
+        assert!(!red(pixel_at(video, 0.8).await), "before the start");
+        assert!(red(pixel_at(video, 2.0).await), "while it plays");
+        assert!(!red(pixel_at(video, 3.4).await), "after the last frame");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn overlay_folders_must_stay_inside_the_project() {
+        let base = |overlay: serde_json::Value| request(serde_json::json!({
+            "projectName": "x", "width": 640, "height": 360, "fps": 30, "duration": 4.0,
+            "scenes": [scene("S01", 0.0, 4.0, serde_json::json!({"kind": "black"}), "none", "cut")], "kenBurns": false, "overlays": [overlay],
+            "mix": {"duration": 4.0, "voicePath": "audio/voice.wav", "music": {"tracks": [], "volume": 0.2, "fadeIn": 2, "fadeOut": 3, "mode": "loop", "ducking": "normal"}, "sfx": [], "normalize": false},
+            "aspectLabel": "16x9", "date": "2026-10-18"
+        }));
+        assert!(base(serde_json::json!({"framesDir": "motion/a/frames", "start": 1.0, "fps": 30})).validate().is_ok());
+        assert!(base(serde_json::json!({"framesDir": "../x", "start": 1.0, "fps": 30})).validate().is_err());
+        assert!(base(serde_json::json!({"framesDir": "/etc", "start": 1.0, "fps": 30})).validate().is_err());
+        assert!(base(serde_json::json!({"framesDir": "motion/a", "start": 9.0, "fps": 30})).validate().is_err());
     }
 
     /// The big one: 20 minutes, 200 scenes, 1080p with captions and transitions. Slow, so it only runs on request:

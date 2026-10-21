@@ -90,6 +90,20 @@ pub struct RenderScene {
     pub transition: SceneTransition,
 }
 
+/// A motion graphic laid over the video: a folder of transparent PNG frames made by `motion/`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Overlay {
+    /// Inside the project, e.g. "motion/m1/frames" (files 00000.png, 00001.png ...).
+    pub frames_dir: String,
+    /// When it appears in the video, in seconds.
+    pub start: f64,
+    /// The frame rate the frames were drawn at.
+    pub fps: u32,
+}
+
+pub const MAX_OVERLAYS: usize = 100;
+
 fn one() -> f64 {
     1.0
 }
@@ -113,6 +127,9 @@ pub struct RenderRequest {
     #[serde(default)]
     pub srt: Option<String>,
     pub mix: MixRequest,
+    /// Motion graphics laid over the whole video (above the pictures, below the captions).
+    #[serde(default)]
+    pub overlays: Vec<Overlay>,
     /// For the file name, e.g. "16x9".
     pub aspect_label: String,
     /// For the file name, e.g. "shorts".
@@ -146,6 +163,19 @@ impl RenderRequest {
         }
         if self.scenes.iter().any(|s| !(s.start.is_finite() && s.end.is_finite() && s.start >= 0.0 && s.end >= s.start)) {
             return Err(bad("A scene has a wrong time.", "non-finite or reversed scene time".to_string()));
+        }
+        if self.overlays.len() > MAX_OVERLAYS {
+            return Err(bad("There are too many motion graphics.", format!("{} overlays", self.overlays.len())));
+        }
+        for overlay in &self.overlays {
+            let path = std::path::Path::new(&overlay.frames_dir);
+            let safe = !overlay.frames_dir.is_empty() && path.is_relative() && !path.components().any(|c| matches!(c, std::path::Component::ParentDir | std::path::Component::Prefix(_) | std::path::Component::RootDir));
+            if !safe {
+                return Err(bad("A motion graphic has a wrong folder.", format!("frames_dir = {:?}", overlay.frames_dir)));
+            }
+            if !(overlay.start.is_finite() && overlay.start >= 0.0 && overlay.start < self.duration && (12..=120).contains(&overlay.fps)) {
+                return Err(bad("A motion graphic has a wrong time.", format!("start = {}, fps = {}", overlay.start, overlay.fps)));
+            }
         }
         Ok(())
     }

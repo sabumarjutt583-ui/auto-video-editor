@@ -177,8 +177,30 @@ export interface RenderData {
   kenBurns: boolean;
 }
 
+/** A motion graphic written by the AI for a scene (the frames are in the project's `motion/<id>/frames`). */
+export interface MotionGraphic {
+  id: string;
+  sceneId: string;
+  /** When it appears in the video, in seconds. */
+  start: number;
+  /** Seconds. */
+  duration: number;
+  /** What the person asked for (empty = the AI chose). */
+  idea: string;
+  /** Inside the project, e.g. "motion/m1/frames". */
+  framesDir: string;
+  htmlPath: string;
+  fps: number;
+  frames: number;
+  width: number;
+  height: number;
+  /** False = kept but not rendered. */
+  enabled: boolean;
+}
+
 export interface EditorData {
   media: MediaFile[];
+  motion: MotionGraphic[];
   timeChoices: Record<string, TimeChoice>;
   placeholder: Placeholder;
   overrides: Record<string, SceneOverride>;

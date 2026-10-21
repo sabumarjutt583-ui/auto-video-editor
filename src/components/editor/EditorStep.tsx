@@ -13,6 +13,7 @@ import type { MediaFile, Project, Scene, SceneOverride } from "../../types";
 import { AudioPanel, useAudio, useSfxLibrary } from "../audio";
 import { CaptionsPanel, useCaptions } from "../captions";
 import { ErrorNotice } from "../ErrorNotice";
+import { MotionPanel, useMotion } from "../motion";
 import { RenderModal, useRender } from "../render";
 import { useMediaActions } from "../media/useMediaActions";
 import { SegmentedControl } from "../ui";
@@ -25,7 +26,7 @@ import { PlaybackContext, usePlayback } from "./usePlayback";
 import { useEditorKeys } from "./useEditorKeys";
 import { useSceneFocusStore } from "../../store/sceneFocusStore";
 
-type Tab = "storyboard" | "scene" | "captions" | "audio";
+type Tab = "storyboard" | "scene" | "motion" | "captions" | "audio";
 
 /** Auto Editor step 2: storyboard, preview and timeline. */
 export function EditorStep({ project }: { project: Project }) {
@@ -39,6 +40,7 @@ export function EditorStep({ project }: { project: Project }) {
   const captions = useCaptions(project, editor);
   const library = useSfxLibrary();
   const audio = useAudio(project, editor, captions.lines, library);
+  const motion = useMotion(project);
   const [renderOpen, setRenderOpen] = useState(false);
   useEffect(() => {
     useSceneFocusStore.getState().set(project.id, selectedId);
@@ -113,7 +115,7 @@ export function EditorStep({ project }: { project: Project }) {
         {actions.notice && <p className="text-sm text-muted" role="status">{actions.notice}</p>}
         <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(320px,2fr)_minmax(0,3fr)]">
           <div className="flex min-h-0 flex-col gap-3">
-            <SegmentedControl<Tab> label="Editor panels" value={tab} onChange={setTab} options={[{ value: "storyboard", label: "Storyboard" }, { value: "scene", label: "Scene settings" }, { value: "captions", label: "Captions" }, { value: "audio", label: "Audio" }]} />
+            <SegmentedControl<Tab> label="Editor panels" value={tab} onChange={setTab} options={[{ value: "storyboard", label: "Storyboard" }, { value: "scene", label: "Scene settings" }, { value: "motion", label: "Motion" }, { value: "captions", label: "Captions" }, { value: "audio", label: "Audio" }]} />
             <div className="max-h-[calc(100vh-14rem)] overflow-y-auto pr-1">
               {tab === "storyboard" && (
                 <Storyboard
@@ -129,6 +131,7 @@ export function EditorStep({ project }: { project: Project }) {
               )}
               {tab === "captions" && <CaptionsPanel project={project} view={captions} />}
               {tab === "audio" && <AudioPanel project={project} view={audio} library={library} />}
+              {tab === "motion" && <MotionPanel project={project} dir={dir} graphics={editor.motion} scene={selected} view={motion} />}
               {tab === "scene" && selected && (
                 <OverridesPanel
                   sceneId={selected.id}
