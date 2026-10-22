@@ -162,3 +162,6 @@ Results phase 9: `npm run test:ts` 396 passed (15 quality tests incl. real Noto 
 
 ### Motion graphics phase 10 (editing and presets)
 Check by hand: click a block on the Graphics track (Motion tab opens with the inspector); drag its edges (snaps to word times) and move it; edit a text and press Apply changes; drag the preview picture (it cannot enter the caption zone); change entrance/exit and colours; Duplicate, Remove, Ctrl+Z / Ctrl+Y; Save as preset, then insert it on another scene with new texts.
+
+### Motion graphics phase 11 (sounds for graphics)
+Check by hand: add a counter graphic and a sliding title; Audio tab > Sound effects: "Add soft sounds for motion graphics" is on, the SFX track shows a pop/whoosh at each graphic start and ticks for the counter; untick it and they vanish; edit or delete one cue; render and listen (quiet, no sound when graphics leave).

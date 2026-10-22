@@ -114,6 +114,8 @@ In the Auto Editor, open the **Motion** tab, pick a scene and press **Make a mot
 
 **Edit a graphic.** Graphics have their own **Graphics** row on the timeline. Click one to edit it: change its texts and numbers (press **Apply changes**), drag it on the preview picture, drag its edges on the timeline to change when it shows (it snaps to the spoken words), pick how it comes in and goes out, or give it its own colours. **Duplicate**, **Remove** and undo/redo work as everywhere else. **Save as preset** keeps a graphic in **My Presets** with its texts as blanks; add it to any scene with your own words. The AI sees your presets as examples of the look you like.
 
+**Sounds for graphics.** In the Audio tab, **Add soft sounds for motion graphics** (on by default) adds a quiet pop or whoosh when a graphic comes in, light ticks while a counter counts, and a swoosh when a map draws a route. Nothing plays when a graphic leaves. They appear on the SFX track, so you can move or delete any of them. They follow the "How many effects" choice and the effects volume.
+
 **Brand kit.** In the Motion tab, open **Brand kit** to choose the look of your graphics: three ready-made kits (Clean Documentary, Bold News, Soft Story), kits that match your visual style (for example Noir gives grey tones and capital-letter titles), or your own. Change colours, round corners, line thickness, shadow and movement, watch the four sample pictures change, then press **Save as my kit**. **Use for all projects** makes it the default.
 
 ## SFX Library

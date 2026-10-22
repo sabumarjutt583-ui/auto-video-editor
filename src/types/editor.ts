@@ -101,7 +101,7 @@ export type MusicMode = "loop" | "fade";
 export type SfxIntensity = "low" | "normal" | "high";
 export type SfxCategory = "whoosh" | "hit" | "pop" | "riser" | "ambience" | "soft_swell" | "click" | "transition";
 /** Why a sound effect is where it is. */
-export type SfxReason = "whoosh" | "pop" | "hit" | "riser" | "ambience" | "manual";
+export type SfxReason = "whoosh" | "pop" | "hit" | "riser" | "ambience" | "graphic" | "manual";
 
 /** A music file copied into the project's music folder. */
 export interface MusicTrack {
@@ -155,6 +155,8 @@ export interface AudioData {
   mode: MusicMode;
   ducking: DuckingPreset;
   autoSfx: boolean;
+  /** Soft sounds for motion graphics (pop or whoosh in, counter ticks, map swoosh). Only used while automatic effects are on. */
+  graphicSfx: boolean;
   intensity: SfxIntensity;
   /** Percent, 0 to 100: the master volume of all sound effects. */
   sfxVolume: number;

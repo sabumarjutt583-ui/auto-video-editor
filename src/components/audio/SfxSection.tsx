@@ -34,6 +34,7 @@ export function SfxSection({ view, library, duration }: { view: AudioView; libra
         <p key={w} className="text-xs text-muted">{w}</p>
       ))}
       <Checkbox label="Add sound effects automatically" checked={audio.autoSfx} onChange={(e) => view.change({ autoSfx: e.target.checked })} />
+      <Checkbox label="Add soft sounds for motion graphics" checked={audio.graphicSfx} disabled={!audio.autoSfx} onChange={(e) => view.change({ graphicSfx: e.target.checked })} />
       <Field label="How many effects">
         <SegmentedControl<SfxIntensity> label="Effect intensity" value={audio.intensity} onChange={(intensity) => view.change({ intensity })} options={INTENSITY} />
       </Field>

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import { buildAudioMix, importMusic } from "../../lib/audio/api";
 import { activeCues, buildMixRequest } from "../../lib/audio/mixRequest";
+import { planGraphicSfx, withGraphicSfx } from "../../lib/audio/graphicSfx";
 import { nextCueId, planSfx } from "../../lib/audio/sfxPlan";
 import { pickMusicFiles } from "../../lib/dialog";
 import { readEditor } from "../../lib/editor/model";
@@ -45,7 +46,7 @@ export function useAudio(project: Project, editor: EditorData, captionLines: rea
     () =>
       library.sounds.length === 0
         ? []
-        : planSfx({
+        : withGraphicSfx(planSfx({
             scenes: project.scenes,
             overrides: editor.overrides,
             locations: project.locationBible,
@@ -55,8 +56,8 @@ export function useAudio(project: Project, editor: EditorData, captionLines: rea
             intensity: audio.intensity,
             transitionMode: editor.render.transitions,
             sounds: library.sounds,
-          }),
-    [library.sounds, project.scenes, project.locationBible, project.words, editor.overrides, editor.captions.style.preset, captionLines, audio.intensity, editor.render.transitions],
+          }), audio.graphicSfx ? planGraphicSfx({ graphics: editor.motion, sounds: library.sounds, intensity: audio.intensity }) : []),
+    [library.sounds, project.scenes, project.locationBible, project.words, editor.overrides, editor.captions.style.preset, captionLines, audio.intensity, audio.graphicSfx, editor.motion, editor.render.transitions],
   );
   const cues = useMemo(() => activeCues(audio, planned), [audio, planned]);
 

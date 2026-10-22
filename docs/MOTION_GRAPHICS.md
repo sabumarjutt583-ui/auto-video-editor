@@ -165,6 +165,11 @@ A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphi
 - App: store/graphicSelectionStore, components/editor/timeline/GraphicsTrack (Graphics row between Video and Captions: click selects and seeks, drag moves, drag an edge changes the time), components/graphics/editing/{useGraphicEditing,GraphicInspector,PresetsPanel}. Every change goes through `applyEdit`, so undo/redo works. A change that alters the picture draws a new clip with a new id (clip files are never overwritten); a pure time move only changes `start`. Presets live in settings `graphicPresets` (max 100, Rust-checked).
 - Limit: undo/redo is not unit-tested (stores cannot be imported in node tests); it relies on `applyEdit`.
 
+## 5l. Sounds for graphics (phase 11)
+- Code: src/lib/audio/graphicSfx.ts (`planGraphicSfx`, `withGraphicSfx`, + graphicSfx.test.ts, 7 tests). Pure: same graphics, same cues. Cue reason `graphic`.
+- Rules: entrance fade/scale/pop/typewriter -> soft pop (`pop_bubble`); slide*/wipe -> `whoosh_soft`; entrance none -> silent; counter -> light `click_tick` ticks every 0.25 s (max 3 / 6 / 8 at low / normal / high, gain 0.35); map with a route -> `whoosh_long` swoosh; exit -> no sound. Gain = sound default x intensity (0.6 / 0.85 / 1) x factor (0.35-0.7), so they stay quiet. A graphic sound within 0.3 s of another automatic effect is dropped.
+- Setting: `audio.graphicSfx` (default ON, only used while automatic effects are on; Audio tab checkbox). The cues join the planned list in `useAudio`, so they show on the SFX track, can be edited or deleted there, and are mixed like every other effect. Sounds come from the built-in library; missing ids fall back to the category.
+
 ## 6. Phase checklist (commit per phase)
 
 | Phase | Result | Commit message |
@@ -180,7 +185,7 @@ A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphi
 | 8 (done) | placement | Motion graphics phase 8: smart placement |
 | 9 (done) | quality checks | Motion graphics phase 9: quality checks |
 | 10 (done) | timeline editing + presets | Motion graphics phase 10: editing and presets |
-| 11 | SFX for graphics | Motion graphics phase 11: graphic sound effects |
+| 11 (done) | SFX for graphics | Motion graphics phase 11: graphic sound effects |
 | 12 | cache + parallel | Motion graphics phase 12: cache and parallel render |
 | 13 | end-to-end tests + docs | Motion graphics phase 13: end-to-end tests and docs |
 

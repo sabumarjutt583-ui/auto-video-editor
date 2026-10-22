@@ -10,6 +10,7 @@ export const DEFAULT_AUDIO: AudioData = {
   mode: "loop",
   ducking: "normal",
   autoSfx: true,
+  graphicSfx: true,
   intensity: "normal",
   sfxVolume: 80,
   cues: null,
@@ -21,7 +22,7 @@ export const DEFAULT_AUDIO: AudioData = {
 const DUCKING: readonly DuckingPreset[] = ["off", "light", "normal", "strong"];
 const MODES: readonly MusicMode[] = ["loop", "fade"];
 const INTENSITIES: readonly SfxIntensity[] = ["low", "normal", "high"];
-const REASONS: readonly SfxReason[] = ["whoosh", "pop", "hit", "riser", "ambience", "manual"];
+const REASONS: readonly SfxReason[] = ["whoosh", "pop", "hit", "riser", "ambience", "graphic", "manual"];
 
 function isObject(value: unknown): value is Obj {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -69,6 +70,7 @@ export function readAudio(value: unknown): AudioData {
     mode: pick(o.mode, MODES, d.mode),
     ducking: pick(o.ducking, DUCKING, d.ducking),
     autoSfx: o.autoSfx === undefined ? d.autoSfx : o.autoSfx === true,
+    graphicSfx: o.graphicSfx === undefined ? d.graphicSfx : o.graphicSfx === true,
     intensity: pick(o.intensity, INTENSITIES, d.intensity),
     sfxVolume: num(o.sfxVolume, 0, 100, d.sfxVolume),
     cues,
