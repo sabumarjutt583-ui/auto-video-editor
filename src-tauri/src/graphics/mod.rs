@@ -3,3 +3,6 @@
 // The structs are first used by the transparent export (phase 3).
 #[allow(dead_code)]
 pub mod spec;
+
+#[cfg(test)]
+mod golden_tests;

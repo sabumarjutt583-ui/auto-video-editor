@@ -6,6 +6,7 @@ import { frameAt } from "../../lib/motion/request";
 import { requestCancel } from "../../store/jobStore";
 import type { MotionGraphic, Project, Scene } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
+import { GraphicLab } from "../graphics";
 import { Button, Checkbox, Field, TextInput } from "../ui";
 import type { MotionView } from "./useMotion";
 
@@ -15,6 +16,8 @@ interface MotionPanelProps {
   graphics: readonly MotionGraphic[];
   scene: Scene | undefined;
   view: MotionView;
+  /** A picture of the selected scene (shown behind the graphic preview). */
+  backgroundUrl?: string | null;
 }
 
 /** A looping preview of the drawn frames on a checkerboard (so the transparent parts show). */
@@ -38,7 +41,7 @@ function Preview({ dir, graphic }: { dir: string; graphic: MotionGraphic }) {
 }
 
 /** Motion graphics written by the AI for the selected scene. */
-export function MotionPanel({ project, dir, graphics, scene, view }: MotionPanelProps) {
+export function MotionPanel({ project, dir, graphics, scene, view, backgroundUrl }: MotionPanelProps) {
   const [idea, setIdea] = useState("");
   const busy = view.job !== null;
   const mine = scene ? graphics.filter((g) => g.sceneId === scene.id) : [];
@@ -85,6 +88,7 @@ export function MotionPanel({ project, dir, graphics, scene, view }: MotionPanel
         </div>
       ))}
       {graphics.length === 0 && !view.job && <p className="text-xs text-muted">No motion graphics yet.</p>}
+      <GraphicLab aspect={project.settings.aspectRatio} backgroundUrl={backgroundUrl ?? null} />
     </section>
   );
 }

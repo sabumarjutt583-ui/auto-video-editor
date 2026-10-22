@@ -83,6 +83,15 @@ fn full() -> f64 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Run {
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weight: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChartRow {
     pub label: String,
     pub value: f64,
@@ -142,6 +151,7 @@ fn d_dust() -> String { "dust".into() }
 fn d_count() -> u32 { 60 }
 fn d_pop() -> String { "pop".into() }
 fn d_kinetic_size() -> f64 { 0.09 }
+fn d_contain() -> String { "contain".into() }
 fn d_rect() -> String { "rect".into() }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -161,6 +171,26 @@ pub enum Layer {
         max_lines: u32,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         color: Option<String>,
+    },
+    RichText {
+        #[serde(flatten)]
+        common: Common,
+        runs: Vec<Run>,
+        #[serde(default = "d_text_size")]
+        size: f64,
+        #[serde(default = "d_center")]
+        align: String,
+        #[serde(rename = "maxLines", default = "d_two")]
+        max_lines: u32,
+    },
+    Image {
+        #[serde(flatten)]
+        common: Common,
+        src: String,
+        #[serde(default = "d_contain")]
+        fit: String,
+        #[serde(default)]
+        radius: f64,
     },
     Icon {
         #[serde(flatten)]
@@ -310,6 +340,8 @@ impl Layer {
     pub fn common(&self) -> &Common {
         match self {
             Layer::Text { common, .. }
+            | Layer::RichText { common, .. }
+            | Layer::Image { common, .. }
             | Layer::Icon { common, .. }
             | Layer::Shape { common, .. }
             | Layer::Counter { common, .. }
@@ -346,14 +378,14 @@ mod tests {
     }
 
     #[test]
-    fn all_fourteen_layer_types_read() {
+    fn all_sixteen_layer_types_read() {
         let spec: GraphicSpec = serde_json::from_str(ALL).unwrap();
-        assert_eq!(spec.layers.len(), 14);
+        assert_eq!(spec.layers.len(), 16);
         assert_eq!(spec.brand, "news");
-        assert!(matches!(spec.layers[6], Layer::Map { .. }));
-        assert!(matches!(spec.layers[13], Layer::Flag { .. }));
+        assert!(matches!(spec.layers[8], Layer::Map { .. }));
+        assert!(matches!(spec.layers[15], Layer::Flag { .. }));
         let json = serde_json::to_value(&spec).unwrap();
-        assert_eq!(json["layers"][6]["type"], "map");
+        assert_eq!(json["layers"][8]["type"], "map");
         assert_eq!(json["layers"][0]["box"]["w"], 0.8);
         let again: GraphicSpec = serde_json::from_value(json).unwrap();
         assert_eq!(spec, again);

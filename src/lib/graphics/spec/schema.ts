@@ -24,7 +24,7 @@ export const MAP_PROJECTIONS = ["naturalEarth", "mercator", "equirectangular", "
 export const MAP_REGIONS = ["world", "europe", "asia", "africa", "northAmerica", "southAmerica", "oceania", "middleEast"] as const;
 export const PARTICLE_KINDS = ["confetti", "sparks", "dust", "snow", "bubbles"] as const;
 export const LAYER_TYPES = [
-  "text", "icon", "shape", "counter", "chart", "timeline", "map", "lowerThird",
+  "text", "richText", "image", "icon", "shape", "counter", "chart", "timeline", "map", "lowerThird",
   "quoteCard", "list", "progressBar", "particles", "kineticText", "flag",
 ] as const;
 
@@ -93,6 +93,29 @@ const textLayer = obj({
   align: oneOf(["left", "center", "right"] as const, "center"),
   maxLines: num({ min: 1, max: 4, int: true, def: 2 }),
   color,
+});
+/** Runs are written one after the other with a space between them (the spec trims every text). */
+const richTextLayer = obj({
+  ...base, type: lit("richText"),
+  runs: arr(
+    obj({ text: str({ min: 1, max: 80 }), weight: opt(oneOf(["regular", "semibold", "bold"] as const)), color }),
+    { min: 1, max: 8 },
+  ),
+  size: num({ min: 0.01, max: 0.3, def: 0.06 }),
+  align: oneOf(["left", "center", "right"] as const, "center"),
+  maxLines: num({ min: 1, max: 4, int: true, def: 2 }),
+});
+/** `src` is a media file of the project or a bundled asset, never a web address or a path that leaves the project. */
+const assetPath = str({
+  min: 1, max: 200,
+  pattern: /^(?!.*\.\.)(?![\\/])[A-Za-z0-9_./ -]+$/,
+  expects: "must be a relative file path inside the project (no .., no web address)",
+});
+const imageLayer = obj({
+  ...base, type: lit("image"),
+  src: assetPath,
+  fit: oneOf(["cover", "contain"] as const, "contain"),
+  radius: num({ min: 0, max: 0.5, def: 0 }),
 });
 const iconLayer = obj({ ...base, type: lit("icon"), icon: iconRef, color });
 const shapeLayer = obj({
@@ -185,7 +208,7 @@ const flagLayer = obj({
 });
 
 export const layerParser = variant("type", {
-  text: textLayer, icon: iconLayer, shape: shapeLayer, counter: counterLayer, chart: chartLayer,
+  text: textLayer, richText: richTextLayer, image: imageLayer, icon: iconLayer, shape: shapeLayer, counter: counterLayer, chart: chartLayer,
   timeline: timelineLayer, map: mapLayer, lowerThird: lowerThirdLayer, quoteCard: quoteLayer, list: listLayer,
   progressBar: progressLayer, particles: particlesLayer, kineticText: kineticLayer, flag: flagLayer,
 });

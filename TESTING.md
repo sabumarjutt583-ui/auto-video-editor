@@ -18,6 +18,7 @@ cargo build --features admin                 # no warnings (admin build)
 cargo test                                   # Rust tests (needs the sidecar for the FFmpeg ones: npm run setup:ffmpeg)
 cargo test smoke_test -- --nocapture         # 5-second project with every feature (CI runs it with the installer FFmpeg)
 cargo test --features admin                  # adds the Admin Edition tests
+cargo test golden                            # motion graphics: every layer / enter / exit preset / script drawn in Chromium and compared with src/lib/graphics/render/golden/*.png (UPDATE_GOLDEN=1 rewrites them: look at them first)
 cargo test imagegen                          # Image Generator: queue, scheduler, real Chromium against a fake Gemini page (needs Chromium; skips when none is found)
 cargo test --release performance_20_minutes -- --ignored --nocapture   # 20 min, 200 scenes, 1080p (slow)
 ```

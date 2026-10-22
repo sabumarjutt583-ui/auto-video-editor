@@ -17,7 +17,7 @@ test("fixtures: stat callout is valid and defaults are filled", () => {
   }
 });
 
-test("fixtures: all 14 layer types validate (country code is upper-cased only in repair)", () => {
+test("fixtures: all 16 layer types validate (country code is upper-cased only in repair)", () => {
   const spec = clone(load("all_layers.json")) as Loose;
   const strict = validateSpec(spec);
   // "pk" is lower case: strict accepts it because the parser normalises it; no issue is reported.
@@ -95,9 +95,9 @@ test("repair: clamps numbers, cuts text, drops unknown fields, and the result is
   spec.junk = true;
   (spec.layers[0] as Record<string, unknown>).text = "a\nb" + "x".repeat(300);
   (spec.layers[0] as Record<string, unknown>).size = 9;
-  (spec.layers[3] as Record<string, unknown>).decimals = 2.6;
-  (spec.layers[4] as { rows: unknown[] }).rows = Array.from({ length: 30 }, (_, i) => ({ label: `L${i}`, value: i }));
-  (spec.layers[11] as Record<string, unknown>).count = 100000;
+  (spec.layers.find((l) => l.type === "counter") as Record<string, unknown>).decimals = 2.6;
+  (spec.layers.find((l) => l.type === "chart") as { rows: unknown[] }).rows = Array.from({ length: 30 }, (_, i) => ({ label: `L${i}`, value: i }));
+  (spec.layers.find((l) => l.type === "particles") as Record<string, unknown>).count = 100000;
   const r = repairSpec(spec);
   assert.equal(r.ok, true);
   if (r.ok) {
@@ -218,4 +218,17 @@ test("repair of a mostly valid spec with bad values keeps strict validity (fuzz 
     if (r.ok) { repaired++; assert.equal(validateSpec(r.spec).ok, true); }
   }
   assert.ok(repaired > 100);
+});
+
+test("image layer: only project-relative paths are accepted", () => {
+  const spec = clone(load("all_layers.json")) as Loose;
+  const image = spec.layers.find((l) => l.type === "image") as { src: string };
+  for (const bad of ["https://x.com/a.png", "../secret.png", "/etc/passwd", "C:\\x.png", "a/../b.png", "file:///a.png"]) {
+    image.src = bad;
+    assert.equal(validateSpec(spec).ok, false, bad);
+    const repaired = repairSpec(spec);
+    assert.ok(!repaired.ok || !repaired.spec.layers.some((l) => l.type === "image"), bad);
+  }
+  image.src = "media/ok file.png";
+  assert.equal(validateSpec(spec).ok, true);
 });

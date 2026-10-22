@@ -1,3 +1,4 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { contextOf } from "../../lib/editor/context";
@@ -131,7 +132,7 @@ export function EditorStep({ project }: { project: Project }) {
               )}
               {tab === "captions" && <CaptionsPanel project={project} view={captions} />}
               {tab === "audio" && <AudioPanel project={project} view={audio} library={library} />}
-              {tab === "motion" && <MotionPanel project={project} dir={dir} graphics={editor.motion} scene={selected} view={motion} />}
+              {tab === "motion" && <MotionPanel project={project} dir={dir} graphics={editor.motion} scene={selected} view={motion} backgroundUrl={selectedFile?.kind === "image" ? convertFileSrc(selectedFile.path) : null} />}
               {tab === "scene" && selected && (
                 <OverridesPanel
                   sceneId={selected.id}

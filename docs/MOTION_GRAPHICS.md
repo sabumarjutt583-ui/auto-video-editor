@@ -80,13 +80,23 @@ One renderer for preview and export (R5). Cache key = hash(spec + rendererVersio
 - Layer types (14): text, icon, shape, counter, chart, timeline, map, lowerThird, quoteCard, list, progressBar, particles, kineticText, flag. Positions are fractions of the frame, times are seconds from the graphic start, frame rate is fixed 30 fps (not in the spec). Limits are in `limits.ts` (max 20 s, 16 layers, 120 characters of text, 12 chart rows, 300 particles ...).
 - Icon and country names are checked through `Catalog` (`defaultCatalog` accepts well-formed Lucide/Tabler names and ISO country codes; phase 4 plugs in the real icon index).
 
+## 5c. Renderer core (phase 2)
+
+- Spec additions: layer types `richText` (runs written one after another, separated by a space) and `image` (`src` = relative project path; web addresses, `..` and absolute paths are refused). Now 16 layer types.
+- Code: `src/lib/graphics/render/`: `renderFrame(spec, frame, ctx, rc, options)` draws one frame (`frame` / 30 = seconds; 30 fps fixed) onto a cleared transparent Canvas 2D context (`CanvasRenderingContext2D` or `OffscreenCanvasRenderingContext2D`). Pure parts (Node-tested): `timing.ts` (visibility window, enter/exit progress), `easing.ts`, `anim.ts` (9 enter and 7 exit presets to alpha / move / scale / clip / typewriter), `script.ts` (Latin, Cyrillic, Korean, Japanese, Chinese, Devanagari, Arabic/Urdu), `wrap.ts` (word and CJK line breaking, punctuation never starts a line), `fit.ts` (wrap inside the box, shrink to 50 % of the size, then cut with an ellipsis). Drawing: `draw/{text,shape,icon,image}.ts` (`text` also draws `richText`). RTL text uses canvas `direction = "rtl"` with words in logical order.
+- Fonts: the bundled Noto fonts of `resources/fonts`, chosen by the detected script (`theme.ts` is a placeholder for the brand kits of phase 6). Icons: `icons.ts` has a tiny hand-drawn set until phase 4 brings Lucide/Tabler. Layer types of phase 5 (counter, chart, ...) report `not-drawn` for now.
+- Notes: `renderFrame` returns `{ drawn, notes }`; notes tell when text was shrunk or cut, or an icon / picture is missing. The quality checks of phase 9 will use them.
+- Motion blur: `options.motionBlurSamples` (+ `shutter`) draws sub-frames into a scratch canvas and adds them with `lighter` at 1/n (the mean of the premultiplied colours). Off by default.
+- Preview: `src/components/graphics/{GraphicPreview,GraphicLab}.tsx`, shown in Auto Editor > Motion as "Graphic preview (new engine)": plays a sample or pasted spec in real time over the scene picture with play/pause and a scrub bar; same renderer as the export.
+- Golden tests: `scripts/graphics-harness.mjs` bundles the renderer (Vite API, no new dependency) to `src-tauri/target/graphics-harness/harness.js`; `src-tauri/src/graphics/golden_tests.rs` runs it in the hidden Chromium of the Image Generator code and compares 41 cases (text in 8 scripts, alignment, wrapping, shrink, cut, rich text, shape, icons, images, every enter and exit preset, motion blur) with `src/lib/graphics/render/golden/*.png` (mean error <= 1.5 and <= 0.3 % of pixels far off). `UPDATE_GOLDEN=1 cargo test golden` rewrites the pictures; look at them before committing.
+
 ## 6. Phase checklist (commit per phase)
 
 | Phase | Result | Commit message |
 |---|---|---|
 | 0 | this document | Motion graphics phase 0: audit and plan |
 | 1 (done) | GraphicSpec schema, validator, repairSpec, Rust structs | Motion graphics phase 1: GraphicSpec schema and validation |
-| 2 | renderer core (text, richText, shape, icon, image), timing engine, preview panel | Motion graphics phase 2: renderer core |
+| 2 (done) | renderer core (text, richText, shape, icon, image), timing engine, preview panel | Motion graphics phase 2: renderer core |
 | 3 | transparent export + composite + alpha tests | Motion graphics phase 3: transparent export and composite |
 | 4 | icons, flags, maps | Motion graphics phase 4: icons, flags and maps |
 | 5 | advanced layers | Motion graphics phase 5: advanced layers |
