@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ## [Unreleased]
 
 ### Added
+- Quick Prompts: the Prompt Generator works without a project. Paste a script (any language) and get prompts P01, P02 ... per sentence (1 to 4 per prompt), per line, or per scene (the AI groups sentences). Or add a voice and timing and get timecode ids. The session saves itself and is restored when you reopen the app. "New quick session" clears it; "Save as project" moves everything (script, voice, timing, scenes, cast, style, prompts) into a normal project.
+- Copy all and Export TXT put empty lines after every prompt (1, 2 or 3, default 2), with a MOTION line directly under its prompt and an "Include IDs" switch. "Copy row" copies one prompt only.
+- Image Generator "Only images": text copied with Copy all can be pasted back (one picture per prompt, ids like S01_000.0-005.1 or P01 become the picture names, MOTION lines are ignored).
+
+### Added
 - Web chat engine: Gemini's chat in the browser, through the same Google accounts as the Image Generator. No API key. Accounts that reach a limit rest, the question moves to the next account. Settings > Text engine switches scene groups, characters and prompts between the Gemini API key and the web chat.
 - AI motion graphics (Auto Editor > Motion): Gemini writes a new animation for a scene (any kind of graphic, nothing is a fixed template). It is checked in a hidden offline browser (errors, empty, covers the screen, does not move; up to 3 tries), drawn to transparent frames at 1080p / 30 fps and laid over the video when you render, below the captions.
 

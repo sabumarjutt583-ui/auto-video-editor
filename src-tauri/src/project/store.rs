@@ -140,6 +140,52 @@ impl ProjectStore {
         Ok(self.root.join(id))
     }
 
+    /// Makes (or recreates) a project folder with a fixed id. Used for the quick session, which lives in
+    /// its own folder and is never listed with the projects.
+    pub fn create_fixed(&self, id: &str, name: &str, settings: ProjectSettings) -> Result<Project, AppError> {
+        let name = clean_name(name)?;
+        let folder = self.folder(id)?;
+        fs::create_dir_all(&folder).map_err(|e| io_error("The quick session folder could not be created.", &e, &folder))?;
+        let project = Project::new(id.to_string(), name, now_iso(), settings);
+        let result = SUB_FOLDERS
+            .iter()
+            .try_for_each(|sub| {
+                let path = folder.join(sub);
+                fs::create_dir_all(&path).map_err(|e| io_error("The quick session folder could not be set up.", &e, &path))
+            })
+            .and_then(|()| write_json(&folder.join(PROJECT_FILE), &project));
+        if let Err(error) = result {
+            let _ = fs::remove_dir_all(&folder);
+            return Err(error);
+        }
+        Ok(project)
+    }
+
+    /// Moves a project of this store into `target` as a normal project with a new id and name (voice,
+    /// timing and every file go with it), then removes it here.
+    pub fn move_to(&self, id: &str, target: &ProjectStore, name: &str) -> Result<ProjectSummary, AppError> {
+        let name = clean_name(name)?;
+        let mut project = self.open(id)?;
+        let (new_id, folder) = target.make_folder()?;
+        let now = now_iso();
+        project.id = new_id;
+        project.name = name;
+        project.created_at = now.clone();
+        project.updated_at = now;
+        let result = copy_folder(&self.folder(id)?, &folder, &["exports", PROJECT_FILE])
+            .and_then(|()| {
+                let exports = folder.join("exports");
+                fs::create_dir_all(&exports).map_err(|e| io_error("The project could not be created.", &e, &exports))
+            })
+            .and_then(|()| write_json(&folder.join(PROJECT_FILE), &project));
+        if let Err(error) = result {
+            let _ = fs::remove_dir_all(&folder);
+            return Err(error);
+        }
+        self.delete(id)?;
+        Ok(ProjectSummary::from(&project))
+    }
+
     /// Makes a new, empty project folder. Removes it again if anything goes wrong.
     fn make_folder(&self) -> Result<(String, PathBuf), AppError> {
         fs::create_dir_all(&self.root)
@@ -278,6 +324,70 @@ mod tests {
 
     fn cleanup(store: &ProjectStore) {
         let _ = fs::remove_dir_all(&store.root);
+    }
+
+    #[test]
+    fn a_quick_session_is_kept_apart_and_can_become_a_project() {
+        let quick = store("quick");
+        let main = store("quick-main");
+        let made = quick.create_fixed("quick-session", "Quick session", ProjectSettings::default()).unwrap();
+        assert_eq!(made.id, "quick-session");
+        let mut project = quick.open("quick-session").unwrap();
+        project.script = "Hello there. Second line.".into();
+        project.voice_path = Some("audio/processed.wav".into());
+        quick.save(project).unwrap();
+        fs::write(quick.root.join("quick-session").join("audio").join("processed.wav"), b"RIFF").unwrap();
+        assert!(main.list().unwrap().projects.is_empty(), "never listed with the projects");
+
+        let summary = quick.move_to("quick-session", &main, "  My story ").unwrap();
+        assert_eq!(summary.name, "My story");
+        assert!(!quick.root.join("quick-session").exists(), "the quick session is gone");
+        let moved = main.open(&summary.id).unwrap();
+        assert_eq!((moved.script.as_str(), moved.id.as_str()), ("Hello there. Second line.", summary.id.as_str()));
+        assert!(main.folder(&summary.id).unwrap().join("audio").join("processed.wav").is_file(), "the voice file moved too");
+        assert!(quick.move_to("quick-session", &main, "x").is_err(), "nothing left to move");
+        assert!(quick.move_to("quick-session", &main, " ").is_err());
+        cleanup(&quick);
+        cleanup(&main);
+    }
+
+    #[test]
+    fn a_quick_session_survives_a_restart_and_keeps_timing_when_it_becomes_a_project() {
+        let quick = store("quick-restore");
+        let main = store("quick-restore-main");
+        quick.create_fixed("quick-session", "Quick session", ProjectSettings::default()).unwrap();
+        let mut project = quick.open("quick-session").unwrap();
+        project.script = "One. Two.".into();
+        project.voice_locked = true;
+        project.words = vec![
+            crate::project::model::Word { text: "One.".into(), start: 0.0, end: 0.5 },
+            crate::project::model::Word { text: "Two.".into(), start: 0.5, end: 1.0 },
+        ];
+        project.scenes = vec![Scene { id: "S01".into(), index: 1, start: 0.0, end: 0.5, duration: 0.5, text: "One.".into(), prompt: "a prompt".into(), ..Scene::default() }];
+        project.style_id = Some("cinematic_realism".into());
+        quick.save(project).unwrap();
+
+        // "Restart": the folder is read again.
+        let again = quick.open("quick-session").unwrap();
+        assert_eq!((again.script.as_str(), again.words.len(), again.scenes.len()), ("One. Two.", 2, 1));
+        assert_eq!(again.scenes[0].prompt, "a prompt");
+
+        // Saved as a project, nothing is lost and the timecode ids stay.
+        let summary = quick.move_to("quick-session", &main, "With timing").unwrap();
+        let moved = main.open(&summary.id).unwrap();
+        assert_eq!((moved.words.len(), moved.scenes[0].id.as_str(), moved.style_id.as_deref(), moved.voice_locked), (2, "S01", Some("cinematic_realism"), true));
+
+        // Without timing: the P ids and the text stay.
+        quick.create_fixed("quick-session", "Quick session", ProjectSettings::default()).unwrap();
+        let mut plain = quick.open("quick-session").unwrap();
+        plain.scenes = vec![Scene { id: "P01".into(), index: 1, text: "Only text".into(), ..Scene::default() }];
+        quick.save(plain).unwrap();
+        let summary = quick.move_to("quick-session", &main, "No timing").unwrap();
+        let moved = main.open(&summary.id).unwrap();
+        assert_eq!((moved.scenes[0].id.as_str(), moved.words.len(), moved.scenes[0].duration), ("P01", 0, 0.0));
+        assert_eq!(main.list().unwrap().projects.len(), 2);
+        cleanup(&quick);
+        cleanup(&main);
     }
 
     #[test]

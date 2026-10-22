@@ -7,11 +7,12 @@ import { pickSavePath } from "../../lib/dialog";
 import { isCancelled, toAppError } from "../../lib/errors";
 import { generateText } from "../../lib/ai";
 import { writeTextFile } from "../../lib/files";
-import { copyLines, timecodeOf, toCsv, toJson } from "../../lib/prompts/export";
+import { clampEmptyLines, copyBlock, copyLines, toCsv, toJson } from "../../lib/prompts/export";
 import { generatePrompts, reassemble, type PromptContext } from "../../lib/prompts/generate";
 import { needsMotion } from "../../lib/prompts/assemble";
 import { requestCancel, runJob, selectJob, useJobStore } from "../../store/jobStore";
 import { useProjectStore } from "../../store/projectStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { useStyleStore } from "../../store/styleStore";
 import type { AppError, AspectRatio, Project, PromptSettings, Scene } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
@@ -24,13 +25,17 @@ import { PromptRow } from "./PromptRow";
 type Ask = "all" | null;
 
 /** Step 5 of the Prompt Generator: write, edit and export the prompts. */
-export function PromptsStep({ project }: { project: Project }) {
+export function PromptsStep({ project, quick = false }: { project: Project; quick?: boolean }) {
   const navigate = useNavigate();
   const update = useProjectStore((state) => state.update);
   const flush = useProjectStore((state) => state.flush);
   const styles = useStyleStore((state) => state.styles);
   const stylesLoaded = useStyleStore((state) => state.loaded);
   const job = useJobStore(selectJob(["ai"]));
+  const appSettings = useSettingsStore((state) => state.settings);
+  const updateAppSettings = useSettingsStore((state) => state.update);
+  const emptyLines = clampEmptyLines(appSettings?.exportEmptyLines ?? 2);
+  const includeIds = appSettings?.exportIncludeIds ?? true;
 
   const [error, setError] = useState<AppError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -110,7 +115,7 @@ export function PromptsStep({ project }: { project: Project }) {
   }
 
   async function copyAll() {
-    const ok = await copyText(copyLines(scenes, withMotion));
+    const ok = await copyText(copyLines(scenes, { withMotion, emptyLines, includeIds }));
     if (!ok) {
       setError({ message: "The text could not be copied. Use Export TXT instead.", details: "Clipboard access was refused." });
       return;
@@ -122,7 +127,7 @@ export function PromptsStep({ project }: { project: Project }) {
   async function exportAs(kind: "txt" | "csv" | "json") {
     setError(null);
     try {
-      const content = kind === "txt" ? copyLines(scenes, withMotion) : kind === "csv" ? toCsv(scenes) : toJson(scenes);
+      const content = kind === "txt" ? copyLines(scenes, { withMotion, emptyLines, includeIds }) : kind === "csv" ? toCsv(scenes) : toJson(scenes);
       const path = await pickSavePath(`Export ${kind.toUpperCase()}`, `${project.name || "prompts"}.${kind}`, kind.toUpperCase(), [kind]);
       if (!path) return;
       await writeTextFile(path, content);
@@ -195,8 +200,19 @@ export function PromptsStep({ project }: { project: Project }) {
         </div>
       )}
 
-      <Card title="Prompts" description="Every prompt starts with its timecode when copied or exported. Edit any text; edited rows are kept when you regenerate.">
-        <ExportBar disabled={!hasPrompts} copied={copied} onCopyAll={() => void copyAll()} onExport={(kind) => void exportAs(kind)} onSend={() => void send()} />
+      <Card title="Prompts" description="Every prompt starts with its ID (timecode) when copied or exported, and prompts are separated by empty lines. Edit any text; edited rows are kept when you regenerate.">
+        <ExportBar
+          disabled={!hasPrompts}
+          copied={copied}
+          onCopyAll={() => void copyAll()}
+          onExport={(kind) => void exportAs(kind)}
+          onSend={() => void send()}
+          emptyLines={emptyLines}
+          includeIds={includeIds}
+          onEmptyLines={(count) => updateAppSettings({ exportEmptyLines: count })}
+          onIncludeIds={(on) => updateAppSettings({ exportIncludeIds: on })}
+          hideSend={quick}
+        />
         <ul className="flex flex-col gap-2" aria-label="Prompts">
           {scenes.map((scene) => (
             <PromptRow
@@ -207,7 +223,7 @@ export function PromptsStep({ project }: { project: Project }) {
               onPrompt={(text) => patch(scene.id, { prompt: text, edited: true })}
               onMotion={(text) => patch(scene.id, { motionPrompt: text, edited: true })}
               onRegenerate={() => void run(new Set([scene.id]))}
-              onCopy={() => void copyText(`${timecodeOf(scene)} | ${scene.prompt}`)}
+              onCopy={() => void copyText(copyBlock(scene, withMotion, includeIds))}
             />
           ))}
         </ul>

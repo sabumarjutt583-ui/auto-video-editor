@@ -83,7 +83,8 @@ export function buildBatchPrompt(batch: readonly BatchScene[], summary: string, 
   const lines = batch.map(({ scene, characters, location }) => {
     const cast = characters.map((c) => c.name || c.id).join(", ") || "none";
     const media = needsMotion(scene, outputType) ? "video/motion" : "image";
-    return `${scene.id} | ${scene.duration.toFixed(1)} s | ${media} | cast: ${cast} | place: ${location?.name || "unspecified"} | narration: ${scene.text.replace(/\s+/g, " ").trim()}`;
+    const length = scene.duration > 0 ? `${scene.duration.toFixed(1)} s | ` : "";
+    return `${scene.id} | ${length}${media} | cast: ${cast} | place: ${location?.name || "unspecified"} | narration: ${scene.text.replace(/\s+/g, " ").trim()}`;
   });
   return `Story so far: ${summary}\n\nWrite the descriptions for these scenes:\n${lines.join("\n")}`;
 }

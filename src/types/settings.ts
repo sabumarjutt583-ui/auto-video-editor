@@ -9,6 +9,10 @@ export interface AppSettings {
   groqTextModel: string;
   /** Write texts with Gemini's web chat (Google accounts) instead of the Gemini API key. */
   textViaChat: boolean;
+  /** Empty lines after every prompt in Copy all and Export TXT (1 to 3). */
+  exportEmptyLines: number;
+  /** Write the id before every prompt in Copy all and Export TXT. */
+  exportIncludeIds: boolean;
   /** Empty when no folder has been chosen yet. */
   exportFolder: string;
   defaultAspectRatio: AspectRatio;

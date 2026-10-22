@@ -8,6 +8,7 @@ import { buildJobs } from "../../lib/imagegen/mapping";
 import { projectDirPath } from "../../lib/media/api";
 import { formatTimecode } from "../../lib/scenes/timecode";
 import { useImageGenStore } from "../../store/imagegenStore";
+import { QUICK_ID } from "../../lib/quick/textScenes";
 import { useProjectStore } from "../../store/projectStore";
 import type { AppError } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
@@ -79,6 +80,7 @@ export function ProjectImagesView() {
   const forThisProject = snapshot !== null && dir !== null && snapshot.projectDir === dir;
 
   if (!project) return <NeedsProject message="Open a project first. The Image Generator makes a picture for every scene of a project." />;
+  if (project.id === QUICK_ID) return <NeedsProject message="Quick prompts is not a project. Use 'Only images' to make pictures from your prompts, or press 'Save as project' in the Prompt Generator first." />;
   if (project.scenes.length === 0) return <NeedsProject message="This project has no scenes yet. Build the scenes and write the prompts in the Prompt Generator first." />;
   if (!snapshot) return storeError ? <ErrorNotice error={storeError} /> : <p className="text-sm text-muted">Loading…</p>;
 

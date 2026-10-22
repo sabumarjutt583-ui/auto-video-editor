@@ -18,6 +18,12 @@ The first time you open the app, three short screens explain this and let you ad
 
 Everything is saved automatically in your **Projects**.
 
+## Quick prompts (no project)
+
+Open **Prompt Generator**. The first choice, **Quick prompts**, needs no project. Paste your script, pick *every sentence*, *every line* or *every scene* (the AI groups sentences by meaning), press **Build the prompts**, choose a style and write the prompts. Prompts are called P01, P02 ... With **Voice + timing** you can add a voice-over and get timecodes (S01_000.0-005.1) instead. Your work saves itself and comes back when you reopen the app. **New quick session** clears it. **Save as project** turns it into a normal project (so you can use the Image Generator and the Auto Editor). Use **Engine** to write with your Gemini key or with the free web chat.
+
+**Copy all / Export TXT** leave empty lines between prompts (1, 2 or 3, you choose), and **Include IDs** switches the ID before each prompt on or off. To make pictures from copied prompts, paste them into Image Generator > Only images.
+
 ## Part 1: Prompt Generator
 
 Open **Projects → New project**, give it a name and choose the language. Then go through the five steps at the top of the Prompt Generator. A step opens when the one before it is done.

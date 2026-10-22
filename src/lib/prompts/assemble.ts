@@ -67,6 +67,7 @@ export function finishMotion(motion: string, durationSeconds: number): string {
   const text = motion.trim();
   if (text === "") return "";
   if (/\bseconds?\b|\b\d+\s?s\b/i.test(text)) return text;
+  if (!(durationSeconds > 0)) return sentence(text);
   return `${sentence(text)} Duration: ${Math.max(1, Math.round(durationSeconds))} seconds.`;
 }
 

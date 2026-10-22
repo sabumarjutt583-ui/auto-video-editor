@@ -118,3 +118,9 @@ Manual checks on a computer with a Google account:
 - Settings > Text engine > Web chat, then Prompt Generator "Generate prompts": answers arrive without a Gemini key. If nothing is typed or the answer is never read, the Gemini page changed: update the `chat` selectors in resources/image-engine/config.json (library package `image_engine`).
 - Auto Editor > Motion > Make a motion graphic; check the preview, render, and that the graphic sits over the picture and under the captions.
 - Not tested: the real Gemini page (selectors come from a DOM capture), the real "limit reached" text, the small production FFmpeg (all parts the overlay needs are in scripts/ci/ffmpeg-components.sh).
+
+### Quick Prompts + empty-line export (2026-10-22, Linux sandbox)
+
+`cargo test` 384 passed, no warnings (also `--features admin`); `npm run test:ts` 259 passed; `npm run build` (tsc -b + vite) clean. Covered by tests: text scenes (sentences in English, Korean, Japanese, Urdu; per sentence 1-4, per line, AI groups, P ids), quick folder kept apart from the projects list, restart restore, Save as project with timing (S ids, words, style kept) and without (P ids), Copy all with 1/2/3 empty lines, Include IDs off, MOTION under its prompt, single row copy, paste back into Only images (one job per prompt, ids kept, MOTION skipped).
+
+Manual checks (the screen itself was not run in the sandbox): open the app with no project > Prompt Generator shows Quick prompts; paste text > Build > Style > Prompts; close and reopen the app (session restored note); Save as project > Image Generator and Auto Editor open it; paste Copy all text into Notepad (2 empty lines) and into Image Generator > Only images.

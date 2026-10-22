@@ -50,15 +50,31 @@ enum Kind {
     Free,
 }
 
-/// `I001`, `I012`.
-pub fn valid_free_id(id: &str) -> bool {
-    let digits = id.strip_prefix('I').unwrap_or("");
+/// `P01`, `P12`: a quick prompt without timing.
+pub fn valid_quick_id(id: &str) -> bool {
+    let digits = id.strip_prefix('P').unwrap_or("");
     (2..=6).contains(&digits.len()) && digits.chars().all(|c| c.is_ascii_digit())
 }
 
-/// `Image 001.png` for `I001`.
+/// `I001`, `I012` (numbered by the app), or the id of a pasted prompt: `S07` (with its timecode in the
+/// file name) or `P01`.
+pub fn valid_free_id(id: &str) -> bool {
+    let digits = id.strip_prefix('I').unwrap_or("");
+    ((2..=6).contains(&digits.len()) && digits.chars().all(|c| c.is_ascii_digit())) || valid_scene_id(id) || valid_quick_id(id)
+}
+
+/// `Image 001.png` for `I001`, `S07_032.4-038.9.png` for `S07`, `P01.png` for `P01`.
 pub fn valid_free_file_name(id: &str, name: &str) -> bool {
-    valid_free_id(id) && name == format!("Image {}.png", &id[1..])
+    if !valid_free_id(id) {
+        return false;
+    }
+    if id.starts_with('I') {
+        name == format!("Image {}.png", &id[1..])
+    } else if id.starts_with('P') {
+        name == format!("{id}.png")
+    } else {
+        valid_file_name(id, name)
+    }
 }
 
 fn check_with(jobs: Vec<NewJob>, kind: Kind) -> Result<Vec<NewJob>, AppError> {
@@ -141,8 +157,10 @@ mod tests {
 
     #[test]
     fn only_images_mode_has_its_own_names() {
-        assert!(valid_free_id("I001") && valid_free_id("I1234"));
-        for bad in ["I1", "S001", "i001", "I00a", "I", "I0001234"] {
+        assert!(valid_free_id("I001") && valid_free_id("I1234") && valid_free_id("S01") && valid_free_id("P01"));
+        assert!(valid_free_file_name("S01", "S01_000.0-005.1.png") && valid_free_file_name("P01", "P01.png"));
+        assert!(!valid_free_file_name("P01", "P02.png") && !valid_free_file_name("P01", "../P01.png") && !valid_free_file_name("S01", "S01.png"));
+        for bad in ["I1", "S1", "i001", "I00a", "I", "I0001234"] {
             assert!(!valid_free_id(bad), "{bad}");
         }
         assert!(valid_free_file_name("I012", "Image 012.png"));
@@ -151,7 +169,8 @@ mod tests {
         }
         let list = check_free_jobs(vec![job("I001", "Image 001.png", " a cat ", "1:1")]).unwrap();
         assert_eq!(list[0].prompt, "a cat");
-        assert!(check_free_jobs(vec![job("S01", "S01_000.0-005.1.png", "x", "16:9")]).is_err());
+        assert!(check_free_jobs(vec![job("S01", "S01_000.0-005.1.png", "x", "16:9")]).is_ok(), "pasted ids with their timecode are kept");
+        assert!(check_free_jobs(vec![job("S01", "Image 001.png", "x", "16:9")]).is_err());
         assert!(check_jobs(vec![job("I001", "Image 001.png", "x", "16:9")]).is_err());
     }
 }

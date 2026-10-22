@@ -13,9 +13,26 @@ pub fn store(app: &AppHandle) -> Result<ProjectStore, AppError> {
     Ok(ProjectStore::new(folder.join("projects")))
 }
 
+/// The id of the quick session (Prompt Generator without a project). Its folder is not in the projects folder.
+pub const QUICK_ID: &str = "quick-session";
+
+/// The store that holds the quick session (a folder of its own in the app data).
+pub fn quick_store(app: &AppHandle) -> Result<ProjectStore, AppError> {
+    let folder = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::new("The app data folder could not be found.", e.to_string()))?;
+    Ok(ProjectStore::new(folder.join("quick")))
+}
+
+/// The store that holds a project: the quick one for the quick session, the normal one otherwise.
+pub fn store_for(app: &AppHandle, id: &str) -> Result<ProjectStore, AppError> {
+    if id == QUICK_ID { quick_store(app) } else { store(app) }
+}
+
 /// The folder of a project (checked to be a plain project id).
 pub fn project_folder(app: &AppHandle, id: &str) -> Result<std::path::PathBuf, AppError> {
-    store(app)?.folder(id)
+    store_for(app, id)?.folder(id)
 }
 
 /// Makes a new project using the defaults from Settings. Does not open it.
@@ -37,14 +54,14 @@ pub async fn list_projects(app: AppHandle) -> Result<ProjectList, AppError> {
 
 #[tauri::command]
 pub async fn open_project(app: AppHandle, id: String) -> Result<Project, AppError> {
-    let store = store(&app)?;
+    let store = store_for(&app, &id)?;
     run_blocking(move || store.open(&id)).await
 }
 
 /// Saves the project and returns its new `updatedAt`.
 #[tauri::command]
 pub async fn save_project(app: AppHandle, project: Project) -> Result<String, AppError> {
-    let store = store(&app)?;
+    let store = store_for(&app, &project.id)?;
     run_blocking(move || store.save(project)).await
 }
 

@@ -49,6 +49,10 @@ pub struct Settings {
     pub groq_text_model: String,
     /// Write texts with Gemini's web chat (the Google accounts of the Image Generator) instead of the Gemini API key.
     pub text_via_chat: bool,
+    /// Empty lines after every prompt in Copy all and Export TXT (1 to 3).
+    pub export_empty_lines: u8,
+    /// Write the id (S01_000.0-005.1 or P01) before every prompt in Copy all and Export TXT.
+    pub export_include_ids: bool,
     /// Empty means "not chosen yet".
     pub export_folder: String,
     pub default_aspect_ratio: AspectRatio,
@@ -83,6 +87,8 @@ impl Default for Settings {
             fallback_to_groq: false,
             groq_text_model: DEFAULT_GROQ_TEXT_MODEL.to_string(),
             text_via_chat: false,
+            export_empty_lines: 2,
+            export_include_ids: true,
             export_folder: String::new(),
             default_aspect_ratio: AspectRatio::Landscape,
             default_quality: Quality::P1080,
@@ -241,6 +247,7 @@ mod tests {
         assert_eq!(settings.groq_whisper_model, "whisper-large-v3-turbo");
         assert!(!settings.fallback_to_groq);
         assert!(!settings.text_via_chat, "the API key is the default");
+        assert_eq!((settings.export_empty_lines, settings.export_include_ids), (2, true));
         assert_eq!(settings.default_aspect_ratio, AspectRatio::Landscape);
         assert_eq!(settings.default_quality, Quality::P1080);
         assert_eq!(settings.export_folder, "");

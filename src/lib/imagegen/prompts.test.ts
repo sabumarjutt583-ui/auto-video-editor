@@ -40,3 +40,26 @@ test("new prompts continue after the pictures already in the folder", () => {
     ["I004", "Image 004.png", "b", "1:1"],
   ]);
 });
+
+test("pasting Copy all text back: one job per prompt, ids kept, MOTION lines ignored, empty lines ignored", () => {
+  const copied = "S01_000.0-005.1 | first prompt\nMOTION: push in\n\n\nS02_005.1-008.6 | second prompt\n   with a second line\nMOTION: pan\n\n\nS03_008.6-010.2 | third prompt";
+  const prompts = parsePrompts(copied);
+  assert.deepEqual(prompts, [
+    { id: "S01_000.0-005.1", text: "first prompt" },
+    { id: "S02_005.1-008.6", text: "second prompt with a second line" },
+    { id: "S03_008.6-010.2", text: "third prompt" },
+  ]);
+  const jobs = buildFolderJobs(prompts, "16:9", []);
+  assert.deepEqual(jobs.map((j) => [j.sceneId, j.fileName]), [["S01", "S01_000.0-005.1.png"], ["S02", "S02_005.1-008.6.png"], ["S03", "S03_008.6-010.2.png"]]);
+});
+
+test("quick P ids are kept; an id that already exists in the folder gets the next free number instead", () => {
+  const prompts = parsePrompts("P01 | a cat\n\n\nP02 | a dog\n\n\nP01 | again");
+  const jobs = buildFolderJobs(prompts, "1:1", [{ id: "I001" }]);
+  assert.deepEqual(jobs.map((j) => [j.sceneId, j.fileName]), [["P01", "P01.png"], ["P02", "P02.png"], ["I002", "Image 002.png"]]);
+  assert.deepEqual(buildFolderJobs(parsePrompts("P01 | x"), "1:1", [{ id: "P01" }]).map((j) => j.sceneId), ["I001"]);
+});
+
+test("text without ids and MOTION-only lines behave as before", () => {
+  assert.deepEqual(parsePrompts("a red fox\n\nMOTION: slow\n\nanother"), [{ text: "a red fox" }, { text: "another" }]);
+});

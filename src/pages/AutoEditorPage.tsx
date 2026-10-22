@@ -8,6 +8,7 @@ import { Button, SegmentedControl } from "../components/ui";
 import { readEditor } from "../lib/editor/model";
 import { reconcile } from "../lib/media/place";
 import { applyEdit } from "../store/historyStore";
+import { QUICK_ID } from "../lib/quick/textScenes";
 import { useProjectStore } from "../store/projectStore";
 
 type StepId = "media" | "edit";
@@ -44,6 +45,7 @@ export function AutoEditorPage() {
   }, [projectId, sceneKey]);
 
   if (!project) return <NeedsScenes message="Open a project first. The Auto Editor builds the video from the scenes of a project." />;
+  if (project.id === QUICK_ID) return <NeedsScenes message="Quick prompts has no editor. Press 'Save as project' in the Prompt Generator first, then come back here." />;
   if (project.scenes.length === 0) return <NeedsScenes message="This project has no scenes yet. Build the scenes in the Prompt Generator first, then come back here." />;
 
   return (

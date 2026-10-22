@@ -7,7 +7,7 @@ import type { Character, Location, PromptSettings, Scene } from "../../types/pro
 import type { StyleProfile } from "../../types/style.ts";
 import { assemblePrompt, finishMotion, needsMotion } from "./assemble.ts";
 import { planBatches, storySoFar } from "./batches.ts";
-import { copyLines, csvField, toCsv, toJson } from "./export.ts";
+import { clampEmptyLines, copyBlock, copyLines, csvField, timecodeOf, toCsv, toJson } from "./export.ts";
 import { generatePrompts, reassemble, type PromptContext } from "./generate.ts";
 import { buildBatchPrompt, buildSystemInstruction, parseBatch } from "./gemini.ts";
 import { positiveNegatives, shortNegativeLine, splitNegatives } from "./negatives.ts";
@@ -231,4 +231,38 @@ test("copy all, CSV and JSON exports", () => {
   assert.equal(json.length, 3);
   assert.equal(json[0]?.id, "S01_000.0-005.0");
   assert.equal(json[0]?.motion, "Slow push-in");
+});
+
+test("copy all puts 1, 2 or 3 empty lines after every prompt and none at the end", () => {
+  const scenes = [scene(1, { prompt: "first" }), scene(2, { prompt: "second" }), scene(3, { prompt: "  " }), scene(4, { prompt: "third" })];
+  const base = { withMotion: false, includeIds: true };
+  assert.equal(copyLines(scenes, { ...base, emptyLines: 2 }), "S01_000.0-005.0 | first\n\n\nS02_005.0-010.0 | second\n\n\nS04_015.0-020.0 | third");
+  assert.equal(copyLines(scenes, { ...base, emptyLines: 1 }), "S01_000.0-005.0 | first\n\nS02_005.0-010.0 | second\n\nS04_015.0-020.0 | third");
+  assert.equal(copyLines(scenes, { ...base, emptyLines: 3 }).split("\n").length, 9, "3 prompts, 3 empty lines between each pair");
+  assert.ok(!copyLines(scenes, { ...base, emptyLines: 3 }).endsWith("\n"));
+  assert.equal(copyLines([], { ...base, emptyLines: 2 }), "");
+});
+
+test("Include IDs off copies only the prompt text, still separated", () => {
+  const scenes = [scene(1, { prompt: "first" }), scene(2, { prompt: "second" })];
+  assert.equal(copyLines(scenes, { withMotion: false, emptyLines: 2, includeIds: false }), "first\n\n\nsecond");
+});
+
+test("the MOTION line stays directly under its prompt and the empty lines come after the pair", () => {
+  const scenes = [scene(1, { prompt: "image one", motionPrompt: "push in" }), scene(2, { prompt: "image two", motionPrompt: "pan left" })];
+  assert.equal(copyLines(scenes, { withMotion: true, emptyLines: 2, includeIds: true }), "S01_000.0-005.0 | image one\nMOTION: push in\n\n\nS02_005.0-010.0 | image two\nMOTION: pan left");
+  assert.equal(copyLines(scenes, { withMotion: false, emptyLines: 2, includeIds: true }).includes("MOTION"), false);
+});
+
+test("quick prompts without timing use P ids, and a single row copy has no extra lines", () => {
+  const quick = { ...scene(1, { prompt: "a cat", motionPrompt: "slow zoom" }), id: "P01", start: 0, end: 0, duration: 0 };
+  assert.equal(timecodeOf(quick), "P01");
+  assert.equal(copyBlock(quick, true), "P01 | a cat\nMOTION: slow zoom");
+  assert.equal(copyBlock(quick, false), "P01 | a cat");
+  assert.equal(copyBlock(quick, true, false), "a cat\nMOTION: slow zoom");
+  assert.equal(copyLines([quick, { ...quick, id: "P02", prompt: "a dog", motionPrompt: "" }], { withMotion: true, emptyLines: 2, includeIds: true }), "P01 | a cat\nMOTION: slow zoom\n\n\nP02 | a dog");
+});
+
+test("the empty-line setting stays between 1 and 3", () => {
+  assert.deepEqual([0, 1, 2, 3, 9, Number.NaN].map(clampEmptyLines), [1, 1, 2, 3, 3, 2]);
 });
