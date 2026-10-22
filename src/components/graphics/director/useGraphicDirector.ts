@@ -3,9 +3,7 @@ import { useState } from "react";
 import { generateText } from "../../../lib/ai";
 import { isCancelled, toAppError } from "../../../lib/errors";
 import { readEditor } from "../../../lib/editor/model";
-import { motionSize } from "../../../lib/motion/request";
 import { buildPlaceIndex, detectTriggers, directGraphics, fallbackFor, type DirectorScene, type Placed, type TimedWord } from "../../../lib/graphics/director";
-import { createFrameSource, exportGraphic, tauriExportApi } from "../../../lib/graphics/export";
 import { kitSummary, type BrandKit, type Density } from "../../../lib/graphics/brand";
 import { captionZone, placeAll, safeArea } from "../../../lib/graphics/placement";
 import { loadCities } from "../../../lib/graphics/geo/cities";
@@ -16,7 +14,8 @@ import { applyEdit } from "../../../store/historyStore";
 import { runJob, selectJob, useJobStore, type JobInfo } from "../../../store/jobStore";
 import { useProjectStore } from "../../../store/projectStore";
 import { useStyleStore } from "../../../store/styleStore";
-import type { AppError, MotionGraphic, Project, Scene } from "../../../types";
+import type { AppError, MotionGraphic, Project } from "../../../types";
+import { drawGraphic } from "../exportClip";
 import { newGraphicId } from "../useGraphicExport";
 import { findSubjects } from "./subjectFinder";
 
@@ -67,7 +66,6 @@ export function useGraphicDirector(project: Project, dir: string | null, kit: Br
     setCancelled(false);
     setSummary(null);
     setNotes([]);
-    const { width, height } = motionSize(project.settings.aspectRatio);
     const made: MotionGraphic[] = [];
     const processed = new Set<string>();
     let note = "";
@@ -101,14 +99,8 @@ export function useGraphicDirector(project: Project, dir: string | null, kit: Br
       if (result.failed) setError(toAppError(result.failed.error, "The AI could not be reached. Graphics made before that are kept."));
       for (const [i, p] of placed.entries()) {
         const id = newGraphicId();
-        const drawn = { ...p.spec, id };
-        const scene: Scene | undefined = project.scenes.find((s) => s.id === p.sceneId);
-        if (!scene) continue;
         try {
-          const clip = await runJob("graphic-export", `Drawing graphic ${i + 1} of ${placed.length}`, (jobId) =>
-            exportGraphic({ projectId: project.id, graphicId: id, spec: drawn, width, height, jobId, api: tauriExportApi, createSource: () => createFrameSource(drawn, width, height, dir ?? "", theme) }),
-          );
-          made.push({ id, sceneId: p.sceneId, start: p.start, duration: p.duration, idea: "", framesDir: "", htmlPath: "", fps: 30, frames: clip.frames, width: clip.width, height: clip.height, enabled: true, kind: "spec", clipPath: clip.path, spec: drawn, origin: "director" });
+          made.push(await drawGraphic(project, dir, theme, { id, sceneId: p.sceneId, start: p.start, duration: p.duration, spec: p.spec, origin: "director" }, `Drawing graphic ${i + 1} of ${placed.length}`));
           processed.add(p.sceneId);
         } catch (e) {
           if (isCancelled(e)) throw e;

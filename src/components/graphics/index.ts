@@ -5,3 +5,6 @@ export { BrandKitPanel } from "./brand/BrandKitPanel";
 export { useBrandKit, type BrandKitView } from "./brand/useBrandKit";
 export { DirectorPanel } from "./director/DirectorPanel";
 export { useGraphicDirector, type DirectorView } from "./director/useGraphicDirector";
+export { QualityPanel } from "./quality/QualityPanel";
+export { RenderCheck } from "./quality/RenderCheck";
+export { useGraphicQuality, type QualityView } from "./quality/useGraphicQuality";

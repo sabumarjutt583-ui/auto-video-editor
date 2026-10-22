@@ -229,3 +229,13 @@ describe("subjects on screen", () => {
     assert.deepEqual(subjectsOnScreen({ ...base, kind: "image", boxes: [] }), []);
   });
 });
+
+describe("frameToSource", () => {
+  it("is the inverse of sourceToFrame for a cropped picture", async () => {
+    const { frameToSource, sourceToFrame } = await import("./index.ts");
+    const source = { width: 1920, height: 1080 }, frame = { width: 1080, height: 1920 };
+    const box = { x: 0.4, y: 0.3, w: 0.1, h: 0.2 };
+    const back = frameToSource(sourceToFrame(box, source, frame, "crop"), source, frame, "crop");
+    assert.ok(iou(back, box) > 0.99);
+  });
+});

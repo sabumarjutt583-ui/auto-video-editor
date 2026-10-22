@@ -110,6 +110,8 @@ In the Auto Editor, open the **Motion** tab, pick a scene and press **Make a mot
 
 **Automatic graphics.** In the Motion tab press **Generate graphics**. The app finds numbers, money, percentages, dates, places, names, lists and quotes in your narration, the AI picks the few moments that deserve a graphic and the app draws them in your brand kit. Choose **Few, Normal or Many** first. Many scenes stay clean on purpose. **Only for S05** does one scene, and the round arrow on a graphic makes a new one. Graphics you made yourself are never replaced.
 
+**Quality check.** In the Motion tab, **Check graphics** looks for text that does not fit, text that is hard to read on the picture, graphics that disappear too fast, letters the font cannot draw, graphics over a face or the captions, and graphics that overlap or leave their scene. **Fix what can be fixed** repairs the safe ones (a dark plate behind text, more time, a better place). A warning triangle marks graphics with a problem left. The same list appears when you press Render; it never stops the render.
+
 **Brand kit.** In the Motion tab, open **Brand kit** to choose the look of your graphics: three ready-made kits (Clean Documentary, Bold News, Soft Story), kits that match your visual style (for example Noir gives grey tones and capital-letter titles), or your own. Change colours, round corners, line thickness, shadow and movement, watch the four sample pictures change, then press **Save as my kit**. **Use for all projects** makes it the default.
 
 ## SFX Library

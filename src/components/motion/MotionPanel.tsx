@@ -1,12 +1,12 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { frameAt } from "../../lib/motion/request";
 import { requestCancel } from "../../store/jobStore";
 import type { MotionGraphic, Project, Scene } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
-import { BrandKitPanel, DirectorPanel, GraphicLab, GraphicPreview, useBrandKit, useGraphicDirector, useGraphicExport } from "../graphics";
+import { BrandKitPanel, DirectorPanel, GraphicLab, GraphicPreview, QualityPanel, useBrandKit, useGraphicDirector, useGraphicExport, useGraphicQuality } from "../graphics";
 import { Button, Checkbox, Field, TextInput } from "../ui";
 import type { MotionView } from "./useMotion";
 
@@ -46,6 +46,8 @@ export function MotionPanel({ project, dir, graphics, scene, view, backgroundUrl
   const brand = useBrandKit(project);
   const exporter = useGraphicExport(project, dir, brand.theme);
   const director = useGraphicDirector(project, dir, brand.kit, brand.theme);
+  const quality = useGraphicQuality(project, dir, brand.kit, brand.theme);
+  const badges = new Map((quality.report?.issues ?? []).filter((i) => !i.fixed).map((i) => [i.graphicId, i]));
   const busy = view.job !== null;
   const mine = scene ? graphics.filter((g) => g.sceneId === scene.id) : [];
   const others = graphics.filter((g) => g.sceneId !== scene?.id);
@@ -54,6 +56,7 @@ export function MotionPanel({ project, dir, graphics, scene, view, backgroundUrl
       <h3 className="text-sm font-semibold">Motion graphics{scene ? ` for ${scene.id}` : ""}</h3>
       <p className="text-xs text-muted">Gemini writes a new animation for this scene: a chart, a title, a highlight, a map, anything that fits the words. It uses your Google accounts (Settings, Image Generator). The result is laid over the video when you render.</p>
       <DirectorPanel view={director} scene={scene} />
+      <QualityPanel view={quality} />
       {scene && (
         <>
           <Field label="What should it show? (optional, leave empty to let the AI decide)" htmlFor="motion-idea">
@@ -79,7 +82,7 @@ export function MotionPanel({ project, dir, graphics, scene, view, backgroundUrl
         <div key={g.id} className="flex flex-col gap-2 rounded-xl border border-line bg-surface-2 p-3">
           {g.kind === "spec" && g.spec ? <GraphicPreview spec={g.spec} aspect={project.settings.aspectRatio} backgroundUrl={backgroundUrl ?? null} theme={brand.theme} /> : dir && g.frames > 0 && <Preview dir={dir} graphic={g} />}
           <div className="flex items-center justify-between text-xs text-muted">
-            <span>{g.sceneId} · from {g.start.toFixed(1)} s · {g.duration.toFixed(1)} s{g.kind === "spec" ? (g.origin === "director" ? " · automatic" : " · drawn by the app") : g.idea ? ` · ${g.idea}` : ""}</span>
+            <span>{badges.has(g.id) && <AlertTriangle className={`mr-1 inline h-3.5 w-3.5 ${badges.get(g.id)?.severity === "error" ? "text-danger" : "text-warning"}`} aria-label="Warning" />}{g.sceneId} · from {g.start.toFixed(1)} s · {g.duration.toFixed(1)} s{g.kind === "spec" ? (g.origin === "director" ? " · automatic" : " · drawn by the app") : g.idea ? ` · ${g.idea}` : ""}</span>
             <span className="flex gap-1">
               {g.origin === "director" && <button type="button" className="cursor-pointer rounded p-1 hover:text-fg disabled:opacity-40" aria-label="Regenerate" title="Regenerate" disabled={director.job !== null} onClick={() => void director.generate(new Set([g.sceneId]))}><RefreshCw className="h-4 w-4" /></button>}
               {g.kind !== "spec" && <button type="button" className="cursor-pointer rounded p-1 hover:text-fg disabled:opacity-40" aria-label="Make it again" disabled={busy} onClick={() => { const s: Scene | undefined = project.scenes.find((x) => x.id === g.sceneId); if (s) void view.make(s, g.idea, g.id); }}><RefreshCw className="h-4 w-4" /></button>}

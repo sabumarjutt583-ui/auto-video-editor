@@ -14,7 +14,7 @@ import type { FromWorker, ToWorker, WorkerFont } from "./renderWorker.ts";
 
 const fontCache = new Map<string, Promise<ArrayBuffer>>();
 
-async function fontBytes(dir: string, file: string): Promise<ArrayBuffer> {
+export async function fontBytes(dir: string, file: string): Promise<ArrayBuffer> {
   const separator = dir.includes("\\") ? "\\" : "/";
   const url = convertFileSrc(`${dir}${separator}${file}`);
   const cached = fontCache.get(url);

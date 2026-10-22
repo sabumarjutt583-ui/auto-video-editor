@@ -9,6 +9,7 @@ import { outputSize } from "../../lib/editor/size";
 import type { AspectRatio, Project, Quality, RenderData, RenderFps, TransitionMode } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
 import { JobBar } from "../voice/JobBar";
+import { RenderCheck } from "../graphics";
 import { Button, Checkbox, Field, Modal, SegmentedControl } from "../ui";
 import { ResultCard } from "./ResultCard";
 import type { RenderView } from "./useRender";
@@ -59,6 +60,7 @@ export function RenderModal({ project, editor, view, onClose }: { project: Proje
         <Checkbox label="Ken Burns (slow zoom and pan on pictures)" checked={editor.render.kenBurns} onChange={(e) => setRender({ kenBurns: e.target.checked })} />
         <p className="text-xs text-muted">Format: MP4 (H.264 + AAC). {best ? `Encoder: ${best.label}.` : view.encoders === null ? "Checking encoders…" : "No H.264 encoder found."}{forceCpu ? " (CPU only, set in Settings)" : ""}</p>
       </div>
+      <RenderCheck project={project} />
       {view.problems.map((p) => (
         <p key={p} className="text-sm text-danger">{p}</p>
       ))}

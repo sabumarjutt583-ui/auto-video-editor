@@ -24,3 +24,13 @@ export function withCameraMove(box: Box, motion: Motion, progress: number): Box 
   const x1 = Math.min(1, moved.x + moved.w), y1 = Math.min(1, moved.y + moved.h);
   return x1 > x0 && y1 > y0 ? clampBox({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }) : { x: 0, y: 0, w: 0, h: 0 };
 }
+
+/** The opposite of `sourceToFrame`: which part of the source picture lies under a box of the frame (kept inside the picture). */
+export function frameToSource(box: Box, source: { width: number; height: number }, frame: { width: number; height: number }, fit: Fit): Box {
+  if (fit === "blur") {
+    const t = containTarget(source.width, source.height, frame.width, frame.height);
+    return clampBox({ x: (box.x * frame.width - t.x) / t.width, y: (box.y * frame.height - t.y) / t.height, w: (box.w * frame.width) / t.width, h: (box.h * frame.height) / t.height });
+  }
+  const c = coverSource(source.width, source.height, frame.width, frame.height);
+  return clampBox({ x: (c.x + box.x * c.width) / source.width, y: (c.y + box.y * c.height) / source.height, w: (box.w * c.width) / source.width, h: (box.h * c.height) / source.height });
+}

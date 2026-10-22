@@ -4,7 +4,7 @@ import { makeThumbnails } from "../../../lib/media/api";
 import { resolveMotion } from "../../../lib/editor/motion";
 import { fileOf } from "../../../lib/editor/status";
 import { overrideOf } from "../../../lib/editor/model";
-import { findSubject, grayOf, parseSubjects, SUBJECT_SYSTEM, subjectQuestion, subjectsOnScreen, frameSize, type Box, type Subject } from "../../../lib/graphics/placement";
+import { findSubject, frameToSource, grayOf, parseSubjects, SUBJECT_SYSTEM, subjectQuestion, subjectsOnScreen, frameSize, type Box, type Subject } from "../../../lib/graphics/placement";
 import { placementAsk } from "../../../lib/graphics/placement/api";
 import { runJob } from "../../../store/jobStore";
 import type { EditorData, MediaFile, Project } from "../../../types";
@@ -18,11 +18,15 @@ interface SceneLook {
   /** Subject boxes in the source, one per preview frame (pictures: one). */
   saliency: Array<Box | null>;
   ai: Box | null;
+  /** The middle preview picture as small colour pixels (for the contrast check). */
+  pixels: Small | null;
   /** The preview picture sent to the AI (project-relative). */
   forAi: string;
 }
 
-async function grayOfFile(url: string): Promise<{ gray: Uint8Array; width: number; height: number } | null> {
+interface Small { gray: Uint8Array; rgba: Uint8ClampedArray; width: number; height: number }
+
+async function grayOfFile(url: string): Promise<Small | null> {
   try {
     const image = new Image();
     image.src = url;
@@ -35,7 +39,8 @@ async function grayOfFile(url: string): Promise<{ gray: Uint8Array; width: numbe
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return null;
     ctx.drawImage(image, 0, 0, width, height);
-    return { gray: grayOf(ctx.getImageData(0, 0, width, height).data, width, height), width, height };
+    const rgba = ctx.getImageData(0, 0, width, height).data;
+    return { gray: grayOf(rgba, width, height), rgba, width, height };
   } catch {
     return null;
   }
@@ -44,6 +49,8 @@ async function grayOfFile(url: string): Promise<{ gray: Uint8Array; width: numbe
 export interface SubjectFinder {
   /** Where the subject is in the frame while a graphic of this scene is on screen (empty = unknown or none). */
   subjectsFor: (item: { sceneId: string; start: number; duration: number }) => Box[];
+  /** Average colour of the picture under a box of the frame (null = no picture, so not known). */
+  colorUnder: (sceneId: string, box: Box) => [number, number, number] | null;
   /** One plain sentence about how the subjects were found (empty when all went well). */
   note: string;
 }
@@ -70,11 +77,13 @@ export async function findSubjects(project: Project, editor: EditorData, dir: st
         const made = thumbs.find((t) => t.path === file.path)?.thumbs ?? [];
         if (made.length === 0) continue;
         const saliency: Array<Box | null> = [];
-        for (const rel of made) {
+        let pixels: Small | null = null;
+        for (const [at, rel] of made.entries()) {
           const g = await grayOfFile(convertFileSrc(`${dir}/${rel}`.replace(/\\/g, "/")));
           saliency.push(g ? (findSubject(g.gray, g.width, g.height)?.box ?? null) : null);
+          if (at === Math.floor(made.length / 2)) pixels = g;
         }
-        looks.set(scene.id, { file, saliency, ai: null, forAi: made[Math.floor(made.length / 2)] as string });
+        looks.set(scene.id, { file, saliency, ai: null, pixels, forAi: made[Math.floor(made.length / 2)] as string });
       }
     } catch {
       note = "The preview pictures could not be made, so graphics were not checked against the picture.";
@@ -100,6 +109,19 @@ export async function findSubjects(project: Project, editor: EditorData, dir: st
   const frame = frameSize(aspectRatio);
   return {
     note,
+    colorUnder: (sceneId, box) => {
+      const look = looks.get(sceneId);
+      const scene = project.scenes.find((x) => x.id === sceneId);
+      if (!look?.pixels || !scene) return null;
+      const overridden = overrideOf(editor, scene.id);
+      const region = frameToSource(box, { width: look.file.width, height: look.file.height }, frame, overridden.videoFit);
+      const { rgba, width: w, height: h } = look.pixels;
+      const x0 = Math.floor(region.x * w), x1 = Math.max(x0 + 1, Math.ceil((region.x + region.w) * w));
+      const y0 = Math.floor(region.y * h), y1 = Math.max(y0 + 1, Math.ceil((region.y + region.h) * h));
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let y = y0; y < Math.min(h, y1); y++) for (let x = x0; x < Math.min(w, x1); x++) { const i = (y * w + x) * 4; r += rgba[i] as number; g += rgba[i + 1] as number; b += rgba[i + 2] as number; n++; }
+      return n > 0 ? [Math.round(r / n), Math.round(g / n), Math.round(b / n)] : null;
+    },
     subjectsFor: (item) => {
       const scene = project.scenes.find((s) => s.id === item.sceneId);
       const look = looks.get(item.sceneId);
