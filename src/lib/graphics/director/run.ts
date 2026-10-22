@@ -61,7 +61,7 @@ export function primaryType(spec: GraphicSpec): string {
   return (spec.layers.find((l) => (MAIN_TYPES as readonly string[]).includes(l.type)) ?? spec.layers[0])?.type ?? "text";
 }
 
-function fallbackFor(scene: DirectorScene): Placed | null {
+export function fallbackFor(scene: DirectorScene): Placed | null {
   const trigger = bestFallbackTrigger(scene.triggers);
   const layers = trigger ? fallbackLayers(trigger) : null;
   if (!trigger || !layers) return null;

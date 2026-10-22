@@ -5,6 +5,6 @@ export { bestFallbackTrigger, fallbackLayers } from "./fallback.ts";
 export { addedBrandName } from "./names.ts";
 export { buildPlaceIndex, findPlaces, type PlaceIndex } from "./places.ts";
 export { buildBatchPrompt, buildSystem, type DirectorScene, type DirectorSettings } from "./prompt.ts";
-export { DIRECTOR_BATCH, directGraphics, primaryType, type DirectorArgs, type DirectorResult, type Placed } from "./run.ts";
+export { DIRECTOR_BATCH, directGraphics, fallbackFor, primaryType, type DirectorArgs, type DirectorResult, type Placed } from "./run.ts";
 export { TRIGGER_KINDS, type SceneInput, type TimedWord, type Trigger, type TriggerKind } from "./types.ts";
 export { graphicWindow, triggerWindow, type Window } from "./window.ts";

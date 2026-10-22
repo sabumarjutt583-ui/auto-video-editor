@@ -30,6 +30,12 @@ export function DirectorPanel({ view, scene }: { view: DirectorView; scene: Scen
       )}
       {view.cancelled && <p className="text-xs text-muted" role="status">Stopped. Graphics that were finished are kept.</p>}
       {view.summary && !busy && <p className="text-xs text-muted" role="status">{view.summary}</p>}
+      {view.notes.length > 0 && !busy && (
+        <details className="text-xs text-muted">
+          <summary className="cursor-pointer">Placement: {view.notes.length} change{view.notes.length === 1 ? "" : "s"} to keep the picture and captions clear</summary>
+          <ul className="mt-1 list-disc pl-4">{view.notes.map((n) => <li key={n}>{n}</li>)}</ul>
+        </details>
+      )}
       {view.error && <ErrorNotice error={view.error} />}
     </div>
   );

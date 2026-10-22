@@ -149,6 +149,12 @@ A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphi
 - The AI is not trusted: JSON is extracted, the graphic goes through `repairSpec`, picture layers are removed, brand/artist names that the narration does not say are refused, the id is ours. A bad graphic is asked for once more with the problems; then a simple rule-made graphic (counter, text, map, lower third, quote) or none. A failed request keeps the finished batches; Cancel stops and keeps what was drawn.
 - UI: Motion tab > Automatic graphics (density Few/Normal/Many, defaults to the kit's, "Generate graphics", "Only for S05", Cancel) and a Regenerate button on every automatic graphic. Automatic graphics are `MotionGraphic.origin = "director"`; a new run replaces them, graphics made by hand are never touched.
 
+## 5i. Smart placement (phase 8)
+- Code: src/lib/graphics/placement/ (pure, tested): `geometry` (boxes as fractions of the frame), `zones` (`captionZone(style, aspect)`: two rows of the caption size at the caption position, same margins as the ASS file and the preview; `safeArea(margins)` from the brand kit), `saliency` (`findSubject`: Sobel edges with a pull to the middle, strongest quarter, trimmed box; flat picture = no subject), `subjects` (AI prompt + `parseSubjects`: boxes clamped, unusable entries ignored), `mapping`/`onScreen` (a box of the source picture -> frame: crop or blur-contain as the preview does it, then the Ken Burns move at the graphic's start and end; clips use the nearest of 3 preview frames), `solver` (`placeGraphic`), `plan` (`placeAll`).
+- Solver: the "main extent" is the union of all layers except ambient ones (particles, layers covering 85 % of the frame). If it is already free (inside the safe area, off the caption zone, 1.5 % away from every subject box) nothing changes. Otherwise a 1 %-grid search over scales 1, .9 ... .5 picks the free place with the lowest cost: short move, little shrinking, far from the subject (the opposite side). With no room: the compact version (the director's rule-made fallback graphic) or the graphic is left out and the reason is logged. Moved graphics have all layer boxes (and `size`) transformed together, then go through `repairSpec`.
+- Finding the subject (src/components/graphics/director/subjectFinder.ts): preview pictures (256 px, 3 per clip) via `make_thumbnails`; the AI sees one per scene, four per question, through Rust `placement_ask` (Gemini API, or the web chat when "text via chat" is on; only `thumbs/*.jpg` of the project are accepted); a scene or a whole run without an answer uses the local saliency map. Scenes without media have no subject (captions and margins still count).
+- The director runs placement after the AI step and before drawing; the Automatic graphics panel lists every move, shrink, replacement and skipped graphic with its reason.
+
 ## 6. Phase checklist (commit per phase)
 
 | Phase | Result | Commit message |
@@ -161,7 +167,7 @@ A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphi
 | 5 (done) | advanced layers | Motion graphics phase 5: advanced layers |
 | 6 (done) | brand kit | Motion graphics phase 6: brand kit |
 | 7 (done) | AI graphics director | Motion graphics phase 7: AI graphics director |
-| 8 | placement | Motion graphics phase 8: smart placement |
+| 8 (done) | placement | Motion graphics phase 8: smart placement |
 | 9 | quality checks | Motion graphics phase 9: quality checks |
 | 10 | timeline editing + presets | Motion graphics phase 10: editing and presets |
 | 11 | SFX for graphics | Motion graphics phase 11: graphic sound effects |

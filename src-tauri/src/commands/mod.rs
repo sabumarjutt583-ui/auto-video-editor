@@ -17,6 +17,7 @@ pub mod media;
 pub mod graphics;
 pub mod motion;
 pub mod music;
+pub mod placement;
 pub mod projects;
 pub mod quick;
 pub mod render;

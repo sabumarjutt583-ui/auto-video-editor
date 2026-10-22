@@ -4,9 +4,10 @@ import { generateText } from "../../../lib/ai";
 import { isCancelled, toAppError } from "../../../lib/errors";
 import { readEditor } from "../../../lib/editor/model";
 import { motionSize } from "../../../lib/motion/request";
-import { buildPlaceIndex, detectTriggers, directGraphics, type DirectorScene, type Placed, type TimedWord } from "../../../lib/graphics/director";
+import { buildPlaceIndex, detectTriggers, directGraphics, fallbackFor, type DirectorScene, type Placed, type TimedWord } from "../../../lib/graphics/director";
 import { createFrameSource, exportGraphic, tauriExportApi } from "../../../lib/graphics/export";
 import { kitSummary, type BrandKit, type Density } from "../../../lib/graphics/brand";
+import { captionZone, placeAll, safeArea } from "../../../lib/graphics/placement";
 import { loadCities } from "../../../lib/graphics/geo/cities";
 import { searchIcons } from "../../../lib/graphics/library/icons";
 import type { Theme } from "../../../lib/graphics/render/theme";
@@ -17,6 +18,7 @@ import { useProjectStore } from "../../../store/projectStore";
 import { useStyleStore } from "../../../store/styleStore";
 import type { AppError, MotionGraphic, Project, Scene } from "../../../types";
 import { newGraphicId } from "../useGraphicExport";
+import { findSubjects } from "./subjectFinder";
 
 export interface DirectorView {
   job: JobInfo | null;
@@ -24,6 +26,8 @@ export interface DirectorView {
   cancelled: boolean;
   /** What the last run did, in plain words. */
   summary: string | null;
+  /** What placement did to graphics that were in the way (moved, made smaller, replaced, left out). */
+  notes: string[];
   density: Density;
   setDensity: (d: Density) => void;
   /** Plans and draws graphics for the whole project (or only for these scenes). */
@@ -50,17 +54,19 @@ async function iconsFor(scene: DirectorScene): Promise<string[]> {
 
 /** The AI graphics director: finds the moments, asks the AI, checks the answers, draws every graphic and puts it in the project. */
 export function useGraphicDirector(project: Project, dir: string | null, kit: BrandKit, theme: Theme): DirectorView {
-  const job = useJobStore(selectJob(["graphics-plan", "graphic-export"]));
+  const job = useJobStore(selectJob(["graphics-plan", "placement", "graphic-export"]));
   const styles = useStyleStore((s) => s.styles);
   const [density, setDensity] = useState<Density>(kit.density);
   const [error, setError] = useState<AppError | null>(null);
   const [cancelled, setCancelled] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
+  const [notes, setNotes] = useState<string[]>([]);
 
   const generate = async (only?: ReadonlySet<string>) => {
     setError(null);
     setCancelled(false);
     setSummary(null);
+    setNotes([]);
     const { width, height } = motionSize(project.settings.aspectRatio);
     const made: MotionGraphic[] = [];
     const processed = new Set<string>();
@@ -80,7 +86,18 @@ export function useGraphicDirector(project: Project, dir: string | null, kit: Br
           icons: iconsFor,
         }),
       );
-      const placed: Placed[] = result.placed;
+      // Placement: keep every graphic off the subject, the captions and the margins.
+      const data = readEditor(useProjectStore.getState().project ?? project);
+      const finder = await findSubjects(project, data, dir ?? "", result.placed.map((p) => p.sceneId));
+      const byScene = new Map(scenes.map((s) => [s.id, s]));
+      const placing = placeAll(result.placed, {
+        caption: captionZone(data.captions.style, project.settings.aspectRatio),
+        safe: safeArea(kit.safeMargins),
+        subjectsFor: finder.subjectsFor,
+        compactFor: (item) => { const s = byScene.get(item.sceneId); return s ? (fallbackFor(s)?.spec ?? null) : null; },
+      });
+      const placed: Placed[] = placing.placed;
+      setNotes([...(finder.note ? [finder.note] : []), ...placing.notes.filter((n) => n.action !== "kept").map((n) => `${n.sceneId}: ${n.reason}.`)]);
       if (result.failed) setError(toAppError(result.failed.error, "The AI could not be reached. Graphics made before that are kept."));
       for (const [i, p] of placed.entries()) {
         const id = newGraphicId();
@@ -116,5 +133,5 @@ export function useGraphicDirector(project: Project, dir: string | null, kit: Br
     }
   };
 
-  return { job, error, cancelled, summary, density, setDensity, generate };
+  return { job, error, cancelled, summary, notes, density, setDensity, generate };
 }
