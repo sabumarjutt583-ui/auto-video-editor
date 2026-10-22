@@ -6,7 +6,7 @@ import { toAppError } from "../../errors.ts";
 import { assemblePrompt, finishMotion, needsMotion } from "../assemble.ts";
 import type { PromptContext } from "../generate.ts";
 import { buildBatchMessage, buildMissingMessage, buildSetupMessage, castOf, DEFAULT_BATCH, planChatGroups } from "./messages.ts";
-import { isSoftFailureText, parseFullBatch, saysReady } from "./parse.ts";
+import { isSoftFailureText, parseFullBatch, saysReady, type FullItem } from "./parse.ts";
 import { verifyPrompt } from "./verify.ts";
 
 export interface ThreadRef {
@@ -76,6 +76,22 @@ export function applyFullPrompt(scene: Scene, prompt: string, motion: string, fi
     status: "prompt_ready",
     fixNotes: fixes,
   };
+}
+
+/** Verifies and stores the prompts of `items` in their scenes. Counts the rows that needed repairs. */
+export function applyItems(scenes: readonly Scene[], items: readonly FullItem[], context: PromptContext): { scenes: Scene[]; fixedRows: number } {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  let fixedRows = 0;
+  const next = scenes.map((scene) => {
+    const item = byId.get(scene.id);
+    if (!item) return scene;
+    const { characters, location } = castOf(scene, context);
+    const checked = verifyPrompt({ prompt: item.prompt, style: context.style, characters, location, detail: context.settings.detail });
+    if (checked.fixes.length > 0) fixedRows += 1;
+    const notes = [...checked.fixes, ...checked.checks.map((c) => `check: ${c}`)];
+    return applyFullPrompt(scene, checked.prompt, item.motion, notes, context);
+  });
+  return { scenes: next, fixedRows };
 }
 
 /** Runs all batches. Never resends a message that got an answer; a soft failure is retried once in a new thread. */
@@ -178,16 +194,9 @@ export async function runChatPrompts(args: ChatRunArgs): Promise<ChatRunResult> 
       }
     }
 
-    let fixedRows = 0;
-    scenes = scenes.map((scene) => {
-      const item = got.get(scene.id);
-      if (!item) return scene;
-      const { characters, location } = castOf(scene, context);
-      const checked = verifyPrompt({ prompt: item.prompt, style: context.style, characters, location, detail: context.settings.detail });
-      if (checked.fixes.length > 0) fixedRows += 1;
-      const notes = [...checked.fixes, ...checked.checks.map((c) => `check: ${c}`)];
-      return applyFullPrompt(scene, checked.prompt, item.motion, notes, context);
-    });
+    const applied = applyItems(scenes, [...got.values()], context);
+    scenes = applied.scenes;
+    const fixedRows = applied.fixedRows;
     args.onScenes?.(scenes);
 
     if (thread) setThread({ ...(thread as ThreadRef), batches: (thread as ThreadRef).batches + 1 });

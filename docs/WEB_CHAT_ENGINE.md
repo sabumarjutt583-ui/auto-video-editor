@@ -82,3 +82,11 @@ copy-paste mode (6).
   recognition".
 - Scenes shorter than `sceneSettings.minSeconds` (default 2.0, 0 = off) are joined to the previous scene (to the next
   if first) in all modes; ids and timecodes are renumbered (src/lib/scenes/short.ts, tests in short.test.ts).
+
+## Part 6: manual mode (done)
+- Engine choice (Prompt Generator, project and quick, and Settings > Text engine): API key / Gemini web chat
+  (automatic) / Manual (copy & paste). Setting `textManual`.
+- src/lib/prompts/chat/manual.ts builds the same messages the web chat sends (`planManual`: Setup + batches with the
+  reminder block); `applyManualAnswer` parses (code block, plain JSON, words around it), verifies/repairs like the web
+  engine, and reports missing / extra ids with a follow-up message for the missing ones.
+- UI: src/components/prompts/ManualPanel.tsx (Copy button, Paste answer box, Use answer per message).

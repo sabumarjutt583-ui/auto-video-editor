@@ -24,6 +24,8 @@ import { JobBar } from "../voice/JobBar";
 import { ExportBar } from "./ExportBar";
 import { OptionsCard } from "./OptionsCard";
 import { PromptRow } from "./PromptRow";
+import { ManualPanel } from "./ManualPanel";
+import { EngineSwitch } from "../quick/EngineSwitch";
 
 type Ask = "all" | null;
 
@@ -65,6 +67,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
   const written = scenes.filter((scene) => scene.prompt.trim() !== "").length;
   const editedCount = scenes.filter((scene) => scene.edited).length;
   const busy = running || job !== null;
+  const manual = appSettings?.textManual === true;
 
   const run = useCallback(
     async (targetIds: ReadonlySet<string>) => {
@@ -177,7 +180,10 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
 
       <OptionsCard project={project} style={style} onSettings={setSettings} onAspect={setAspect} />
 
-      <div className="flex flex-wrap items-center gap-2">
+      {!quick && <EngineSwitch />}
+      {manual && <ManualPanel scenes={scenes} context={context} tag={project.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "P"} batchSize={Math.min(25, Math.max(5, appSettings?.chatBatchSize ?? 20))} onScenes={(next) => update({ scenes: next })} />}
+
+      <div className={manual ? "hidden" : "flex flex-wrap items-center gap-2"}>
         <Button variant="primary" icon={Sparkles} disabled={busy || !context || missing === 0} onClick={generateMissing}>
           {hasPrompts ? `Write the ${missing} missing prompts` : "Generate prompts"}
         </Button>
