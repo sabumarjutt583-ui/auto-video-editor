@@ -17,6 +17,9 @@ use super::browser::session::{Session, Tab};
 use super::config::{ChatConfig, EngineConfig};
 use super::errors::{classify_browser_error, clip, contains_any, ErrorKind, GenError};
 use super::tool_page;
+use crate::logging;
+
+const LOG: &str = "webchat";
 
 /// The longest prompt the chat box is given (the page refuses very long text).
 pub const MAX_PROMPT_CHARS: usize = 30_000;
@@ -181,6 +184,7 @@ async fn wait_for_answer(session: &Session, tab: &Tab, engine: &EngineConfig, ti
         let state = read_state(session, tab, chat).await?;
         if state.answers == 0 {
             if tokio::time::Instant::now() >= started_by {
+                logging::warn(LOG, &format!("wait: no answer element after {} ms (Gemini may still be thinking); giving up", chat.timing.reply_start_ms));
                 return Err(diagnose(session, tab, engine, "Gemini did not start an answer.").await);
             }
         } else if !state.text.is_empty() || !state.code.is_empty() {
@@ -217,8 +221,13 @@ pub async fn ask_with_images(session: &Session, engine: &EngineConfig, prompt: &
     if images.len() > MAX_IMAGES || images.iter().any(|p| !p.is_absolute() || !p.is_file()) {
         return Err(GenError::new(ErrorKind::BadRequest, "The pictures for the chat could not be found."));
     }
+    logging::info(LOG, &format!("ask: opening a new chat tab ({} chars, {} pictures, timeout {} s)", prompt.chars().count(), images.len(), timeout.as_secs()));
     let tab = session.open_tab().await.map_err(|e| from_cdp(&e, "Opening a chat tab"))?;
     let result = ask_in(session, &tab, engine, prompt, images, timeout).await;
+    match &result {
+        Ok(reply) => logging::info(LOG, &format!("ask: finished, answer {} chars, {} code blocks; closing the tab", reply.text.chars().count(), reply.code.len())),
+        Err(error) => logging::warn(LOG, &format!("ask: failed ({:?}): {}; closing the tab", error.kind, error.message)),
+    }
     session.close_tab(&tab).await;
     result
 }
@@ -292,12 +301,15 @@ async fn attach_images(session: &Session, tab: &Tab, engine: &EngineConfig, imag
 
 async fn ask_in(session: &Session, tab: &Tab, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration) -> Result<ChatReply, GenError> {
     let chat = &engine.chat;
+    logging::info(LOG, &format!("step: navigate to {}", chat.url));
     session.navigate_tab(tab, &chat.url, Duration::from_millis(chat.timing.page_ready_ms)).await.map_err(|e| from_cdp(&e, "Opening Gemini's chat"))?;
     wait_for_input(session, tab, engine).await?;
     if !images.is_empty() {
         attach_images(session, tab, engine, images).await?;
     }
+    logging::info(LOG, "step: message box ready; inserting text and pressing Send");
     type_and_send(session, tab, chat, prompt).await?;
+    logging::info(LOG, "step: sent; waiting for the answer");
     let state = wait_for_answer(session, tab, engine, timeout).await?;
     let code = if state.code.is_empty() { code_from_markdown(&state.text) } else { state.code.clone() };
     if let Some(error) = judge_answer(chat, &state.text, !code.is_empty()) {

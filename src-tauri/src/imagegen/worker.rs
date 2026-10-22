@@ -122,6 +122,7 @@ impl FreeWorker {
         self.drop_session().await;
         let config = self.config();
         let launch = Launch { exe: config.exe.clone(), profile: config.profile.clone(), mode: config.mode, extra_args: config.extra_args.clone() };
+        crate::logging::info("webchat", &format!("browser: launching mode={:?} profile={}", launch.mode, launch.profile.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()));
         let session = Session::open(&launch).await.map_err(|e| classify_browser_error(&e.to_string(), "Starting the browser"))?;
         if config.mode == Mode::Window {
             // A normal window, but out of the way.

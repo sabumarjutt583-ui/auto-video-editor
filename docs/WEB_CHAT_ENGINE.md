@@ -1,0 +1,46 @@
+# Web chat engine (Gemini in the browser)
+
+Status: part 1 (diagnosis). Later parts update the "Design" section.
+
+## How it works today
+- `ImageGen::chat_ask` (imagegen/ops.rs) picks a free Google account (`claim_chat`), then `FreeWorker::chat`
+  (worker.rs) -> `chat::ask_with_images` (chat.rs).
+- Every question opens a NEW tab in the account's browser, navigates to gemini.google.com/app, inserts the text,
+  clicks Send and polls the page. The tab is closed afterwards. There is no thread reuse.
+- The browser is the same one the image engine uses (`FreeWorker::ready`, per-account profile, `Mode::Hidden`
+  = `--headless=new` by default).
+- `generate_text` (commands/ai.rs) with `textViaChat` sends `system + prompt` as ONE message per call.
+- Prompt batches: `generatePrompts` (src/lib/prompts/generate.ts) calls `call(system, prompt)` for every batch of 20;
+  the system instruction (style, bible, rules) is repeated in every message.
+
+## Root causes found
+1. **"Gemini did not start an answer" (the screenshot).** `wait_for_answer` fails as soon as no `model-response`
+   element exists after `replyStartMs` = 25 s. Gemini thinking about a 20-scene batch often shows only the spinner
+   and stop button for much longer, so a healthy generation was declared dead. Only the *start* is judged by one
+   selector; the stop button / thinking indicator is never looked at.
+2. **Wrong error kind.** The failure is reported with `ErrorKind::NoImage` (an image-engine error) and the text
+   "NoImage" appears in Details.
+3. **Resend loop.** `generatePrompts` retries every failed batch `BATCH_RETRIES = 2` times immediately, each retry
+   is a new tab and a new chat, and the old chat may still be generating. `ops.rs` also tries the next account
+   for some errors. Result: tabs opening/closing, refreshes, repeated messages, and Gemini's
+   "I seem to be encountering an error" in interrupted chats.
+4. **Stability rule ends early.** If the answer text is unchanged for `stableMs` = 9 s, the reply is accepted even
+   if Gemini is still generating (no check that the stop button is gone).
+5. **Everything in one huge message.** Style profile + bible + rules + scenes are sent in each batch message; there
+   is no setup message, no READY check, no batch id, no reminder block, no verification of the returned prompts.
+6. **Visible Chrome window.** The default mode is hidden, but the browser runs as a normal (minimized) window when
+   `browserMode = window`. That is set automatically and persistently by `engine.rs::handle_error` and
+   `ops.rs::verify_inner` when Google refuses the hidden browser, and can be chosen in Settings. In window mode
+   `Target.createTarget` for the chat tab can bring the window up, so the user sees a Chrome profile with two tabs
+   (image tool + gemini.google.com/app). The sign-in window (PlainWindow) is visible by design.
+7. **Narration text.** The scene text sent comes from the scene model; with Groq timing it can be the Whisper
+   transcript instead of the user's script (typos), and short scenes (0.6 s, 1.4 s) are never merged.
+
+## Step log
+Every step is written to the app log (target `webchat`, no keys, no account details): browser launch mode, tab
+opened, navigation, message inserted/sent, waiting, answer finished/failed, tab closed.
+
+## Design (parts 2-6)
+See the task parts: hidden shared browser (2), reliable driver that never interrupts (3), one thread per project with
+setup + READY + batches with reminder block + verified prompts (4), user script + min scene length (5), manual
+copy-paste mode (6).
