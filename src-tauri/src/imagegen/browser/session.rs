@@ -168,7 +168,7 @@ impl Session {
 
     /// Opens an extra tab in the same browser (the chat uses one, so the image tool page stays untouched).
     pub async fn open_tab(&self) -> Result<Tab, CdpError> {
-        let created = self.cdp.call("Target.createTarget", json!({ "url": "about:blank" }), None).await?;
+        let created = self.cdp.call("Target.createTarget", json!({ "url": "about:blank", "background": true }), None).await?;
         let target = created["targetId"].as_str().ok_or_else(|| session_error("the browser opened no tab"))?.to_string();
         let attached = self.cdp.call("Target.attachToTarget", json!({ "targetId": target, "flatten": true }), None).await?;
         let session = attached["sessionId"].as_str().ok_or_else(|| session_error("the browser gave no tab session"))?.to_string();

@@ -191,7 +191,15 @@ impl FreeWorker {
     async fn chat_inner(&self, prompt: &str, images: &[std::path::PathBuf], timeout: Duration) -> Result<ChatReply, GenError> {
         let (session, _, _) = self.ready().await?;
         let _turn = self.inner.chat_lock.lock().await;
-        chat::ask_with_images(&session, &self.config().engine, prompt, images, timeout).await
+        if self.mode() == Mode::Window {
+            let _ = session.minimize().await;
+        }
+        let result = chat::ask_with_images(&session, &self.config().engine, prompt, images, timeout).await;
+        if self.mode() == Mode::Window {
+            // A normal window is only ever kept out of the way, never shown by the chat.
+            let _ = session.minimize().await;
+        }
+        result
     }
 
     fn start_poller(&self) {
