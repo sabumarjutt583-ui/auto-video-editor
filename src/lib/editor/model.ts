@@ -1,3 +1,4 @@
+import { repairSpec } from "../graphics/spec/index.ts";
 import type { EditorData, KenBurns, MotionGraphic, MediaFile, Placeholder, SceneOverride, TimeChoice, Transition, VideoFit } from "../../types/editor.ts";
 import type { Project } from "../../types/project.ts";
 import { readAudio } from "../audio/read.ts";
@@ -59,24 +60,33 @@ function readMedia(value: unknown): MediaFile | null {
   };
 }
 
+/** A path inside the project: relative, no "..", no backslashes. */
+function insideProject(path: string): boolean {
+  return path !== "" && !path.startsWith("/") && !path.includes("..") && !path.includes("\\") && !/^[A-Za-z]:/.test(path);
+}
+
 function readMotion(value: unknown): MotionGraphic | null {
-  if (!isObject(value) || typeof value.id !== "string" || typeof value.sceneId !== "string" || typeof value.framesDir !== "string") return null;
-  const framesDir = value.framesDir;
-  if (framesDir === "" || framesDir.startsWith("/") || framesDir.includes("..") || framesDir.includes("\\")) return null;
-  return {
+  if (!isObject(value) || typeof value.id !== "string" || typeof value.sceneId !== "string") return null;
+  const common = {
     id: value.id,
     sceneId: value.sceneId,
     start: Math.max(0, finite(value.start, 0)),
     duration: Math.max(0, finite(value.duration, 0)),
     idea: text(value.idea, "") ?? "",
-    framesDir,
-    htmlPath: text(value.htmlPath, "") ?? "",
     fps: Math.min(60, Math.max(12, Math.round(finite(value.fps, 30)))),
     frames: Math.max(0, Math.round(finite(value.frames, 0))),
     width: Math.max(0, Math.round(finite(value.width, 0))),
     height: Math.max(0, Math.round(finite(value.height, 0))),
     enabled: value.enabled !== false,
   };
+  if (value.kind === "spec") {
+    const clipPath = value.clipPath;
+    const repaired = repairSpec(value.spec);
+    if (typeof clipPath !== "string" || !insideProject(clipPath) || !clipPath.endsWith(".mov") || !repaired.ok) return null;
+    return { ...common, framesDir: "", htmlPath: "", kind: "spec", clipPath, spec: repaired.spec };
+  }
+  if (typeof value.framesDir !== "string" || !insideProject(value.framesDir)) return null;
+  return { ...common, framesDir: value.framesDir, htmlPath: text(value.htmlPath, "") ?? "" };
 }
 
 /** The editor data of a project, with every missing or damaged part replaced by its default. */

@@ -94,8 +94,12 @@ pub struct RenderScene {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Overlay {
-    /// Inside the project, e.g. "motion/m1/frames" (files 00000.png, 00001.png ...).
+    /// Inside the project, e.g. "motion/m1/frames" (files 00000.png, 00001.png ...). Empty when `clip` is used.
+    #[serde(default)]
     pub frames_dir: String,
+    /// Inside the project, e.g. "graphics/g1/clip.mov": a transparent clip made by `graphics/export.rs`.
+    #[serde(default)]
+    pub clip: Option<String>,
     /// When it appears in the video, in seconds.
     pub start: f64,
     /// The frame rate the frames were drawn at.
@@ -168,10 +172,20 @@ impl RenderRequest {
             return Err(bad("There are too many motion graphics.", format!("{} overlays", self.overlays.len())));
         }
         for overlay in &self.overlays {
-            let path = std::path::Path::new(&overlay.frames_dir);
-            let safe = !overlay.frames_dir.is_empty() && path.is_relative() && !path.components().any(|c| matches!(c, std::path::Component::ParentDir | std::path::Component::Prefix(_) | std::path::Component::RootDir));
-            if !safe {
-                return Err(bad("A motion graphic has a wrong folder.", format!("frames_dir = {:?}", overlay.frames_dir)));
+            let inside_project = |text: &str| {
+                let path = std::path::Path::new(text);
+                !text.is_empty() && path.is_relative() && !path.components().any(|c| matches!(c, std::path::Component::ParentDir | std::path::Component::Prefix(_) | std::path::Component::RootDir))
+            };
+            match overlay.clip.as_deref() {
+                Some(clip) => {
+                    if !inside_project(clip) || !clip.ends_with(".mov") || !overlay.frames_dir.is_empty() {
+                        return Err(bad("A motion graphic has a wrong file.", format!("clip = {clip:?}, frames_dir = {:?}", overlay.frames_dir)));
+                    }
+                }
+                None if !inside_project(&overlay.frames_dir) => {
+                    return Err(bad("A motion graphic has a wrong folder.", format!("frames_dir = {:?}", overlay.frames_dir)));
+                }
+                None => {}
             }
             if !(overlay.start.is_finite() && overlay.start >= 0.0 && overlay.start < self.duration && (12..=120).contains(&overlay.fps)) {
                 return Err(bad("A motion graphic has a wrong time.", format!("start = {}, fps = {}", overlay.start, overlay.fps)));

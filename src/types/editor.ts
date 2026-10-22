@@ -1,3 +1,4 @@
+import type { GraphicSpec } from "../lib/graphics/spec/schema";
 /** Everything the Auto Editor adds to a project. Stored in `project.editor` (see src-tauri model.rs). */
 
 export type MediaKind = "image" | "video";
@@ -196,6 +197,12 @@ export interface MotionGraphic {
   height: number;
   /** False = kept but not rendered. */
   enabled: boolean;
+  /** "spec" = drawn by the app from a GraphicSpec (`spec`, `clipPath`); missing or "legacy" = written by the AI as HTML (`framesDir`). */
+  kind?: "legacy" | "spec";
+  /** Spec graphics: the transparent clip inside the project, e.g. "graphics/g1/clip.mov". */
+  clipPath?: string;
+  /** Spec graphics: what the clip shows (kept so it can be edited and drawn again). */
+  spec?: GraphicSpec;
 }
 
 export interface EditorData {

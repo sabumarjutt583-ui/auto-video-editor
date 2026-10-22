@@ -165,16 +165,24 @@ pub async fn render(job: &Job, env: &RenderEnv, request: &RenderRequest) -> Resu
     // Motion graphics: each one is a folder of transparent frames, read as one more input.
     let mut graph = Graph { inputs: Vec::new(), filter: vec!["-vf".into(), filter.clone()], maps: vec!["-map".into(), "0:v:0".into(), "-map".into(), "1:a:0".into()] };
     if !request.overlays.is_empty() {
-        let mut starts = Vec::new();
+        let mut inputs = Vec::new();
         for overlay in &request.overlays {
-            let dir = env.project_dir.join(&overlay.frames_dir);
-            if !dir.join("00000.png").is_file() {
-                return Err(AppError::new("A motion graphic is missing. Please make it again.", format!("no frames in {}", dir.display())));
+            if let Some(clip) = &overlay.clip {
+                let file = env.project_dir.join(clip);
+                if !file.is_file() {
+                    return Err(AppError::new("A motion graphic is missing. Please make it again.", format!("no clip {}", file.display())));
+                }
+                graph.inputs.extend(["-i".into(), arg(&file)]);
+            } else {
+                let dir = env.project_dir.join(&overlay.frames_dir);
+                if !dir.join("00000.png").is_file() {
+                    return Err(AppError::new("A motion graphic is missing. Please make it again.", format!("no frames in {}", dir.display())));
+                }
+                graph.inputs.extend(["-framerate".into(), overlay.fps.to_string(), "-start_number".into(), "0".into(), "-i".into(), arg(&dir.join("%05d.png"))]);
             }
-            graph.inputs.extend(["-framerate".into(), overlay.fps.to_string(), "-start_number".into(), "0".into(), "-i".into(), arg(&dir.join("%05d.png"))]);
-            starts.push(overlay.start);
+            inputs.push(plan::OverlayInput { start: overlay.start, exact_frames: overlay.clip.is_some() });
         }
-        graph.filter = vec!["-filter_complex".into(), plan::overlay_graph(&starts, request.width, request.height, &filter)];
+        graph.filter = vec!["-filter_complex".into(), plan::overlay_graph_for(&inputs, request.width, request.height, request.fps, &filter)];
         graph.maps = vec!["-map".into(), "[vout]".into(), "-map".into(), "1:a:0".into()];
     }
 
@@ -405,6 +413,202 @@ mod tests {
         assert!(red(pixel_at(video, 2.0).await), "while it plays");
         assert!(!red(pixel_at(video, 3.4).await), "after the last frame");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    use crate::graphics::export::test_support::{flat_frame, make_clip};
+    use crate::graphics::export::GraphicExports;
+
+    /// The picture at `seconds` scaled to `w` x `h`, as RGB bytes.
+    async fn frame_rgb(video: &Path, seconds: f64, w: u32, h: u32) -> Vec<u8> {
+        let mut cmd = command(Tool::Ffmpeg).unwrap();
+        cmd.args(["-hide_banner", "-v", "error", "-ss", &format!("{seconds:.4}"), "-i"]).arg(video).args(["-frames:v", "1", "-vf", &format!("scale={w}:{h}"), "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]);
+        let out = cmd.output().await.unwrap();
+        assert_eq!(out.stdout.len() as u32, w * h * 3, "{}", String::from_utf8_lossy(&out.stderr));
+        out.stdout
+    }
+
+    /// The average colour of every frame, in order.
+    async fn frame_colours(video: &Path) -> Vec<[u8; 3]> {
+        let mut cmd = command(Tool::Ffmpeg).unwrap();
+        cmd.args(["-hide_banner", "-v", "error", "-i"]).arg(video).args(["-vf", "scale=1:1", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]);
+        let out = cmd.output().await.unwrap();
+        out.stdout.chunks(3).map(|c| [c[0], c[1], c[2]]).collect()
+    }
+
+    fn is_red(px: &[u8]) -> bool {
+        px[0] > 150 && px[1] < 90 && px[2] < 90
+    }
+
+    fn overlay_project(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("ave-render-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        for sub in ["audio", "exports"] {
+            std::fs::create_dir_all(dir.join(sub)).unwrap();
+        }
+        dir
+    }
+
+    fn overlay_request(duration: f64, clip: &str, start: f64, extra: serde_json::Value) -> RenderRequest {
+        let mut json = serde_json::json!({
+            "projectName": "Clip", "width": 640, "height": 360, "fps": 30, "duration": duration,
+            "scenes": [scene("S01", 0.0, duration, serde_json::json!({"kind": "black"}), "none", "cut")],
+            "kenBurns": false,
+            "overlays": [{"clip": clip, "start": start, "fps": 30}],
+            "mix": {"duration": duration, "voicePath": "audio/voice.wav", "music": {"tracks": [], "volume": 0.2, "fadeIn": 2, "fadeOut": 3, "mode": "loop", "ducking": "normal"}, "sfx": [], "normalize": false},
+            "aspectLabel": "16x9", "suffix": null, "date": "2026-10-18"
+        });
+        if let (Some(map), Some(more)) = (json.as_object_mut(), extra.as_object()) {
+            map.extend(more.clone());
+        }
+        request(json)
+    }
+
+    #[tokio::test]
+    async fn a_graphic_clip_starts_on_its_exact_frame_and_the_video_keeps_its_exact_length() {
+        if !sidecars_for_tests() {
+            return;
+        }
+        let dir = overlay_project("clip");
+        ffmpeg(&["-f", "lavfi", "-i", "sine=frequency=300:duration=4", &dir.join("audio/voice.wav").to_string_lossy()]).await;
+        // One second (30 frames) of opaque red, laid over the video at 1.5 s = frame 45.
+        let exports = GraphicExports::default();
+        let registry = JobRegistry::default();
+        let clip = make_clip(&exports, &registry, &dir, "g1", 640, 360, 30, &|_| flat_frame(640, 360, [255, 0, 0, 255])).await;
+        let request = overlay_request(4.0, &clip.path, 1.5, serde_json::json!({}));
+        request.validate().unwrap();
+        let env = RenderEnv { project_dir: dir.clone(), fonts_dir: dir.clone(), sfx_dir: dir.clone(), export_folder: None, force_cpu: true };
+        let (job, _) = test_job(&registry, "clip");
+        let result = render(&job, &env, &request).await.unwrap();
+        assert!(result.duration_ok, "{:.3}", result.duration);
+        let video = Path::new(&result.path);
+        assert_eq!(count_frames(video).await, 120, "round(4.0 * 30) frames, nothing added or lost by the graphic");
+        // Every frame in order (no seeking, which is only approximate): red must be exactly frames 45 to 74.
+        let colours = frame_colours(video).await;
+        assert_eq!(colours.len(), 120);
+        let red: Vec<usize> = colours.iter().enumerate().filter(|(_, p)| is_red(&p[..])).map(|(i, _)| i).collect();
+        assert_eq!((red.first().copied(), red.last().copied(), red.len()), (Some(45), Some(74), 30), "the clip covers frames 45 to 74 (1.5 s to 2.5 s)");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Composites a clip over a flat background with the same filter graph the render uses; returns the first frame as RGB.
+    async fn composite_over(background: &str, clip: &Path, width: u32, height: u32) -> Vec<u8> {
+        let graph = plan::overlay_graph_for(&[plan::OverlayInput { start: 0.0, exact_frames: true }], width, height, 30, "format=yuv420p");
+        let mut cmd = command(Tool::Ffmpeg).unwrap();
+        cmd.args(["-hide_banner", "-v", "error", "-f", "lavfi", "-i", &format!("color=c={background}:s={width}x{height}:r=30:d=0.5,format=yuv420p"), "-f", "lavfi", "-i", "anullsrc=d=0.5", "-i"])
+            .arg(clip)
+            .args(["-filter_complex", &graph, "-map", "[vout]", "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]);
+        let out = cmd.output().await.unwrap();
+        assert_eq!(out.stdout.len() as u32, width * height * 3, "{}", String::from_utf8_lossy(&out.stderr));
+        out.stdout
+    }
+
+    /// Straight-alpha pixels with every alpha from 0 to 255 along the row, in one colour.
+    fn ramp(width: u32, height: u32, rgb: [u8; 3]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        for _ in 0..height {
+            for x in 0..width {
+                bytes.extend_from_slice(&[rgb[0], rgb[1], rgb[2], (x * 255 / (width - 1)) as u8]);
+            }
+        }
+        bytes
+    }
+
+    #[tokio::test]
+    async fn soft_edges_have_no_dark_or_white_halo_over_black_and_over_white() {
+        if !sidecars_for_tests() {
+            return;
+        }
+        let dir = overlay_project("halo");
+        let exports = GraphicExports::default();
+        let registry = JobRegistry::default();
+        let (w, h) = (256u32, 16u32);
+        // White text with soft edges (alpha 0..255).
+        let white = make_clip(&exports, &registry, &dir, "white", w, h, 3, &|_| ramp(w, h, [255, 255, 255])).await;
+        let over_black = composite_over("black", &dir.join(&white.path), w, h).await;
+        let over_white = composite_over("white", &dir.join(&white.path), w, h).await;
+        for x in 0..w {
+            let i = ((8 * w + x) * 3) as usize;
+            let alpha = (x * 255 / (w - 1)) as i32;
+            // White over black is exactly the alpha (a white halo would be brighter, a dark one darker).
+            assert!((i32::from(over_black[i]) - alpha).abs() <= 4, "over black at x={x}: {} vs {alpha}", over_black[i]);
+            // White over white stays white (a dark halo would show up as gray).
+            assert!(over_white[i] >= 251 && over_white[i + 1] >= 251 && over_white[i + 2] >= 251, "over white at x={x}: {:?}", &over_white[i..i + 3]);
+        }
+        // Black text with soft edges over white: 255 - alpha.
+        let black = make_clip(&exports, &registry, &dir, "black", w, h, 3, &|_| ramp(w, h, [0, 0, 0])).await;
+        let black_over_white = composite_over("white", &dir.join(&black.path), w, h).await;
+        let black_over_black = composite_over("black", &dir.join(&black.path), w, h).await;
+        for x in 0..w {
+            let i = ((8 * w + x) * 3) as usize;
+            let alpha = (x * 255 / (w - 1)) as i32;
+            assert!((i32::from(black_over_white[i]) - (255 - alpha)).abs() <= 4, "black over white at x={x}: {} vs {}", black_over_white[i], 255 - alpha);
+            assert!(black_over_black[i] <= 4, "black over black at x={x}: {}", black_over_black[i]);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn a_graphic_colour_matches_the_same_colour_in_a_picture() {
+        if !sidecars_for_tests() {
+            return;
+        }
+        let dir = overlay_project("colour");
+        let exports = GraphicExports::default();
+        let registry = JobRegistry::default();
+        let clip = make_clip(&exports, &registry, &dir, "c", 64, 64, 3, &|_| flat_frame(64, 64, [200, 100, 50, 255])).await;
+        let graphic = composite_over("black", &dir.join(&clip.path), 64, 64).await;
+        let mut cmd = command(Tool::Ffmpeg).unwrap();
+        cmd.args(["-hide_banner", "-v", "error", "-f", "lavfi", "-i", "color=c=0xC86432:s=64x64:r=30:d=0.5,format=yuv420p", "-frames:v", "1", "-pix_fmt", "rgb24", "-f", "rawvideo", "-"]);
+        let picture = cmd.output().await.unwrap().stdout;
+        assert_eq!(picture.len(), graphic.len());
+        let worst = graphic.iter().zip(&picture).map(|(a, b)| (i32::from(*a) - i32::from(*b)).abs()).max().unwrap();
+        assert!(worst <= 2, "the graphic and a picture of the same colour differ by {worst} levels: the colour conversion must be the same");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn captions_are_always_drawn_above_graphics() {
+        if !sidecars_for_tests() {
+            return;
+        }
+        let dir = overlay_project("captions");
+        ffmpeg(&["-f", "lavfi", "-i", "sine=frequency=300:duration=3", &dir.join("audio/voice.wav").to_string_lossy()]).await;
+        let exports = GraphicExports::default();
+        let registry = JobRegistry::default();
+        // A red graphic that covers the whole picture for the whole video; the captions must still be readable on top.
+        let clip = make_clip(&exports, &registry, &dir, "g", 640, 360, 90, &|_| flat_frame(640, 360, [255, 0, 0, 255])).await;
+        let captions = serde_json::json!({"width": 640, "height": 360, "look": {"preset": "highlight", "font": "Noto Sans", "fontSize": 48, "primary": "#FFFFFF", "highlight": "#FFFFFF", "outline": 0, "shadow": 0, "position": "bottom", "uppercase": false, "bold": true, "marginV": 30, "marginH": 30},
+            "lines": [{"start": 0.0, "end": 3.0, "words": [{"text": "Hello", "start": 0.0, "end": 1.0}, {"text": "world", "start": 1.0, "end": 3.0}], "breakAt": null}]});
+        let request = overlay_request(3.0, &clip.path, 0.0, serde_json::json!({"captions": captions}));
+        request.validate().unwrap();
+        let fonts = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("resources").join("fonts");
+        let env = RenderEnv { project_dir: dir.clone(), fonts_dir: fonts, sfx_dir: dir.clone(), export_folder: None, force_cpu: true };
+        let (job, _) = test_job(&registry, "captions");
+        let result = render(&job, &env, &request).await.unwrap();
+        assert!(result.duration_ok);
+        let rgb = frame_rgb(Path::new(&result.path), 2.0, 320, 180).await;
+        // Only white has green and blue: the graphic is pure red.
+        let white = rgb.chunks(3).filter(|p| p[1] > 150 && p[2] > 150).count();
+        let red = rgb.chunks(3).filter(|p| is_red(p)).count();
+        assert!(white > 40, "caption letters are visible on top of the graphic ({white} white pixels)");
+        assert!(red > 320 * 180 / 2, "the graphic covers the rest ({red} red pixels)");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_clip_overlay_must_be_a_mov_inside_the_project() {
+        let base = |overlay: serde_json::Value| request(serde_json::json!({
+            "projectName": "x", "width": 640, "height": 360, "fps": 30, "duration": 4.0,
+            "scenes": [scene("S01", 0.0, 4.0, serde_json::json!({"kind": "black"}), "none", "cut")], "kenBurns": false, "overlays": [overlay],
+            "mix": {"duration": 4.0, "voicePath": "audio/voice.wav", "music": {"tracks": [], "volume": 0.2, "fadeIn": 2, "fadeOut": 3, "mode": "loop", "ducking": "normal"}, "sfx": [], "normalize": false},
+            "aspectLabel": "16x9", "date": "2026-10-18"
+        }));
+        assert!(base(serde_json::json!({"clip": "graphics/g1/clip.mov", "start": 1.0, "fps": 30})).validate().is_ok());
+        assert!(base(serde_json::json!({"clip": "../clip.mov", "start": 1.0, "fps": 30})).validate().is_err());
+        assert!(base(serde_json::json!({"clip": "/tmp/clip.mov", "start": 1.0, "fps": 30})).validate().is_err());
+        assert!(base(serde_json::json!({"clip": "graphics/g1/clip.png", "start": 1.0, "fps": 30})).validate().is_err());
+        assert!(base(serde_json::json!({"clip": "graphics/g1/clip.mov", "framesDir": "motion/a", "start": 1.0, "fps": 30})).validate().is_err());
+        assert!(base(serde_json::json!({"start": 1.0, "fps": 30})).validate().is_err(), "neither frames nor clip");
     }
 
     #[test]

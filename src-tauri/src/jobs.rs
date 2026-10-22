@@ -78,6 +78,10 @@ pub struct Job {
 }
 
 impl Job {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
     /// Reports `percent` (0 to 100) of the current range.
     pub fn progress(&self, stage: &str, percent: f64) {
         let (from, to) = *self.range.lock().unwrap_or_else(|e| e.into_inner());

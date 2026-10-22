@@ -32,8 +32,10 @@ export interface RenderScene {
   transition: { kind: TransitionKind; seconds: number };
 }
 
+/** A graphic laid over the video: a folder of PNG frames (AI HTML graphics) or one transparent clip (app-drawn graphics). */
 export interface RenderOverlay {
-  framesDir: string;
+  framesDir?: string;
+  clip?: string;
   start: number;
   fps: number;
 }
@@ -43,7 +45,7 @@ export function buildOverlays(motion: readonly MotionGraphic[], width: number, h
   const shape = width / height;
   return motion
     .filter((g) => g.enabled && g.frames > 0 && g.width > 0 && g.height > 0 && Math.abs(g.width / g.height - shape) < 0.02 && g.start < duration)
-    .map((g) => ({ framesDir: g.framesDir, start: g.start, fps: g.fps }));
+    .map((g): RenderOverlay => (g.kind === "spec" && g.clipPath ? { clip: g.clipPath, start: g.start, fps: g.fps } : { framesDir: g.framesDir, start: g.start, fps: g.fps }));
 }
 
 /** What the Rust renderer needs (see src-tauri/src/render/model.rs). */

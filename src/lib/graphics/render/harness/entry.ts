@@ -125,6 +125,72 @@ const api = {
     const mae = sum / total;
     return { name, status: mae <= 1.5 && bad / total <= 0.003 ? "same" : "different", mae, bad, total, notes, png };
   },
+  /**
+   * Draws every frame of a case in a real Web Worker (OffscreenCanvas, the code of the export) and on this page, and compares
+   * the bytes. They must be identical: one renderer for preview and export.
+   */
+  async exportViaWorker(index: number, workerUrl: string, fontBaseUrl: string): Promise<{ frames: number; identical: number; maxDiff: number; bytes: number }> {
+    const item = GOLDEN_CASES[index];
+    if (!item) throw new Error(`no case ${index}`);
+    const { width, height } = GOLDEN_SIZE;
+    const fonts = [];
+    for (const [family, file, weight] of FONT_FILES.slice(0, 2)) {
+      fonts.push({ family, weight, data: await (await fetch(`${fontBaseUrl}${file}`)).arrayBuffer() });
+    }
+    const worker = new Worker(workerUrl);
+    const waiting = new Map<number, (b: ArrayBuffer) => void>();
+    const ready = new Promise<void>((resolve, reject) => {
+      worker.onmessage = (event: MessageEvent<{ type: string; n?: number; buffer?: ArrayBuffer; message?: string }>) => {
+        const m = event.data;
+        if (m.type === "ready") resolve();
+        else if (m.type === "frame" && m.n !== undefined && m.buffer) waiting.get(m.n)?.(m.buffer);
+        else reject(new Error(m.message ?? "worker error"));
+      };
+      worker.onerror = (e) => reject(new Error(e.message));
+    });
+    worker.postMessage({ type: "init", spec: item.spec, width, height, fonts, images: {} });
+    await ready;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("no 2d context");
+    const rc = context(width, height);
+    const total = Math.round(item.spec.duration * 30);
+    let identical = 0;
+    let maxDiff = 0;
+    let bytes = 0;
+    for (let n = 0; n < total; n++) {
+      const fromWorker = new Promise<ArrayBuffer>((resolve) => waiting.set(n, resolve));
+      worker.postMessage({ type: "frame", n });
+      const a = new Uint8ClampedArray(await fromWorker);
+      renderFrame(item.spec, n, ctx as Canvas2D, rc);
+      const b = ctx.getImageData(0, 0, width, height).data;
+      bytes += a.length;
+      let diff = 0;
+      for (let i = 0; i < a.length; i++) diff = Math.max(diff, Math.abs((a[i] ?? 0) - (b[i] ?? 0)));
+      maxDiff = Math.max(maxDiff, diff);
+      if (diff === 0) identical++;
+    }
+    worker.terminate();
+    return { frames: total, identical, maxDiff, bytes };
+  },
+  /** Frame `n` of a case as raw RGBA bytes (straight alpha, as the export sends them), base64 text. */
+  rawFrame(index: number, n: number): string {
+    const item = GOLDEN_CASES[index];
+    if (!item) throw new Error(`no case ${index}`);
+    const canvas = document.createElement("canvas");
+    canvas.width = GOLDEN_SIZE.width;
+    canvas.height = GOLDEN_SIZE.height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("no 2d context");
+    renderFrame(item.spec, n, ctx as Canvas2D, context(canvas.width, canvas.height));
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let text = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < data.length; i += chunk) text += String.fromCharCode(...data.subarray(i, i + chunk));
+    return btoa(text);
+  },
   /** The share of fully transparent pixels of a case (nothing is painted outside the layers). */
   transparentShare(index: number): number {
     const { canvas, ctx } = drawCase(index);

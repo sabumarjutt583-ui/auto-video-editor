@@ -1,17 +1,25 @@
+import { Film, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { SAMPLE_GRAPHICS } from "../../lib/graphics/samples";
 import { describeIssues, repairSpec } from "../../lib/graphics/spec";
+import { requestCancel } from "../../store/jobStore";
+import type { Scene } from "../../types";
+import { ErrorNotice } from "../ErrorNotice";
 import { Button } from "../ui";
 import { GraphicPreview } from "./GraphicPreview";
+import type { GraphicExportView } from "./useGraphicExport";
 
 interface GraphicLabProps {
   aspect: "16:9" | "9:16" | "1:1";
   backgroundUrl?: string | null;
+  /** The selected scene: the graphic is put at its start. */
+  scene?: Scene;
+  exporter: GraphicExportView;
 }
 
 /** Try the new graphics engine: pick a sample or paste a GraphicSpec (JSON) and watch it play. */
-export function GraphicLab({ aspect, backgroundUrl }: GraphicLabProps) {
+export function GraphicLab({ aspect, backgroundUrl, scene, exporter }: GraphicLabProps) {
   const first = SAMPLE_GRAPHICS[0];
   const [text, setText] = useState(() => JSON.stringify(first?.spec ?? {}, null, 2));
   const result = useMemo(() => {
@@ -33,6 +41,22 @@ export function GraphicLab({ aspect, backgroundUrl }: GraphicLabProps) {
           ))}
         </div>
         {spec ? <GraphicPreview spec={spec} aspect={aspect} backgroundUrl={backgroundUrl ?? null} /> : <p className="text-xs text-danger" role="alert">{result === null ? "This is not valid JSON." : `This graphic cannot be used:\n${describeIssues(result.issues)}`}</p>}
+        {spec && scene && (
+          <div className="flex items-center gap-2">
+            <Button variant="primary" icon={Film} loading={exporter.job !== null} disabled={exporter.job !== null} onClick={() => void exporter.add(spec, scene)}>
+              Add to {scene.id}
+            </Button>
+            {exporter.job && <Button onClick={() => requestCancel(exporter.job?.id ?? "")}>Cancel</Button>}
+          </div>
+        )}
+        {exporter.job && (
+          <div role="status" className="flex flex-col gap-1 text-xs text-muted">
+            <span className="flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />{exporter.job.stage}</span>
+            <div className="h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full bg-accent transition-all" style={{ width: `${Math.round(exporter.job.percent)}%` }} /></div>
+          </div>
+        )}
+        {exporter.cancelled && <p className="text-xs text-muted" role="status">Cancelled.</p>}
+        {exporter.error && <ErrorNotice error={exporter.error} />}
         {result?.ok && result.issues.length > 0 && <p className="whitespace-pre-line text-xs text-muted" role="status">Fixed automatically:{"\n"}{describeIssues(result.issues)}</p>}
         <textarea
           value={text}

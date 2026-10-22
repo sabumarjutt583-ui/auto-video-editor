@@ -18,7 +18,7 @@ DECODERS=(
   ass ssa srt subrip webvtt
 )
 DEMUXERS=(
-  mov matroska ogg mp3 wav flac aac image2 image2pipe image_png_pipe image_jpeg_pipe image_webp_pipe
+  mov matroska ogg mp3 wav flac aac rawvideo image2 image2pipe image_png_pipe image_jpeg_pipe image_webp_pipe
   concat lavfi srt ass webvtt pcm_s16le pcm_f32le
 )
 MUXERS=(

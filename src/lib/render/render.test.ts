@@ -86,3 +86,19 @@ test("labels, dates, sizes and time left", () => {
   assert.equal(timeLeft(25, 120), "about 6 min left");
   assert.equal(timeLeft(95, 100), "a few seconds left");
 });
+
+test("buildOverlays sends a clip for app-drawn graphics and a frames folder for AI graphics", async () => {
+  const { buildOverlays } = await import("./request.ts");
+  const base = { id: "a", sceneId: "S01", start: 2, duration: 3, idea: "", htmlPath: "", fps: 30, frames: 90, width: 1920, height: 1080, enabled: true };
+  const spec = { schemaVersion: 1, id: "a", duration: 3, seed: 1, brand: "default", layers: [] };
+  const overlays = buildOverlays(
+    [
+      { ...base, framesDir: "", kind: "spec", clipPath: "graphics/a/clip.mov", spec: spec as never },
+      { ...base, id: "b", framesDir: "motion/b/frames" },
+      { ...base, id: "c", framesDir: "", kind: "spec", clipPath: "graphics/c/clip.mov", enabled: false, spec: spec as never },
+      { ...base, id: "d", framesDir: "", kind: "spec", clipPath: "graphics/d/clip.mov", width: 1080, height: 1920, spec: spec as never },
+    ],
+    1920, 1080, 60,
+  );
+  assert.deepEqual(overlays, [{ clip: "graphics/a/clip.mov", start: 2, fps: 30 }, { framesDir: "motion/b/frames", start: 2, fps: 30 }]);
+});

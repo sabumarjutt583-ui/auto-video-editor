@@ -111,6 +111,10 @@ macro_rules! handler {
             commands::imagegen::imagegen_test_image,
             commands::imagegen::imagegen_chat_ask,
             commands::motion::motion_generate,
+            commands::graphics::graphic_export_start,
+            commands::graphics::graphic_export_frame,
+            commands::graphics::graphic_export_finish,
+            commands::graphics::graphic_export_abort,
             commands::imagegen::imagegen_background_snapshot,
             commands::imagegen::imagegen_show_browser,
             commands::imagegen::imagegen_start,
@@ -206,6 +210,10 @@ macro_rules! handler {
             commands::imagegen::imagegen_test_image,
             commands::imagegen::imagegen_chat_ask,
             commands::motion::motion_generate,
+            commands::graphics::graphic_export_start,
+            commands::graphics::graphic_export_frame,
+            commands::graphics::graphic_export_finish,
+            commands::graphics::graphic_export_abort,
             commands::imagegen::imagegen_background_snapshot,
             commands::imagegen::imagegen_show_browser,
             commands::imagegen::imagegen_start,
@@ -255,6 +263,7 @@ fn start_logging(app: &tauri::AppHandle) {
 fn main() {
     tauri::Builder::default()
         .manage(jobs::JobRegistry::default())
+        .manage(graphics::export::GraphicExports::default())
         .manage(commands::app_update::PendingUpdate::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())

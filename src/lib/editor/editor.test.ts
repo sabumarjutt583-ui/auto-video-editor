@@ -5,6 +5,7 @@ import { test } from "node:test";
 import type { MediaFile } from "../../types/editor.ts";
 import type { Scene } from "../../types/project.ts";
 import { emptyScene } from "../scenes/assemble.ts";
+import { readEditor } from "./model.ts";
 import { splitSentences } from "../sentences.ts";
 import { followFileTime, moveBoundary, moveBoundaryToTime, nearestWord } from "./boundaries.ts";
 import { coverSource, containTarget, kenBurnsAt, resolveMotion, ZOOM_AMOUNT } from "./motion.ts";
@@ -145,4 +146,18 @@ test("effectiveTransition: the scene's own choice wins, otherwise the render mod
   const mixed = Array.from({ length: 20 }, (_, i) => effectiveTransition("auto", i + 1, "mixed"));
   assert.ok(mixed.filter((k) => k === "cut").length >= 12, "mostly cuts");
   assert.ok(mixed.includes("dissolve") && mixed.includes("slide"));
+});
+
+test("readEditor keeps graphics drawn by the app and drops damaged ones", async () => {
+  const { repairSpec } = await import("../graphics/spec/index.ts");
+  const made = repairSpec({ schemaVersion: 1, id: "g1", duration: 2, layers: [{ id: "a", type: "shape", box: { x: 0.1, y: 0.1, w: 0.5, h: 0.2 } }] });
+  assert.ok(made.ok);
+  const good = { id: "g1", sceneId: "S01", start: 1, duration: 2, idea: "", framesDir: "", htmlPath: "", fps: 30, frames: 60, width: 1920, height: 1080, enabled: true, kind: "spec", clipPath: "graphics/g1/clip.mov", spec: made.ok ? made.spec : null };
+  const legacy = { id: "m1", sceneId: "S01", start: 0, duration: 2, framesDir: "motion/m1/frames", fps: 30, frames: 60, width: 1920, height: 1080 };
+  const editor = readEditor({ editor: { motion: [good, legacy, { ...good, id: "x1", clipPath: "../clip.mov" }, { ...good, id: "x2", clipPath: "graphics/x/clip.png" }, { ...good, id: "x3", spec: { schemaVersion: 1 } }, { ...legacy, id: "x4", framesDir: "../m" }] } as never });
+  assert.deepEqual(editor.motion.map((g) => g.id), ["g1", "m1"]);
+  assert.equal(editor.motion[0]?.kind, "spec");
+  assert.equal(editor.motion[0]?.clipPath, "graphics/g1/clip.mov");
+  assert.equal(editor.motion[0]?.spec?.id, "g1");
+  assert.equal(editor.motion[1]?.kind, undefined);
 });

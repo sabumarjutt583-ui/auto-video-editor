@@ -266,14 +266,31 @@ pub fn filter_path(path: &Path) -> String {
     format!("'{escaped}'")
 }
 
+/// One graphic laid over the video.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OverlayInput {
+    pub start: f64,
+    /// A transparent clip (30 fps, made by the app): it starts on an exact frame of the video.
+    pub exact_frames: bool,
+}
+
 /// The filter graph of the final encode when motion graphics are laid over the video. Input 0 is the
-/// joined scenes, input 1 the audio, inputs 2.. the frame sequences (in the order of `starts`).
+/// joined scenes, input 1 the audio, inputs 2.. the graphics (in the order of `starts`).
 /// `tail` runs last (captions, pixel format). The result ends in the label `[vout]`.
+#[cfg(test)]
 pub fn overlay_graph(starts: &[f64], width: u32, height: u32, tail: &str) -> String {
+    let inputs: Vec<OverlayInput> = starts.iter().map(|&start| OverlayInput { start, exact_frames: false }).collect();
+    overlay_graph_for(&inputs, width, height, 30, tail)
+}
+
+/// Same as `overlay_graph`. A clip made by the app starts on frame `round(start * fps)` of the video, written as an exact
+/// fraction (`n/(fps*TB)`), so it never lags a frame behind because of a rounded decimal.
+pub fn overlay_graph_for(inputs: &[OverlayInput], width: u32, height: u32, fps: u32, tail: &str) -> String {
     let mut parts: Vec<String> = Vec::new();
     let mut base = String::from("0:v");
-    for (i, start) in starts.iter().enumerate() {
-        parts.push(format!("[{}:v]format=rgba,scale={width}:{height},setpts=PTS-STARTPTS+{start:.3}/TB[o{i}]", i + 2));
+    for (i, input) in inputs.iter().enumerate() {
+        let shift = if input.exact_frames { format!("{}/({fps}*TB)", (input.start * f64::from(fps)).round() as u64) } else { format!("{:.3}/TB", input.start) };
+        parts.push(format!("[{}:v]format=rgba,scale={width}:{height},setpts=PTS-STARTPTS+{shift}[o{i}]", i + 2));
         parts.push(format!("[{base}][o{i}]overlay=eof_action=pass:format=auto[v{}]", i + 1));
         base = format!("v{}", i + 1);
     }
@@ -446,6 +463,15 @@ mod tests {
         let graph = overlay_graph(&[1.5, 4.0], 1920, 1080, "format=yuv420p");
         assert_eq!(graph, "[2:v]format=rgba,scale=1920:1080,setpts=PTS-STARTPTS+1.500/TB[o0];[0:v][o0]overlay=eof_action=pass:format=auto[v1];[3:v]format=rgba,scale=1920:1080,setpts=PTS-STARTPTS+4.000/TB[o1];[v1][o1]overlay=eof_action=pass:format=auto[v2];[v2]format=yuv420p[vout]");
         assert_eq!(overlay_graph(&[], 64, 64, "format=yuv420p"), "[0:v]format=yuv420p[vout]");
+    }
+
+    #[test]
+    fn clips_start_on_an_exact_frame() {
+        let graph = overlay_graph_for(&[OverlayInput { start: 32.43, exact_frames: true }, OverlayInput { start: 1.5, exact_frames: false }], 1080, 1920, 30, "format=yuv420p");
+        assert!(graph.contains("[2:v]format=rgba,scale=1080:1920,setpts=PTS-STARTPTS+973/(30*TB)[o0]"), "{graph}");
+        assert!(graph.contains("[3:v]format=rgba,scale=1080:1920,setpts=PTS-STARTPTS+1.500/TB[o1]"), "{graph}");
+        let at_24 = overlay_graph_for(&[OverlayInput { start: 2.0, exact_frames: true }], 640, 360, 24, "null");
+        assert!(at_24.contains("+48/(24*TB)"), "{at_24}");
     }
 
     #[test]

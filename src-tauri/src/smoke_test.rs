@@ -111,7 +111,12 @@ async fn smoke_test_every_feature_in_five_seconds() {
     }
 
     // 5. The render itself: 5.04 s, picture with Ken Burns, clip with trim, transitions, Korean captions,
-    //    music with ducking, a sound effect and loudness normalisation.
+    //    music with ducking, a sound effect, loudness normalisation and a motion graphic (a transparent clip written
+    //    through the raw-video pipe: rawvideo demuxer, png encoder and decoder, mov muxer and demuxer, overlay filter).
+    let graphic = crate::graphics::export::test_support::make_clip(
+        &crate::graphics::export::GraphicExports::default(), &registry, &dir, "smoke", 640, 360, 45,
+        &|k| crate::graphics::export::test_support::gradient_frame(640, 360, k),
+    ).await;
     let image = serde_json::json!({"kind": "image", "path": "media/a.png"});
     let clip = serde_json::json!({"kind": "video", "path": "media/clip.mp4", "duration": 4.0});
     let scene = |id: &str, start: f64, end: f64, source: serde_json::Value, motion: &str, transition: &str| serde_json::json!({"id": id, "start": start, "end": end, "source": source, "motion": motion, "fit": "crop", "speed": 1, "transition": {"kind": transition, "seconds": 0.5}});
@@ -123,6 +128,7 @@ async fn smoke_test_every_feature_in_five_seconds() {
             scene("S03", 3.4, 5.04, image, "pan_left", "slide"),
         ],
         "kenBurns": true,
+        "overlays": [{"clip": graphic.path, "start": 1.0, "fps": 30}],
         "captions": {"width": 640, "height": 360, "look": {"preset": "highlight", "font": "Noto Sans KR", "fontSize": 28, "primary": "#FFFFFF", "highlight": "#FFD400", "outline": 2, "shadow": 1, "position": "bottom", "uppercase": false, "bold": true, "marginV": 30, "marginH": 30},
             "lines": [{"start": 0.5, "end": 2.5, "words": [{"text": "안녕하세요", "start": 0.5, "end": 1.5}, {"text": "여러분", "start": 1.5, "end": 2.5}], "breakAt": null}]},
         "srt": "1\n00:00:00,500 --> 00:00:02,500\n안녕하세요 여러분\n",
