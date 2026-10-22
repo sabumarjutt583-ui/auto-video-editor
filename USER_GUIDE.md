@@ -116,6 +116,8 @@ In the Auto Editor, open the **Motion** tab, pick a scene and press **Make a mot
 
 **Sounds for graphics.** In the Audio tab, **Add soft sounds for motion graphics** (on by default) adds a quiet pop or whoosh when a graphic comes in, light ticks while a counter counts, and a swoosh when a map draws a route. Nothing plays when a graphic leaves. They appear on the SFX track, so you can move or delete any of them. They follow the "How many effects" choice and the effects volume.
 
+**Graphics cache.** Graphics you drew once are kept, so drawing the same one again is instant, and several graphics are drawn at the same time. **Settings > Graphics cache** shows how much room they use (at most 5 GB; the oldest go first) and has a **Clear cache** button. Clearing it never removes graphics from your projects.
+
 **Brand kit.** In the Motion tab, open **Brand kit** to choose the look of your graphics: three ready-made kits (Clean Documentary, Bold News, Soft Story), kits that match your visual style (for example Noir gives grey tones and capital-letter titles), or your own. Change colours, round corners, line thickness, shadow and movement, watch the four sample pictures change, then press **Save as my kit**. **Use for all projects** makes it the default.
 
 ## SFX Library

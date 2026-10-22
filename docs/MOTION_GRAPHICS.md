@@ -170,6 +170,12 @@ A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphi
 - Rules: entrance fade/scale/pop/typewriter -> soft pop (`pop_bubble`); slide*/wipe -> `whoosh_soft`; entrance none -> silent; counter -> light `click_tick` ticks every 0.25 s (max 3 / 6 / 8 at low / normal / high, gain 0.35); map with a route -> `whoosh_long` swoosh; exit -> no sound. Gain = sound default x intensity (0.6 / 0.85 / 1) x factor (0.35-0.7), so they stay quiet. A graphic sound within 0.3 s of another automatic effect is dropped.
 - Setting: `audio.graphicSfx` (default ON, only used while automatic effects are on; Audio tab checkbox). The cues join the planned list in `useAudio`, so they show on the SFX track, can be edited or deleted there, and are mixed like every other effect. Sounds come from the built-in library; missing ids fall back to the category.
 
+## 5m. Cache and parallel drawing (phase 12)
+- Key: src/lib/graphics/cache/key.ts `cacheKey` = SHA-256 of the spec (without id/name), the theme as drawn (brand kit + the graphic's own colours), the font files, `RENDERER_VERSION`, `ASSETS_VERSION` (bump when icons/flags/maps change), width, height and fps. Graphics with a picture-file layer are not cached (the file may change).
+- Store: Rust src-tauri/src/graphics/cache.rs, folder app_data/graphics-cache (`<key>.mov` + `<key>.json`). A hit copies the clip into `<project>/graphics/<id>/clip.mov` (no drawing); a miss draws as before and then stores it. Limit 5 GB: least recently used go first (a hit counts as use). A broken entry is a miss; a cache that cannot be written never stops the work. Commands graphic_cache_restore / _store / _info / _clear. Settings > Graphics cache shows the size and has Clear cache (projects keep their own clips).
+- Parallel: `runPool` (lib/graphics/cache/pool.ts) draws several graphics at once (half of the cores, 1 to 4) in the AI director and the quality fix; results keep their order. After the first failure or Cancel nothing new starts; the ones already running finish. Changing a text and changing it back is instant (cache hit). The final video render itself is unchanged (the per-scene clips and the encoder are already as parallel as FFmpeg allows).
+- Tests: cache/cache.test.ts (6) and 5 Rust tests in cache.rs.
+
 ## 6. Phase checklist (commit per phase)
 
 | Phase | Result | Commit message |
@@ -186,7 +192,7 @@ A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphi
 | 9 (done) | quality checks | Motion graphics phase 9: quality checks |
 | 10 (done) | timeline editing + presets | Motion graphics phase 10: editing and presets |
 | 11 (done) | SFX for graphics | Motion graphics phase 11: graphic sound effects |
-| 12 | cache + parallel | Motion graphics phase 12: cache and parallel render |
+| 12 (done) | cache + parallel | Motion graphics phase 12: cache and parallel render |
 | 13 | end-to-end tests + docs | Motion graphics phase 13: end-to-end tests and docs |
 
 Every phase ends with: all old and new tests, `npx tsc -b`, `npm run build`, `cargo build` with zero warnings (also `--features admin`), then commit + push (no force). TESTING.md is run after phases 3, 7 and 13.

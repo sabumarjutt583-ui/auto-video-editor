@@ -8,6 +8,7 @@ import { mapDataOfSpec } from "../../../lib/graphics/geo/mapData";
 import { ensureIcons, iconRefsOf } from "../../../lib/graphics/library/icons";
 import type { Box } from "../../../lib/graphics/placement";
 import { captionZone, safeArea } from "../../../lib/graphics/placement";
+import { poolSize, runPool } from "../../../lib/graphics/cache";
 import { notesOf } from "./notes";
 import { checkGraphics, glyphChecker, type GraphicItem, type QualityEnv, type QualityReport } from "../../../lib/graphics/quality";
 import type { BrandKit } from "../../../lib/graphics/brand";
@@ -108,11 +109,11 @@ export function useGraphicQuality(project: Project, dir: string | null, kit: Bra
       const made = await build();
       if (!made) { setReport({ issues: [], changed: [] }); return; }
       const result = checkGraphics(made.items, made.env, { fix: true });
-      const redrawn = [];
-      for (const [i, g] of result.changed.entries()) {
-        const old = readEditor(useProjectStore.getState().project ?? project).motion.find((m) => m.id === g.id);
-        redrawn.push(await drawGraphic(project, dir, theme, { id: newGraphicId(), sceneId: g.sceneId, start: g.start, duration: g.duration, spec: g.spec, ...(old?.origin ? { origin: old.origin } : {}), ...(old?.colors ? { colors: old.colors } : {}) }, `Drawing the repaired graphic ${i + 1} of ${result.changed.length}`));
-      }
+      const live = readEditor(useProjectStore.getState().project ?? project).motion;
+      const redrawn = await runPool(result.changed, poolSize(navigator.hardwareConcurrency), (g, i) => {
+        const old = live.find((m) => m.id === g.id);
+        return drawGraphic(project, dir, theme, { id: newGraphicId(), sceneId: g.sceneId, start: g.start, duration: g.duration, spec: g.spec, ...(old?.origin ? { origin: old.origin } : {}), ...(old?.colors ? { colors: old.colors } : {}) }, `Drawing the repaired graphic ${i + 1} of ${result.changed.length}`);
+      });
       if (redrawn.length > 0) {
         const data = readEditor(useProjectStore.getState().project ?? project);
         const replaced = new Set(result.changed.map((g) => g.id));

@@ -165,3 +165,6 @@ Check by hand: click a block on the Graphics track (Motion tab opens with the in
 
 ### Motion graphics phase 11 (sounds for graphics)
 Check by hand: add a counter graphic and a sliding title; Audio tab > Sound effects: "Add soft sounds for motion graphics" is on, the SFX track shows a pop/whoosh at each graphic start and ticks for the counter; untick it and they vanish; edit or delete one cue; render and listen (quiet, no sound when graphics leave).
+
+### Motion graphics phase 12 (cache and parallel drawing)
+Check by hand: make graphics with the AI director (several are drawn at once); edit a text and change it back (the second draw is instant); Settings > Graphics cache shows a count and size; Clear cache empties it and graphics already in the project still render.

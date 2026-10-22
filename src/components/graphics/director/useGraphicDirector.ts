@@ -5,6 +5,7 @@ import { isCancelled, toAppError } from "../../../lib/errors";
 import { readEditor } from "../../../lib/editor/model";
 import { buildPlaceIndex, detectTriggers, directGraphics, fallbackFor, type DirectorScene, type Placed, type TimedWord } from "../../../lib/graphics/director";
 import { kitSummary, type BrandKit, type Density } from "../../../lib/graphics/brand";
+import { poolSize, runPool } from "../../../lib/graphics/cache";
 import { presetExamples, readPresets } from "../../../lib/graphics/editing";
 import { captionZone, placeAll, safeArea } from "../../../lib/graphics/placement";
 import { loadCities } from "../../../lib/graphics/geo/cities";
@@ -101,16 +102,20 @@ export function useGraphicDirector(project: Project, dir: string | null, kit: Br
       const placed: Placed[] = placing.placed;
       setNotes([...(finder.note ? [finder.note] : []), ...placing.notes.filter((n) => n.action !== "kept").map((n) => `${n.sceneId}: ${n.reason}.`)]);
       if (result.failed) setError(toAppError(result.failed.error, "The AI could not be reached. Graphics made before that are kept."));
-      for (const [i, p] of placed.entries()) {
-        const id = newGraphicId();
+      // Several graphics are drawn at the same time (half of the cores, 1 to 4); the order of the list is kept.
+      let cancelledRun: unknown = null;
+      const drawn = await runPool(placed, poolSize(navigator.hardwareConcurrency), async (p, i) => {
         try {
-          made.push(await drawGraphic(project, dir, theme, { id, sceneId: p.sceneId, start: p.start, duration: p.duration, spec: p.spec, origin: "director" }, `Drawing graphic ${i + 1} of ${placed.length}`));
+          const entry = await drawGraphic(project, dir, theme, { id: newGraphicId(), sceneId: p.sceneId, start: p.start, duration: p.duration, spec: p.spec, origin: "director" }, `Drawing graphic ${i + 1} of ${placed.length}`);
           processed.add(p.sceneId);
+          return entry;
         } catch (e) {
-          if (isCancelled(e)) throw e;
+          if (isCancelled(e)) { cancelledRun = e; throw e; }
           setError(toAppError(e, "A graphic could not be drawn."));
+          return null;
         }
-      }
+      }).catch((e: unknown) => { throw cancelledRun ?? e; });
+      for (const entry of drawn) if (entry) made.push(entry);
       const fallbacks = placed.filter((p) => p.source === "fallback").length;
       complete = !result.failed && made.length === placed.length;
       note = `${made.length} graphic${made.length === 1 ? "" : "s"} added${fallbacks > 0 ? ` (${fallbacks} simple one${fallbacks === 1 ? "" : "s"} because the AI's answer could not be used)` : ""}. ${result.skipped.length} scene${result.skipped.length === 1 ? "" : "s"} left clean.`;

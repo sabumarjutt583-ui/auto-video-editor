@@ -1,4 +1,5 @@
 import { ShieldCheck } from "lucide-react";
+import { GraphicCacheCard } from "../components/graphics/cache/GraphicCacheCard";
 import { useEffect } from "react";
 
 import { ErrorNotice } from "../components/ErrorNotice";
@@ -79,6 +80,7 @@ export function SettingsPage() {
           <FallbackCard settings={settings} onChange={update} />
           <DefaultsCard settings={settings} onChange={update} />
           <EncodingCard settings={settings} onChange={update} />
+          <GraphicCacheCard />
           <LibraryUrlCard settings={settings} onChange={update} />
           <AppUpdateCard settings={settings} onChange={update} />
           <SupportCard settings={settings} onChange={update} />

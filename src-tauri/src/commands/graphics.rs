@@ -1,7 +1,9 @@
 //! Transparent export of graphics drawn by the TypeScript renderer (see `graphics/export.rs`).
 
 use tauri::ipc::{InvokeBody, Request};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
+
+use crate::graphics::cache::{self, CacheInfo};
 
 use crate::commands::error::AppError;
 use crate::commands::projects::project_folder;
@@ -38,4 +40,39 @@ pub async fn graphic_export_finish(exports: State<'_, GraphicExports>, job_id: S
 pub async fn graphic_export_abort(exports: State<'_, GraphicExports>, job_id: String) -> Result<(), AppError> {
     exports.abort(&job_id).await;
     Ok(())
+}
+
+fn cache_dir(app: &AppHandle) -> Result<std::path::PathBuf, AppError> {
+    let folder = app.path().app_data_dir().map_err(|e| AppError::new("The app data folder could not be found.", e.to_string()))?;
+    Ok(folder.join("graphics-cache"))
+}
+
+/// A clip with this key from an earlier drawing, copied into the project as graphics/<id>/clip.mov. None = not cached.
+#[tauri::command]
+pub async fn graphic_cache_restore(app: AppHandle, project_id: String, graphic_id: String, key: String) -> Result<Option<GraphicClip>, AppError> {
+    let (dir, cache) = (project_folder(&app, &project_id)?, cache_dir(&app)?);
+    tauri::async_runtime::spawn_blocking(move || cache::restore(&cache, &key, &dir, &graphic_id)).await.map_err(|e| AppError::new("The graphic cache stopped.", e.to_string()))?
+}
+
+/// Keeps a finished clip of the project in the cache (and trims the cache to 5 GB).
+#[tauri::command]
+pub async fn graphic_cache_store(app: AppHandle, project_id: String, graphic_id: String, key: String, frames: u32, width: u32, height: u32) -> Result<(), AppError> {
+    let (dir, cache) = (project_folder(&app, &project_id)?, cache_dir(&app)?);
+    let clip = GraphicClip { path: format!("graphics/{graphic_id}/clip.mov"), frames, width, height, size_bytes: 0 };
+    if !crate::graphics::export::valid_graphic_id(&graphic_id) {
+        return Err(AppError::new("The graphic has a wrong name.", format!("graphic id = {graphic_id:?}")));
+    }
+    tauri::async_runtime::spawn_blocking(move || cache::store(&cache, &key, &dir, &clip, cache::LIMIT_BYTES)).await.map_err(|e| AppError::new("The graphic cache stopped.", e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn graphic_cache_info(app: AppHandle) -> Result<CacheInfo, AppError> {
+    let cache = cache_dir(&app)?;
+    tauri::async_runtime::spawn_blocking(move || cache::info(&cache)).await.map_err(|e| AppError::new("The graphic cache stopped.", e.to_string()))
+}
+
+#[tauri::command]
+pub async fn graphic_cache_clear(app: AppHandle) -> Result<(), AppError> {
+    let cache = cache_dir(&app)?;
+    tauri::async_runtime::spawn_blocking(move || cache::clear(&cache)).await.map_err(|e| AppError::new("The graphic cache stopped.", e.to_string()))?
 }
