@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import { copyText } from "../../lib/clipboard";
 import { applyManualAnswer, planManual, type ManualStep } from "../../lib/prompts/chat/manual";
+import { withoutDeleted } from "../../lib/prompts/delete";
 import type { PromptContext } from "../../lib/prompts/generate";
 import type { Scene } from "../../types";
 import { Button, Card } from "../ui";
@@ -14,6 +15,8 @@ interface ManualPanelProps {
   batchSize: number;
   /** Stores the scenes after an answer was used. */
   onScenes: (scenes: Scene[]) => void;
+  /** Scenes whose prompt the person deleted: a pasted answer must not bring them back. */
+  deleted?: ReadonlySet<string>;
 }
 
 interface StepState {
@@ -26,7 +29,7 @@ interface StepState {
 const EMPTY: StepState = { answer: "", note: "", followUp: null, done: false };
 
 /** Manual mode: the messages to copy into any AI chat, and a box to paste each answer back. No browser, account or key needed. */
-export function ManualPanel({ scenes, context, tag, batchSize, onScenes }: ManualPanelProps) {
+export function ManualPanel({ scenes, context, tag, batchSize, onScenes, deleted }: ManualPanelProps) {
   const [steps, setSteps] = useState<ManualStep[] | null>(null);
   const [state, setState] = useState<Record<string, StepState>>({});
   const [copied, setCopied] = useState<string | null>(null);
@@ -59,7 +62,7 @@ export function ManualPanel({ scenes, context, tag, batchSize, onScenes }: Manua
       patch(step.id, { note: "No JSON list was found in this answer. Copy the whole answer of the AI, including the ```json block.", done: false });
       return;
     }
-    if (result.applied.length > 0) onScenes(result.scenes);
+    if (result.applied.length > 0) onScenes(withoutDeleted(result.scenes, scenes, deleted ?? new Set()));
     const notes = [`${result.applied.length} prompts were used.`];
     if (result.missing.length > 0) notes.push(`Missing: ${result.missing.join(", ")}. Copy the follow-up message below and paste the new answer here.`);
     if (result.extra.length > 0) notes.push(`Not part of this batch (ignored): ${result.extra.join(", ")}.`);

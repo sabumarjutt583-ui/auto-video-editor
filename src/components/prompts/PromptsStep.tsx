@@ -1,5 +1,5 @@
 import { Sparkles, Wand2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { copyText } from "../../lib/clipboard";
@@ -25,9 +25,10 @@ import { ExportBar } from "./ExportBar";
 import { OptionsCard } from "./OptionsCard";
 import { PromptRow } from "./PromptRow";
 import { ManualPanel } from "./ManualPanel";
+import { clearPrompts, restorePrompts, withoutDeleted, type RemovedPrompt } from "../../lib/prompts/delete";
 import { EngineSwitch } from "../quick/EngineSwitch";
 
-type Ask = "all" | null;
+type Ask = "all" | "clear" | null;
 
 /** Step 5 of the Prompt Generator: write, edit and export the prompts. */
 export function PromptsStep({ project, quick = false }: { project: Project; quick?: boolean }) {
@@ -48,6 +49,10 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
   const [ask, setAsk] = useState<Ask>(null);
   const [copied, setCopied] = useState(false);
   const [running, setRunning] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [undo, setUndo] = useState<{ removed: RemovedPrompt[]; count: number } | null>(null);
+  const deletedRef = useRef<Set<string>>(new Set());
+  const undoTimer = useRef<number | null>(null);
 
   useEffect(() => {
     if (!stylesLoaded) void useStyleStore.getState().load();
@@ -76,6 +81,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
       setNotice(null);
       setAsk(null);
       setRunning(true);
+      deletedRef.current = new Set();
       try {
         const viaChat = appSettings?.textViaChat === true;
         const result = await runJob("ai", "Writing prompts with Gemini", async (jobId) => {
@@ -91,7 +97,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
               thread: loadThread(project.id),
               onThread: (thread) => saveThread(project.id, thread),
               onBatch: ({ batch: number, total, account }) => setBatch({ number, total, account }),
-              onScenes: (next) => update({ scenes: next }),
+              onScenes: (next) => update({ scenes: withoutDeleted(next, useProjectStore.getState().project?.scenes ?? next, deletedRef.current) }),
             });
             return { scenes: chatResult.scenes, failed: chatResult.failed ? { batch: chatResult.failed.batch, error: chatResult.failed.error } : null };
           }
@@ -102,10 +108,10 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
             resendOnError: !appSettings?.textViaChat,
             call: async (system, prompt) => (await generateText(prompt, system, true, jobId)).text,
             onBatch: (number, total) => setBatch({ number, total }),
-            onScenes: (next) => update({ scenes: next }),
+            onScenes: (next) => update({ scenes: withoutDeleted(next, useProjectStore.getState().project?.scenes ?? next, deletedRef.current) }),
           });
         });
-        update({ scenes: result.scenes });
+        update({ scenes: withoutDeleted(result.scenes, useProjectStore.getState().project?.scenes ?? result.scenes, deletedRef.current) });
         if (result.failed) {
           setError(toAppError(result.failed.error, `Batch ${result.failed.batch} failed. The earlier batches were kept.`));
         }
@@ -122,6 +128,27 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
 
   const generateMissing = () => void run(new Set(scenes.filter((s) => s.prompt.trim() === "" && !s.edited).map((s) => s.id)));
   const regenerateAll = (keepEdited: boolean) => void run(new Set(scenes.filter((s) => !(keepEdited && s.edited)).map((s) => s.id)));
+
+  function deletePrompts(ids: ReadonlySet<string> | null) {
+    const current = useProjectStore.getState().project?.scenes ?? scenes;
+    const { scenes: next, removed } = clearPrompts(current, ids);
+    if (removed.length === 0) return;
+    for (const r of removed) deletedRef.current.add(r.id);
+    update({ scenes: next });
+    setSelected(new Set());
+    setAsk(null);
+    setUndo({ removed, count: removed.length });
+    if (undoTimer.current !== null) window.clearTimeout(undoTimer.current);
+    undoTimer.current = window.setTimeout(() => setUndo(null), 10_000);
+  }
+
+  function undoDelete() {
+    if (!undo) return;
+    const current = useProjectStore.getState().project?.scenes ?? scenes;
+    for (const r of undo.removed) deletedRef.current.delete(r.id);
+    update({ scenes: restorePrompts(current, undo.removed) });
+    setUndo(null);
+  }
 
   const patch = (id: string, change: Partial<Scene>) => update({ scenes: scenes.map((s) => (s.id === id ? { ...s, ...change } : s)) });
 
@@ -181,7 +208,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
       <OptionsCard project={project} style={style} onSettings={setSettings} onAspect={setAspect} />
 
       {!quick && <EngineSwitch />}
-      {manual && <ManualPanel scenes={scenes} context={context} tag={project.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "P"} batchSize={Math.min(25, Math.max(5, appSettings?.chatBatchSize ?? 20))} onScenes={(next) => update({ scenes: next })} />}
+      {manual && <ManualPanel scenes={scenes} context={context} tag={project.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "P"} batchSize={Math.min(25, Math.max(5, appSettings?.chatBatchSize ?? 20))} onScenes={(next) => update({ scenes: next })} deleted={deletedRef.current} />}
 
       <div className={manual ? "hidden" : "flex flex-wrap items-center gap-2"}>
         <Button variant="primary" icon={Sparkles} disabled={busy || !context || missing === 0} onClick={generateMissing}>
@@ -194,6 +221,9 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
         >
           Regenerate all
         </Button>
+        <Button variant="danger" disabled={busy || !hasPrompts} onClick={() => setAsk("clear")}>
+          Clear all prompts
+        </Button>
         <Button disabled={busy || !context || !hasPrompts} onClick={applyOptions}>
           Apply new options
         </Button>
@@ -201,6 +231,18 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
           {written} of {scenes.length} scenes have a prompt
         </span>
       </div>
+
+      {ask === "clear" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/40 bg-warning/10 px-5 py-4" role="alertdialog" aria-label="Clear all prompts">
+          <p className="text-sm">Delete all {written} prompts? Your script, scenes and settings stay. You can undo for 10 seconds.</p>
+          <div className="flex gap-2">
+            <Button onClick={() => setAsk(null)}>Cancel</Button>
+            <Button variant="danger" onClick={() => deletePrompts(null)}>
+              Delete all prompts
+            </Button>
+          </div>
+        </div>
+      )}
 
       {ask === "all" && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/40 bg-warning/10 px-5 py-4" role="alertdialog" aria-label="Regenerate all prompts">
@@ -227,6 +269,13 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
         </div>
       )}
 
+      {undo && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm" role="status">
+          <span>{undo.count} {undo.count === 1 ? "prompt" : "prompts"} deleted.</span>
+          <Button onClick={undoDelete}>Undo</Button>
+        </div>
+      )}
+
       <Card title="Prompts" description="Every prompt starts with its ID (timecode) when copied or exported, and prompts are separated by empty lines. Edit any text; edited rows are kept when you regenerate.">
         <ExportBar
           disabled={!hasPrompts}
@@ -240,6 +289,15 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
           onIncludeIds={(on) => updateAppSettings({ exportIncludeIds: on })}
           hideSend={quick}
         />
+        {selected.size > 0 && (
+          <div className="flex items-center gap-2 text-sm">
+            <span>{selected.size} selected</span>
+            <Button variant="danger" disabled={busy} onClick={() => deletePrompts(selected)}>
+              Delete selected
+            </Button>
+            <Button onClick={() => setSelected(new Set())}>Clear selection</Button>
+          </div>
+        )}
         <ul className="flex flex-col gap-2" aria-label="Prompts">
           {scenes.map((scene) => (
             <PromptRow
@@ -251,6 +309,9 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
               onMotion={(text) => patch(scene.id, { motionPrompt: text, edited: true })}
               onRegenerate={() => void run(new Set([scene.id]))}
               onCopy={() => void copyText(copyBlock(scene, withMotion, includeIds))}
+              selected={selected.has(scene.id)}
+              onSelect={(on) => setSelected((s) => { const n = new Set(s); if (on) n.add(scene.id); else n.delete(scene.id); return n; })}
+              onDelete={() => deletePrompts(new Set([scene.id]))}
             />
           ))}
         </ul>

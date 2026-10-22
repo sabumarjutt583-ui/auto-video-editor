@@ -1,4 +1,4 @@
-import { Clapperboard, Copy, Image as ImageIcon, Pencil, RefreshCw } from "lucide-react";
+import { Clapperboard, Copy, Image as ImageIcon, Pencil, RefreshCw, Trash2 } from "lucide-react";
 
 import { timecodeOf } from "../../lib/prompts/export";
 import type { Scene } from "../../types";
@@ -15,16 +15,22 @@ interface PromptRowProps {
   onMotion: (text: string) => void;
   onRegenerate: () => void;
   onCopy: () => void;
+  selected?: boolean;
+  onSelect?: (on: boolean) => void;
+  onDelete?: () => void;
 }
 
 /** One scene: timecode ID, length, media, narration, editable prompt and motion. */
-export function PromptRow({ scene, showMotion, busy, onPrompt, onMotion, onRegenerate, onCopy }: PromptRowProps) {
+export function PromptRow({ scene, showMotion, busy, onPrompt, onMotion, onRegenerate, onCopy, selected = false, onSelect, onDelete }: PromptRowProps) {
   const MediaIcon = scene.mediaType === "video" ? Clapperboard : ImageIcon;
   return (
     <li className="rounded-xl border border-line bg-surface-2 p-3" data-testid="prompt-row">
       <div className="grid grid-cols-[minmax(11rem,13rem)_1fr_auto] items-start gap-3">
         <div className="flex flex-col gap-1">
-          <span className="font-mono text-xs tabular-nums">{timecodeOf(scene)}</span>
+          <span className="flex items-center gap-2 font-mono text-xs tabular-nums">
+            {onSelect && <input type="checkbox" aria-label={`Select ${scene.id}`} className="h-4 w-4 cursor-pointer accent-accent" checked={selected} onChange={(event) => onSelect(event.target.checked)} />}
+            {timecodeOf(scene)}
+          </span>
           <span className="flex items-center gap-1.5 text-xs text-muted">
             <MediaIcon size={13} aria-label={scene.mediaType} />
             {scene.duration > 0 && `${scene.duration.toFixed(1)} s`}
@@ -58,6 +64,7 @@ export function PromptRow({ scene, showMotion, busy, onPrompt, onMotion, onRegen
         </div>
         <div className="flex gap-1">
           <IconButton icon={RefreshCw} label={`Regenerate ${scene.id}`} disabled={busy} onClick={onRegenerate} />
+          {onDelete && <IconButton icon={Trash2} label={`Delete prompt ${scene.id}`} disabled={busy || scene.prompt.trim() === ""} onClick={onDelete} />}
           <IconButton icon={Copy} label={`Copy ${scene.id}`} disabled={scene.prompt.trim() === ""} onClick={onCopy} />
         </div>
       </div>

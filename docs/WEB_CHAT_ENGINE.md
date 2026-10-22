@@ -90,3 +90,8 @@ copy-paste mode (6).
   reminder block); `applyManualAnswer` parses (code block, plain JSON, words around it), verifies/repairs like the web
   engine, and reports missing / extra ids with a follow-up message for the missing ones.
 - UI: src/components/prompts/ManualPanel.tsx (Copy button, Paste answer box, Use answer per message).
+
+## Part 7: delete prompts (done)
+- Prompts step: "Clear all prompts" (confirmation, keeps script/scenes/settings), a Delete button per row, row
+  checkboxes + "Delete selected", and a 10-second Undo bar. Logic: src/lib/prompts/delete.ts (+delete.test.ts).
+- A prompt deleted while an answer is on its way (or while a manual batch is pending) is not brought back by it.
