@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-22
+
 ### Added
 - Custom styles from reference pictures: Style Gallery > My Styles > Create style. Give a name and 3 or 4 pictures (PNG, JPG, WebP, up to 10 MB, drag and drop), optionally a few words about the look, and press "Analyze with AI". Gemini (your key), OpenAI (your key, new optional key in Settings with its own model setting) or Gemini's web chat (Google accounts, pictures uploaded through the page's own upload) writes the full style profile from what the pictures have in common. The result is checked with the same rules as `npm run styles:check`; if it breaks any, the AI is asked once more with the list of problems, then the remaining errors are shown. Review screen: every field editable, Regenerate, and Test style (3 sample prompts, shows whether each ends with the style lock). The style is saved with its pictures (so it can be re-analyzed), its thumbnail is made from the first picture, and it works everywhere like any other style.
 - My Styles: Edit, Duplicate, Re-analyze, Delete, Export and Import. Export writes one `.avstyle` file (a zip with the profile, notes and pictures); Import adds it as a new style and never replaces one.
