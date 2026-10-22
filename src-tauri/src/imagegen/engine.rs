@@ -651,7 +651,7 @@ impl Engine {
                 run.storage_retry_at = now + tuning.storage_retry_ms;
             }
             ErrorKind::Blocked | ErrorKind::BadRequest => fail = true,
-            ErrorKind::Timeout | ErrorKind::NoImage | ErrorKind::Server | ErrorKind::Unknown => {
+            ErrorKind::Timeout | ErrorKind::NoImage | ErrorKind::Server | ErrorKind::Unknown | ErrorKind::NoResponse | ErrorKind::ResponseTimeout | ErrorKind::SoftFailure | ErrorKind::InvalidJson | ErrorKind::MissingIds | ErrorKind::PageChanged => {
                 accounts.mark_failure(account, &error.message);
                 let used = job.attempts + 1;
                 options.count_attempt = true;

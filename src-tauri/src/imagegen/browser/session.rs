@@ -254,6 +254,12 @@ impl Session {
         shot["data"].as_str().and_then(crate::api::base64::decode).ok_or_else(|| session_error("no screenshot"))
     }
 
+    /// A JPEG of an extra tab (for failure reports).
+    pub async fn snapshot_tab(&self, tab: &Tab) -> Result<Vec<u8>, CdpError> {
+        let shot = self.cdp.call("Page.captureScreenshot", json!({ "format": "jpeg", "quality": 50 }), Some(&tab.frame.session)).await?;
+        shot["data"].as_str().and_then(crate::api::base64::decode).ok_or_else(|| session_error("no screenshot"))
+    }
+
     /// Brings the window to the front (only a normal window has one).
     pub async fn show(&self) -> Result<(), CdpError> {
         self.set_window_state("normal").await?;

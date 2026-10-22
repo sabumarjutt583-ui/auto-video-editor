@@ -1,5 +1,5 @@
 {
-  "configVersion": "1.2",
+  "configVersion": "1.3",
   "toolUrl": "https://share.gemini.google/rqUWVwvowbjG",
   "signInUrl": "https://accounts.google.com/ServiceLogin?continue={continueUrl}",
   "signInContinueUrl": "https://gemini.google.com/app",
@@ -43,14 +43,17 @@
       "responseText": "message-content",
       "codeBlock": "code-block pre",
       "done": "button[aria-label=\"Good response\"]",
+      "stop": "button[aria-label=\"Stop response\"]",
+      "thinking": "model-response .loading, .thinking-indicator",
       "attach": "button[aria-label=\"Open upload file menu\"]",
       "uploadItem": "button[data-test-id=\"local-images-files-uploader-button\"]",
       "fileInput": "input[type=\"file\"]",
       "attachment": "uploader-file-preview"
     },
-    "timing": { "pageReadyMs": 30000, "sendEnableMs": 8000, "replyStartMs": 25000, "pollMs": 700, "stableMs": 9000, "uploadMs": 45000 },
+    "timing": { "pageReadyMs": 30000, "sendEnableMs": 30000, "replyStartMs": 180000, "pollMs": 700, "stableMs": 9000, "uploadMs": 45000, "thinkMaxMs": 300000, "finishStableMs": 2000 },
     "limitTexts": ["reached your limit", "usage limit", "limit for today", "try again tomorrow", "come back later", "reached the limit"],
-    "errorTexts": ["something went wrong", "i'm having trouble", "couldn't complete"]
+    "errorTexts": ["something went wrong", "i'm having trouble", "couldn't complete"],
+    "softFailureTexts": ["encountering an error", "having a hard time fulfilling", "something else instead", "can't help with that", "cannot help with that"]
   },
   "errorPatterns": [
     { "contains": ["API Error 429"], "kind": "rate_limit", "message": "Usage limit reached for this Google account." },

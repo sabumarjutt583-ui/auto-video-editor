@@ -76,6 +76,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
             scenes: useProjectStore.getState().project?.scenes ?? scenes,
             targetIds,
             context,
+            resendOnError: !appSettings?.textViaChat,
             call: async (system, prompt) => (await generateText(prompt, system, true, jobId)).text,
             onBatch: (number, total) => setBatch({ number, total }),
             onScenes: (next) => update({ scenes: next }),
@@ -93,7 +94,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
         setBatch(null);
       }
     },
-    [context, scenes, update],
+    [context, scenes, update, appSettings?.textViaChat],
   );
 
   const generateMissing = () => void run(new Set(scenes.filter((s) => s.prompt.trim() === "" && !s.edited).map((s) => s.id)));

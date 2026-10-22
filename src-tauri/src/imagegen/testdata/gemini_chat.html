@@ -30,19 +30,26 @@
     var prompt = input.innerText.trim();
     if (!prompt) return;
     input.innerText = '';
+    var stop = document.createElement('button');
+    stop.setAttribute('aria-label', 'Stop response');
+    document.body.appendChild(stop);
     var response = document.createElement('model-response');
     var content = document.createElement('message-content');
     response.appendChild(content);
-    chat.appendChild(response);
+    var delay = prompt.indexOf('[think]') >= 0 ? 6000 : 0;
+    if (prompt.indexOf('[soft]') >= 0) { chat.appendChild(response); content.innerText = 'I seem to be encountering an error. Can I help with something else instead?'; stop.remove(); return; }
+    if (delay === 0) chat.appendChild(response);
     if (prompt.indexOf('[limit]') >= 0) {
       content.innerText = "You've reached your limit for today.";
       return;
     }
-    if (prompt.indexOf('[never]') >= 0) { response.remove(); return; }
+    if (prompt.indexOf('[never]') >= 0) { response.remove(); stop.remove(); return; }
     var files = previews.children.length;
     previews.innerHTML = '';
     var full = prompt.indexOf('[code]') >= 0 ? 'Here you go:' : (files > 0 ? 'Echo with ' + files + ' files: ' : 'Echo: ') + prompt;
     var i = 0;
+    window.__sends = (window.__sends || 0) + 1;
+    setTimeout(function () { if (delay) chat.appendChild(response);
     var timer = setInterval(function () {
       i += 6;
       content.innerText = full.slice(0, i);
@@ -55,6 +62,7 @@
           block.appendChild(pre);
           content.appendChild(block);
         }
+        stop.remove();
         if (prompt.indexOf('[nodone]') < 0) {
           var good = document.createElement('button');
           good.setAttribute('aria-label', 'Good response');
@@ -62,6 +70,7 @@
         }
       }
     }, 120);
+    }, delay);
   });
 </script>
 </body></html>

@@ -85,6 +85,8 @@ impl TestServer {
         config.chat.timing.page_ready_ms = 15_000;
         config.chat.timing.reply_start_ms = 4_000;
         config.chat.timing.stable_ms = 2_500;
+        config.chat.timing.finish_stable_ms = 800;
+        config.chat.timing.think_max_ms = 20_000;
         config
     }
 }

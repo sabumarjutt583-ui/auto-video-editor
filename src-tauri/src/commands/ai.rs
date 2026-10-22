@@ -39,9 +39,10 @@ pub async fn generate_text(
     if settings.text_via_chat {
         job.progress("Asking Gemini in the web chat", 5.0);
         let question = chat_question(system.as_deref(), &prompt, json);
+        let report = |msg: String| job.progress(&msg, 30.0);
         let reply = tokio::select! {
             () = job.cancelled() => return Err(AppError::cancelled()),
-            reply = ig.chat_ask(&question) => reply?,
+            reply = ig.chat_ask_progress(&question, &[], Some(&report)) => reply?,
         };
         let text = if json { json_from_reply(&reply).unwrap_or(reply.text) } else { reply.text };
         return Ok(TextAnswer { text, provider: "chat".into() });

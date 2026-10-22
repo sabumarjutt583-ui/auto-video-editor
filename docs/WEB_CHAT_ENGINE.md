@@ -44,3 +44,15 @@ opened, navigation, message inserted/sent, waiting, answer finished/failed, tab 
 See the task parts: hidden shared browser (2), reliable driver that never interrupts (3), one thread per project with
 setup + READY + batches with reminder block + verified prompts (4), user script + min scene length (5), manual
 copy-paste mode (6).
+
+## Part 3: the driver (done)
+- Started = Stop button OR a new answer element OR a thinking indicator (wait up to `replyStartMs`, now 180 s).
+- While Stop is visible the driver only waits (up to `thinkMaxMs` 300 s) and reports "Gemini is thinking... N s".
+- Finished = Stop gone and the text unchanged for `finishStableMs` (2 s). Without a Stop button ever seen, the old
+  careful rule (`stableMs` 9 s or the Good-response marker) is used.
+- Never refresh / navigate / open a new chat / resend while waiting. A failed call is not sent again by the app
+  when `textViaChat` is on (`resendOnError: false`).
+- Chat error kinds: `no_response`, `response_timeout`, `soft_failure`, `invalid_json`, `missing_ids`, `page_changed`
+  (plus the shared `rate_limit`, `auth`, `flagged`, `network`). Never `no_image`.
+- On failure a screenshot + short page summary go to the log folder (`webchat-fail-<time>.jpg/.txt`).
+- Selectors and timings: resources/image-engine/config.json `chat` block (configVersion 1.3).

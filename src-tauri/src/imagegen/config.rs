@@ -77,6 +77,10 @@ pub struct ChatSelectors {
     pub code_block: String,
     /// Appears under an answer only when it is finished.
     pub done: String,
+    /// The Stop button, visible while Gemini is generating.
+    pub stop: String,
+    /// A thinking / loading indicator (optional, may be empty).
+    pub thinking: String,
     /// The "+" button that opens the upload menu.
     pub attach: String,
     /// The menu entry that uploads files from the computer.
@@ -96,6 +100,8 @@ impl Default for ChatSelectors {
             response_text: "message-content".into(),
             code_block: "code-block pre".into(),
             done: "button[aria-label=\"Good response\"]".into(),
+            stop: "button[aria-label=\"Stop response\"]".into(),
+            thinking: "model-response .loading, .thinking-indicator".into(),
             attach: "button[aria-label=\"Open upload file menu\"]".into(),
             upload_item: "button[data-test-id=\"local-images-files-uploader-button\"]".into(),
             file_input: "input[type=\"file\"]".into(),
@@ -116,11 +122,15 @@ pub struct ChatTiming {
     pub stable_ms: u64,
     /// How long uploaded pictures may take to show up in the message box.
     pub upload_ms: u64,
+    /// While the Stop button is visible: the longest wait for the answer to finish.
+    pub think_max_ms: u64,
+    /// The answer text must stay unchanged this long (with Stop gone) to count as finished.
+    pub finish_stable_ms: u64,
 }
 
 impl Default for ChatTiming {
     fn default() -> Self {
-        Self { page_ready_ms: 30_000, send_enable_ms: 8_000, reply_start_ms: 25_000, poll_ms: 700, stable_ms: 9_000, upload_ms: 45_000 }
+        Self { page_ready_ms: 30_000, send_enable_ms: 30_000, reply_start_ms: 180_000, poll_ms: 700, stable_ms: 9_000, upload_ms: 45_000, think_max_ms: 300_000, finish_stable_ms: 2_000 }
     }
 }
 
@@ -135,6 +145,8 @@ pub struct ChatConfig {
     pub limit_texts: Vec<String>,
     /// Words in a short answer that mean Gemini failed.
     pub error_texts: Vec<String>,
+    /// Generic error / refusal replies that mean "this chat is broken, start a new one".
+    pub soft_failure_texts: Vec<String>,
 }
 
 impl Default for ChatConfig {
@@ -146,6 +158,7 @@ impl Default for ChatConfig {
             timing: ChatTiming::default(),
             limit_texts: words(&["reached your limit", "usage limit", "limit for today", "try again tomorrow", "come back later", "reached the limit"]),
             error_texts: words(&["something went wrong", "i'm having trouble", "couldn't complete"]),
+            soft_failure_texts: words(&["encountering an error", "having a hard time fulfilling", "something else instead", "can't help with that", "cannot help with that"]),
         }
     }
 }
@@ -302,7 +315,7 @@ mod tests {
         assert!(EngineConfig::parse("not json").is_err());
         let no_ratio = BUNDLED_JSON.replace("{ratio}", "16-9");
         assert!(EngineConfig::parse(&no_ratio).is_err());
-        let bad_version = BUNDLED_JSON.replace("\"1.2\"", "\"x\"");
+        let bad_version = BUNDLED_JSON.replace("\"1.3\"", "\"x\"");
         assert!(EngineConfig::parse(&bad_version).is_err());
     }
 

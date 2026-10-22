@@ -11,7 +11,7 @@ use tokio::sync::Notify;
 use super::accounts::Phase;
 use super::browser::locator;
 use super::browser::signin::{PlainWindow, WindowState};
-use super::chat::ChatReply;
+use super::chat::{self, ChatReply};
 use super::config::EngineConfig;
 use super::engine::{Engine, Generators, Sink};
 use super::errors::{ErrorKind, GenError};
@@ -97,6 +97,11 @@ impl ImageGen {
 
     /// Like `chat_ask`, with pictures (files on this computer) uploaded into the question.
     pub async fn chat_ask_images(&self, prompt: &str, images: &[std::path::PathBuf]) -> Result<ChatReply, AppError> {
+        self.chat_ask_progress(prompt, images, None).await
+    }
+
+    /// Like `chat_ask_images`, and reports what Gemini is doing ("Gemini is thinking... 42 s").
+    pub async fn chat_ask_progress(&self, prompt: &str, images: &[std::path::PathBuf], progress: chat::Progress<'_>) -> Result<ChatReply, AppError> {
         let settings = self.engine.settings();
         let config = self.engine.config();
         if !settings.consent_given(config.major().unwrap_or(1)) {
@@ -108,7 +113,7 @@ impl ImageGen {
         for _ in 0..attempts {
             let Some(id) = self.engine.with_accounts(|accounts, now| accounts.claim_chat(now)) else { break };
             let result = match self.real.worker(&id, &settings) {
-                Ok(worker) => worker.chat(prompt, images, timeout).await,
+                Ok(worker) => worker.chat_with(prompt, images, timeout, progress).await,
                 Err(error) => Err(error),
             };
             let error = match result {

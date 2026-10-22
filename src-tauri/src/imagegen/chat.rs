@@ -82,6 +82,12 @@ pub struct PageState {
     pub done: bool,
     pub has_input: bool,
     pub page_text: String,
+    /// The Stop button is visible: Gemini is generating.
+    pub stop_visible: bool,
+    /// A thinking / loading indicator is visible.
+    pub thinking: bool,
+    /// The message box is empty (our message left it).
+    pub input_empty: bool,
 }
 
 pub fn parse_state(value: &Value) -> PageState {
@@ -92,6 +98,9 @@ pub fn parse_state(value: &Value) -> PageState {
         done: value["done"].as_bool().unwrap_or(false),
         has_input: value["hasInput"].as_bool().unwrap_or(false),
         page_text: value["pageText"].as_str().unwrap_or_default().to_string(),
+        stop_visible: value["stop"].as_bool().unwrap_or(false),
+        thinking: value["thinking"].as_bool().unwrap_or(false),
+        input_empty: value["inputEmpty"].as_bool().unwrap_or(false),
     }
 }
 
@@ -99,6 +108,9 @@ pub fn parse_state(value: &Value) -> PageState {
 pub fn judge_answer(chat: &ChatConfig, text: &str, has_code: bool) -> Option<GenError> {
     if has_code || text.chars().count() > 400 {
         return None;
+    }
+    if contains_any(text, &chat.soft_failure_texts) {
+        return Some(GenError::new(ErrorKind::SoftFailure, "Gemini gave a generic error reply instead of an answer."));
     }
     if contains_any(text, &chat.limit_texts) {
         return Some(GenError::new(ErrorKind::RateLimit, "Gemini says the usage limit of this Google account is reached."));
@@ -112,12 +124,14 @@ pub fn judge_answer(chat: &ChatConfig, text: &str, has_code: bool) -> Option<Gen
 async fn read_state(session: &Session, tab: &Tab, chat: &ChatConfig) -> Result<PageState, GenError> {
     let s = &chat.selectors;
     let expression = format!(
-        "(function () {{ var q = function (x, r) {{ return (r || document).querySelector(x); }}; var all = document.querySelectorAll({response}); var last = all.length ? all[all.length - 1] : null; var textEl = last ? q({text}, last) : null; var codes = last ? Array.prototype.map.call(last.querySelectorAll({code}), function (e) {{ return e.innerText; }}) : []; return {{ answers: all.length, text: textEl ? textEl.innerText : (last ? last.innerText : ''), code: codes, done: !!q({done}), hasInput: !!q({input}), pageText: (document.body ? document.body.innerText : '').slice(0, 5000) }}; }})()",
+        "(function () {{ var q = function (x, r) {{ return (r || document).querySelector(x); }}; var all = document.querySelectorAll({response}); var last = all.length ? all[all.length - 1] : null; var textEl = last ? q({text}, last) : null; var codes = last ? Array.prototype.map.call(last.querySelectorAll({code}), function (e) {{ return e.innerText; }}) : []; return {{ answers: all.length, text: textEl ? textEl.innerText : (last ? last.innerText : ''), code: codes, done: !!q({done}), hasInput: !!q({input}), stop: !!q({stop}), thinking: {thinking_expr}, inputEmpty: (function () {{ var i = q({input}); return !!i && i.innerText.trim() === ''; }})(), pageText: (document.body ? document.body.innerText : '').slice(0, 5000) }}; }})()",
         response = js(&s.response),
         text = js(&s.response_text),
         code = js(&s.code_block),
         done = js(&s.done),
         input = js(&s.input),
+        stop = js(&s.stop),
+        thinking_expr = if s.thinking.trim().is_empty() { "false".to_string() } else { format!("!!q({})", js(&s.thinking)) },
     );
     session.eval_in(&tab.frame, &expression).await.map(|v| parse_state(&v)).map_err(|e| from_cdp(&e, "Reading the chat page"))
 }
@@ -135,7 +149,7 @@ async fn diagnose(session: &Session, tab: &Tab, engine: &EngineConfig, fallback:
             return limit;
         }
     }
-    GenError::new(ErrorKind::NoImage, fallback)
+    GenError::new(ErrorKind::PageChanged, fallback)
 }
 
 /// Waits for the message box to exist. The first thing on a fresh chat page.
@@ -167,42 +181,101 @@ async fn type_and_send(session: &Session, tab: &Tab, chat: &ChatConfig, prompt: 
             return Ok(());
         }
         if tokio::time::Instant::now() >= deadline {
-            return Err(GenError::new(ErrorKind::NoImage, "Gemini's Send button did not become available."));
+            return Err(GenError::new(ErrorKind::PageChanged, "Gemini's Send button did not become available. The page may have changed."));
         }
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
 }
 
-async fn wait_for_answer(session: &Session, tab: &Tab, engine: &EngineConfig, timeout: Duration) -> Result<PageState, GenError> {
+/// Reports what the chat is doing ("Gemini is thinking... 42 s").
+pub type Progress<'a> = Option<&'a (dyn Fn(String) + Send + Sync)>;
+
+/// Waits for the answer and NEVER interrupts it: no reload, no new chat, no second send.
+/// Started = Stop button, a new answer element or a thinking indicator (up to `reply_start_ms`).
+/// While Stop is visible only waiting happens (up to `think_max_ms`).
+/// Finished = Stop gone and the text unchanged for `finish_stable_ms`.
+async fn wait_for_answer(session: &Session, tab: &Tab, engine: &EngineConfig, timeout: Duration, answers_before: u32, progress: Progress<'_>) -> Result<PageState, GenError> {
     let chat = &engine.chat;
     let poll = Duration::from_millis(chat.timing.poll_ms);
-    let started_by = tokio::time::Instant::now() + Duration::from_millis(chat.timing.reply_start_ms);
-    let deadline = tokio::time::Instant::now() + timeout;
+    let began = tokio::time::Instant::now();
+    let start_by = began + Duration::from_millis(chat.timing.reply_start_ms);
+    let mut deadline = began + timeout.max(Duration::from_millis(chat.timing.think_max_ms));
+    let mut started_at: Option<tokio::time::Instant> = None;
     let mut last_text = String::new();
     let mut unchanged_since = tokio::time::Instant::now();
+    let mut last_report = 0u64;
+    let mut saw_stop = false;
     loop {
         let state = read_state(session, tab, chat).await?;
-        if state.answers == 0 {
-            if tokio::time::Instant::now() >= started_by {
-                logging::warn(LOG, &format!("wait: no answer element after {} ms (Gemini may still be thinking); giving up", chat.timing.reply_start_ms));
-                return Err(diagnose(session, tab, engine, "Gemini did not start an answer.").await);
+        saw_stop |= state.stop_visible;
+        let has_answer = state.answers > answers_before;
+        let started = state.stop_visible || has_answer || state.thinking;
+        if started && started_at.is_none() {
+            started_at = Some(tokio::time::Instant::now());
+            deadline = tokio::time::Instant::now() + Duration::from_millis(chat.timing.think_max_ms).max(timeout);
+            logging::info(LOG, &format!("wait: Gemini started after {} s (stop={}, answer={}, thinking={})", began.elapsed().as_secs(), state.stop_visible, has_answer, state.thinking));
+        }
+        let Some(started_at) = started_at else {
+            if tokio::time::Instant::now() >= start_by {
+                logging::warn(LOG, &format!("wait: no sign of an answer after {} s", chat.timing.reply_start_ms / 1000));
+                return Err(diagnose_kind(session, tab, engine, ErrorKind::NoResponse, "Gemini did not start an answer. Nothing was resent; please try again.").await);
             }
-        } else if !state.text.is_empty() || !state.code.is_empty() {
-            if state.done {
-                return Ok(state);
+            tokio::time::sleep(poll).await;
+            continue;
+        };
+        let secs = started_at.elapsed().as_secs();
+        if state.stop_visible && secs >= last_report + 5 {
+            last_report = secs;
+            if let Some(report) = progress {
+                report(format!("Gemini is thinking... {secs} s"));
             }
-            if state.text != last_text {
-                last_text = state.text.clone();
-                unchanged_since = tokio::time::Instant::now();
-            } else if unchanged_since.elapsed() >= Duration::from_millis(chat.timing.stable_ms) {
+        }
+        let text_ready = !state.text.is_empty() || !state.code.is_empty();
+        if state.text != last_text {
+            last_text = state.text.clone();
+            unchanged_since = tokio::time::Instant::now();
+        }
+        if !state.stop_visible && has_answer && text_ready {
+            let quiet = unchanged_since.elapsed();
+            // With a Stop button seen, "Stop gone + 2 s quiet" is enough. Without one (page changed), be more careful.
+            let needed = if saw_stop || state.done { chat.timing.finish_stable_ms } else { chat.timing.stable_ms.max(chat.timing.finish_stable_ms) };
+            if quiet >= Duration::from_millis(needed) {
+                logging::info(LOG, &format!("wait: finished after {} s, {} chars", began.elapsed().as_secs(), state.text.chars().count()));
                 return Ok(state);
             }
         }
         if tokio::time::Instant::now() >= deadline {
-            return Err(GenError::new(ErrorKind::Timeout, "Gemini took too long to answer."));
+            logging::warn(LOG, "wait: Gemini was still busy at the longest wait");
+            return Err(diagnose_kind(session, tab, engine, ErrorKind::ResponseTimeout, "Gemini took too long to answer. It was not interrupted or resent.").await);
         }
         tokio::time::sleep(poll).await;
     }
+}
+
+/// Saves a screenshot and a short page summary of a failed chat into the log folder.
+async fn save_failure_report(session: &Session, tab: &Tab, chat: &ChatConfig, kind: ErrorKind) {
+    let Some(dir) = logging::dir() else { return };
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let base = dir.join(format!("webchat-fail-{stamp}"));
+    if let Ok(jpeg) = session.snapshot_tab(tab).await {
+        let _ = std::fs::write(base.with_extension("jpg"), jpeg);
+    }
+    if let Ok(state) = read_state(session, tab, chat).await {
+        let summary = format!(
+            "kind: {kind:?}\nanswers: {}\nstop visible: {}\nthinking: {}\nhas input: {}\ninput empty: {}\nlast answer (start): {}\npage text (start): {}\n",
+            state.answers, state.stop_visible, state.thinking, state.has_input, state.input_empty,
+            clip(&state.text, 400), clip(&state.page_text, 600),
+        );
+        let _ = std::fs::write(base.with_extension("txt"), logging::redact(&summary));
+    }
+    logging::warn(LOG, &format!("failure report saved: {}", base.display()));
+}
+
+async fn diagnose_kind(session: &Session, tab: &Tab, engine: &EngineConfig, kind: ErrorKind, message: &str) -> GenError {
+    let error = diagnose(session, tab, engine, message).await;
+    let error = if error.kind == ErrorKind::PageChanged { GenError::new(kind, message) } else { error };
+    save_failure_report(session, tab, &engine.chat, error.kind).await;
+    error
 }
 
 /// The most pictures one question may carry.
@@ -210,7 +283,7 @@ pub const MAX_IMAGES: usize = 4;
 
 /// Asks one question in a fresh chat and returns the finished answer. The pictures (files on this computer) are uploaded into the message first,
 /// through the page's own upload button.
-pub async fn ask_with_images(session: &Session, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration) -> Result<ChatReply, GenError> {
+pub async fn ask_full(session: &Session, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration, progress: Progress<'_>) -> Result<ChatReply, GenError> {
     let prompt = prompt.trim();
     if prompt.is_empty() {
         return Err(GenError::new(ErrorKind::BadRequest, "The prompt is empty."));
@@ -223,7 +296,7 @@ pub async fn ask_with_images(session: &Session, engine: &EngineConfig, prompt: &
     }
     logging::info(LOG, &format!("ask: opening a new chat tab ({} chars, {} pictures, timeout {} s)", prompt.chars().count(), images.len(), timeout.as_secs()));
     let tab = session.open_tab().await.map_err(|e| from_cdp(&e, "Opening a chat tab"))?;
-    let result = ask_in(session, &tab, engine, prompt, images, timeout).await;
+    let result = ask_in(session, &tab, engine, prompt, images, timeout, progress).await;
     match &result {
         Ok(reply) => logging::info(LOG, &format!("ask: finished, answer {} chars, {} code blocks; closing the tab", reply.text.chars().count(), reply.code.len())),
         Err(error) => logging::warn(LOG, &format!("ask: failed ({:?}): {}; closing the tab", error.kind, error.message)),
@@ -299,7 +372,7 @@ async fn attach_images(session: &Session, tab: &Tab, engine: &EngineConfig, imag
     }
 }
 
-async fn ask_in(session: &Session, tab: &Tab, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration) -> Result<ChatReply, GenError> {
+async fn ask_in(session: &Session, tab: &Tab, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration, progress: Progress<'_>) -> Result<ChatReply, GenError> {
     let chat = &engine.chat;
     logging::info(LOG, &format!("step: navigate to {}", chat.url));
     session.navigate_tab(tab, &chat.url, Duration::from_millis(chat.timing.page_ready_ms)).await.map_err(|e| from_cdp(&e, "Opening Gemini's chat"))?;
@@ -308,9 +381,10 @@ async fn ask_in(session: &Session, tab: &Tab, engine: &EngineConfig, prompt: &st
         attach_images(session, tab, engine, images).await?;
     }
     logging::info(LOG, "step: message box ready; inserting text and pressing Send");
+    let before = read_state(session, tab, chat).await?.answers;
     type_and_send(session, tab, chat, prompt).await?;
     logging::info(LOG, "step: sent; waiting for the answer");
-    let state = wait_for_answer(session, tab, engine, timeout).await?;
+    let state = wait_for_answer(session, tab, engine, timeout, before, progress).await?;
     let code = if state.code.is_empty() { code_from_markdown(&state.text) } else { state.code.clone() };
     if let Some(error) = judge_answer(chat, &state.text, !code.is_empty()) {
         return Err(error);

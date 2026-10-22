@@ -58,6 +58,8 @@ export interface GenerateArgs {
   context: PromptContext;
   /** Sends one request to the AI and returns its text. Throws on failure. */
   call: (system: string, prompt: string) => Promise<string>;
+  /** false = a call that threw is not repeated (web chat). Default true. */
+  resendOnError?: boolean;
   /** Called before each batch with (batch number from 1, total). */
   onBatch?: (number: number, total: number) => void;
   /** Called after every batch with all scenes, so finished batches can be saved. */
@@ -101,6 +103,8 @@ export async function generatePrompts(args: GenerateArgs): Promise<GenerateResul
       } catch (error) {
         if (isCancelled(error)) throw error;
         lastError = error;
+        // A web chat may still be generating: a failed call is never sent again by itself.
+        if (args.resendOnError === false) break;
       }
     }
     if (!described) return { scenes, failed: { batch: b + 1, error: lastError } };

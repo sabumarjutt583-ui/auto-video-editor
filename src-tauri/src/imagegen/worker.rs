@@ -180,21 +180,26 @@ impl FreeWorker {
     }
 
     /// Asks Gemini's chat one question (a fresh chat in an extra tab of this account's browser).
+    #[cfg(test)]
     pub async fn chat(&self, prompt: &str, images: &[std::path::PathBuf], timeout: Duration) -> Result<ChatReply, GenError> {
+        self.chat_with(prompt, images, timeout, None).await
+    }
+
+    pub async fn chat_with(&self, prompt: &str, images: &[std::path::PathBuf], timeout: Duration, progress: chat::Progress<'_>) -> Result<ChatReply, GenError> {
         self.inner.chat_busy.fetch_add(1, Ordering::SeqCst);
-        let result = self.chat_inner(prompt, images, timeout).await;
+        let result = self.chat_inner(prompt, images, timeout, progress).await;
         self.inner.chat_busy.fetch_sub(1, Ordering::SeqCst);
         self.touch();
         result
     }
 
-    async fn chat_inner(&self, prompt: &str, images: &[std::path::PathBuf], timeout: Duration) -> Result<ChatReply, GenError> {
+    async fn chat_inner(&self, prompt: &str, images: &[std::path::PathBuf], timeout: Duration, progress: chat::Progress<'_>) -> Result<ChatReply, GenError> {
         let (session, _, _) = self.ready().await?;
         let _turn = self.inner.chat_lock.lock().await;
         if self.mode() == Mode::Window {
             let _ = session.minimize().await;
         }
-        let result = chat::ask_with_images(&session, &self.config().engine, prompt, images, timeout).await;
+        let result = chat::ask_full(&session, &self.config().engine, prompt, images, timeout, progress).await;
         if self.mode() == Mode::Window {
             // A normal window is only ever kept out of the way, never shown by the chat.
             let _ = session.minimize().await;

@@ -37,6 +37,18 @@ pub enum ErrorKind {
     /// Everything waits and the save is tried again; no attempt is used.
     Storage,
     Unknown,
+    /// Chat: Gemini never started an answer.
+    NoResponse,
+    /// Chat: Gemini was still thinking after the longest wait.
+    ResponseTimeout,
+    /// Chat: a generic error/refusal reply ("encountering an error").
+    SoftFailure,
+    /// Chat: the answer was not usable JSON.
+    InvalidJson,
+    /// Chat: the answer left out some scene ids.
+    MissingIds,
+    /// Chat: the page does not look like it should (selectors missing).
+    PageChanged,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -27,6 +27,11 @@ pub fn init(dir: PathBuf) {
     info("app", &format!("Auto Video Editor {} started on {}", env!("CARGO_PKG_VERSION"), std::env::consts::OS));
 }
 
+/// The log folder (None before `init`).
+pub fn dir() -> Option<&'static Path> {
+    DIR.get().map(PathBuf::as_path)
+}
+
 pub fn set_debug(on: bool) {
     DEBUG.store(on, Ordering::Relaxed);
 }

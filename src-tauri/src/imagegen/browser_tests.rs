@@ -268,11 +268,29 @@ async fn a_usage_limit_message_is_a_rate_limit_error() {
 async fn an_answer_that_never_starts_is_an_error_and_a_missing_done_marker_falls_back_to_stable_text() {
     let Some((worker, _server, dir)) = worker("chat-edge").await else { return };
     let error = worker.chat("[never] nothing", &[], Duration::from_secs(30)).await.expect_err("no answer");
+    assert_eq!(error.kind, ErrorKind::NoResponse, "never an image-engine error");
     assert_ne!(error.kind, ErrorKind::RateLimit);
     let reply = worker.chat("[nodone] still counts", &[], Duration::from_secs(30)).await.expect("stable text is finished");
     assert_eq!(reply.text, "Echo: [nodone] still counts");
     let empty = worker.chat("   ", &[], Duration::from_secs(5)).await.expect_err("empty prompt");
     assert_eq!(empty.kind, ErrorKind::BadRequest);
     worker.close().await;
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_slow_answer_with_the_stop_button_is_waited_for_and_never_interrupted() {
+    let Some((worker, _server, dir)) = worker("chat-think").await else { return };
+    // The answer element appears after 6 s, longer than the 4 s start window; Stop is visible meanwhile.
+    let reply = worker.chat("[think] slow one", &[], Duration::from_secs(60)).await.expect("waited");
+    assert!(reply.text.starts_with("Echo: [think] slow one"), "{}", reply.text);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_generic_error_reply_is_a_soft_failure() {
+    let Some((worker, _server, dir)) = worker("chat-soft").await else { return };
+    let error = worker.chat("[soft] hi", &[], Duration::from_secs(30)).await.expect_err("soft failure");
+    assert_eq!(error.kind, ErrorKind::SoftFailure);
     let _ = std::fs::remove_dir_all(dir);
 }
