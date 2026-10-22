@@ -161,3 +161,10 @@ test("readEditor keeps graphics drawn by the app and drops damaged ones", async 
   assert.equal(editor.motion[0]?.spec?.id, "g1");
   assert.equal(editor.motion[1]?.kind, undefined);
 });
+
+test("the brand kit choice of a project is read safely", () => {
+  assert.equal(readEditor({ editor: {} } as never).brandKitId, "");
+  assert.equal(readEditor({ editor: { brandKitId: "bold_news" } } as never).brandKitId, "bold_news");
+  assert.equal(readEditor({ editor: { brandKitId: 5 } } as never).brandKitId, "");
+  assert.equal(readEditor({ editor: { brandKitId: "x".repeat(61) } } as never).brandKitId, "");
+});

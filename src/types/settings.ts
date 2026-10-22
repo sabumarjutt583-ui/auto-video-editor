@@ -38,4 +38,8 @@ export interface AppSettings {
   debugLogging: boolean;
   /** The first-run screens were seen or skipped. */
   onboardingDone: boolean;
+  /** Brand kits the person made (any JSON; `repairBrandKit` reads them). */
+  brandKits: unknown[];
+  /** The brand kit of the app (built-in, suggested or custom id). */
+  brandKitId: string;
 }

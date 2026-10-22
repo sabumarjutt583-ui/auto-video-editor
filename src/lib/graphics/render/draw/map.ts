@@ -6,7 +6,7 @@ import { routePixels, trimPolylines } from "../../geo/route.ts";
 import { labelPoint } from "../../geo/topo.ts";
 import type { Area, Canvas2D } from "../context.ts";
 import { resolveColor } from "../theme.ts";
-import { type DrawEnv, phase, withAlpha, withLayerAlpha } from "./common.ts";
+import { cornerRadius, type DrawEnv, phase, withAlpha, withLayerAlpha } from "./common.ts";
 import { drawCountries, drawPin, drawRoutePieces } from "./geo.ts";
 import { drawLabel, textWidth } from "./label.ts";
 import { roundedRect } from "./path.ts";
@@ -41,7 +41,7 @@ export function drawMap(ctx: Canvas2D, layer: MapLayer, area: Area, env: DrawEnv
     return;
   }
   const local = timing.local;
-  const radius = Math.min(area.h * 0.05, 22);
+  const radius = cornerRadius(Math.min(area.h * 0.05, 22), rc);
   const unit = rc.height / 1080;
   const palette = highlightColors(env);
 

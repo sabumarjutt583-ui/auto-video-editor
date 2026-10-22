@@ -131,6 +131,16 @@ All 16 layer types now draw (src/lib/graphics/render/draw/): counter, barChart, 
 - Limits: charts take at most the values allowed in limits.ts; a chart with no positive pie values draws nothing; a missing flag or map data is reported as a note, not an error.
 - Tests: render/layers.test.ts (all types draw, determinism, formatting, camera, notes) and about 70 golden pictures (enter / hold / exit). The worker == page test is exact for most cases; for the map and the flag (clipped shapes) a page canvas and an OffscreenCanvas anti-alias the edge pixels a little differently (at most ~10 % of the pixels, edges only), while the worker equals an OffscreenCanvas on the page exactly.
 
+## 5g. Brand kit (phase 6)
+
+A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphics/brand/` (pure, Node-tested): `model.ts` (`BrandKit`, limits, bundled font choices), `repair.ts` (`repairBrandKit`: any input becomes a valid kit and every change is explained), `builtin.ts` (Clean Documentary, Bold News, Soft Story), `suggest.ts` (six more kits matched to the 51 visual styles: Monochrome for noir and sketches, Bright Pop for anime and cartoons, Neon Tech, Warm Vintage, Elegant Gold, Dark Mystery; `suggestKit(styleId)` gives the kit and the reason), `choose.ts` (`resolveKit`: the project's choice, then the app's, then Clean Documentary; `match-style` follows the project's visual style), `theme.ts` (`themeOfKit`: kit to the renderer's `Theme`, `kitSummary` for the AI in phase 7).
+- Kit fields: 7 colours (primary, secondary, accent, text, background, success, danger; `muted` is derived), fonts per script, corner roundness, line thickness, text-shadow strength, title weight (400/700) and case (as written / CAPITALS), default entrance and exit (preset + time), movement style (easing), logo path, graphic density (low/normal/high), safe margins.
+- The renderer reads the theme: cards, lower thirds and map panels use `theme.radius`, chart/timeline/shape lines use `theme.strokeWidth`, letters use `theme.shadow`, titles use `headingWeight`/`headingCase`, and `withThemeDefaults` (render/defaults.ts) gives layers that have no entrance/exit the kit's. The default theme keeps the old look exactly (no golden picture of phases 1-5 changed). Colour names `success` and `danger` are now valid in a GraphicSpec.
+- Where kits live: custom kits in the settings (`brandKits`, `brandKitId`; Rust `settings.rs` keeps them as JSON, at most 50 of 20 kB; the frontend repairs them when it reads them). The project's choice is `editor.brandKitId` ("" = the app's kit). The app has no "channel presets" yet, so kits are global to the app with a per-project choice.
+- UI: Auto Editor > Motion > "Brand kit": picker (app's kit, match the visual style, ready-made, made for a style, mine), four live sample pictures (lower third, counter, list, map), editor, save / save as copy / delete / "use for all projects". The preview and the export both draw with the chosen kit (the export worker gets the theme in its init message).
+- Limits and honest notes: only the bundled Noto fonts can be chosen (a typewriter or serif look needs a font file added to resources/fonts, which needs your OK); the logo is stored with the kit but no layer draws it yet; density and safe margins are used by the AI director (phase 7) and placement (phase 8); the kit used for a graphic is not stored with the graphic yet (phase 10 editing and phase 12 cache add it).
+- Tests: `src/lib/graphics/brand/brand.test.ts` (valid built-ins, readable text on every background, repair of broken values, every style has a kit, kit choice, theme, changing the kit changes fillStyle / fonts / letters / shadow / line width / default entrance in the drawn output) and six golden pictures `brand_*_sampler`.
+
 ## 6. Phase checklist (commit per phase)
 
 | Phase | Result | Commit message |
@@ -141,7 +151,7 @@ All 16 layer types now draw (src/lib/graphics/render/draw/): counter, barChart, 
 | 3 (done) | transparent export + composite + alpha tests | Motion graphics phase 3: transparent export and composite |
 | 4 (done) | icons, flags, maps | Motion graphics phase 4: icons, flags and maps |
 | 5 (done) | advanced layers | Motion graphics phase 5: advanced layers |
-| 6 | brand kit | Motion graphics phase 6: brand kit |
+| 6 (done) | brand kit | Motion graphics phase 6: brand kit |
 | 7 | AI graphics director | Motion graphics phase 7: AI graphics director |
 | 8 | placement | Motion graphics phase 8: smart placement |
 | 9 | quality checks | Motion graphics phase 9: quality checks |

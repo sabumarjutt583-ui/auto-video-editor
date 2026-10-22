@@ -80,7 +80,15 @@ pub struct Settings {
     pub debug_logging: bool,
     /// The first-run screens have been seen (or skipped).
     pub onboarding_done: bool,
+    /// The brand kits the person made (JSON objects; the frontend repairs them when it reads them).
+    pub brand_kits: Vec<serde_json::Value>,
+    /// The brand kit of the app: a built-in, suggested or custom kit id.
+    pub brand_kit_id: String,
 }
+
+/// Most brand kits a person can keep, and the size of one kit as JSON text.
+const MAX_BRAND_KITS: usize = 50;
+const MAX_BRAND_KIT_BYTES: usize = 20_000;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -106,6 +114,8 @@ impl Default for Settings {
             last_app_update_check: 0,
             debug_logging: false,
             onboarding_done: false,
+            brand_kits: Vec::new(),
+            brand_kit_id: "clean_documentary".to_string(),
         }
     }
 }
@@ -164,7 +174,16 @@ impl Settings {
         let mut recent_styles = clean_ids(&self.recent_styles, 6)?;
         recent_styles.truncate(6);
 
+        if self.brand_kits.len() > MAX_BRAND_KITS || self.brand_kits.iter().any(|kit| !kit.is_object() || kit.to_string().len() > MAX_BRAND_KIT_BYTES) {
+            return Err(invalid("A brand kit is not valid or there are too many of them."));
+        }
+        let brand_kit_id = self.brand_kit_id.trim().to_string();
+        if brand_kit_id.is_empty() || brand_kit_id.len() > 60 || brand_kit_id.contains(char::is_control) {
+            return Err(invalid("The brand kit id is not valid."));
+        }
+
         Ok(Self {
+            brand_kit_id,
             style_favorites,
             recent_styles,
             library_update_url,
@@ -245,6 +264,34 @@ mod tests {
         let folder = std::env::temp_dir().join(format!("ave-test-{name}-{}-{nanos}", std::process::id()));
         fs::create_dir_all(&folder).unwrap();
         folder
+    }
+
+    #[test]
+    fn brand_kits_are_kept_as_given_and_checked_for_size_and_shape() {
+        let mut settings = Settings::default();
+        assert_eq!(settings.brand_kit_id, "clean_documentary");
+        settings.brand_kits = vec![serde_json::json!({"id": "mine", "name": "Mine", "colors": {"primary": "#112233"}})];
+        settings.brand_kit_id = " mine ".to_string();
+        let ok = settings.clone().validated().unwrap();
+        assert_eq!(ok.brand_kit_id, "mine");
+        assert_eq!(ok.brand_kits.len(), 1);
+        // Old settings files without the fields still load.
+        let old: Settings = serde_json::from_str("{\"geminiModel\": \"gemini-3.8-flash\"}").unwrap();
+        assert!(old.brand_kits.is_empty());
+        assert_eq!(old.brand_kit_id, "clean_documentary");
+
+        let mut not_an_object = settings.clone();
+        not_an_object.brand_kits = vec![serde_json::json!("text")];
+        assert!(not_an_object.validated().is_err());
+        let mut too_many = settings.clone();
+        too_many.brand_kits = (0..51).map(|i| serde_json::json!({"id": format!("k{i}")})).collect();
+        assert!(too_many.validated().is_err());
+        let mut too_big = settings.clone();
+        too_big.brand_kits = vec![serde_json::json!({"name": "x".repeat(20_001)})];
+        assert!(too_big.validated().is_err());
+        let mut empty_id = settings;
+        empty_id.brand_kit_id = "  ".to_string();
+        assert!(empty_id.validated().is_err());
     }
 
     #[test]

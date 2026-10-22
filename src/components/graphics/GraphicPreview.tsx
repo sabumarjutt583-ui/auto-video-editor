@@ -6,6 +6,7 @@ import { flagCodesOf, loadFlagBitmaps } from "../../lib/graphics/library/flags";
 import { ensureIcons, iconRefsOf } from "../../lib/graphics/library/icons";
 import { loadGraphicFonts, previewContext, previewSize } from "../../lib/graphics/render/browser";
 import { FPS, frameCount, renderFrame, type RenderNote } from "../../lib/graphics/render";
+import type { Theme } from "../../lib/graphics/render/theme";
 import type { GraphicSpec } from "../../lib/graphics/spec";
 import { Button } from "../ui";
 
@@ -14,10 +15,12 @@ interface GraphicPreviewProps {
   aspect: "16:9" | "9:16" | "1:1";
   /** A picture of the scene to show behind the graphic (optional). */
   backgroundUrl?: string | null;
+  /** Colours, fonts and shapes (a brand kit as a theme). The standard look when missing. */
+  theme?: Theme;
 }
 
 /** Plays a graphic in real time over the scene picture, with play/pause and a scrub bar. Uses the same renderer as the export. */
-export function GraphicPreview({ spec, aspect, backgroundUrl }: GraphicPreviewProps) {
+export function GraphicPreview({ spec, aspect, backgroundUrl, theme }: GraphicPreviewProps) {
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const total = frameCount(spec.duration);
   const size = useMemo(() => previewSize(aspect), [aspect]);
@@ -71,9 +74,9 @@ export function GraphicPreview({ spec, aspect, backgroundUrl }: GraphicPreviewPr
     const element = canvas.current;
     const ctx = element?.getContext("2d");
     if (!element || !ctx || !fontsReady) return;
-    const report = renderFrame(spec, frame, ctx, previewContext(size.width, size.height, images, maps.current));
+    const report = renderFrame(spec, frame, ctx, previewContext(size.width, size.height, images, maps.current, theme));
     setNotes((old) => (old.length === report.notes.length && old.every((n, i) => n.message === report.notes[i]?.message) ? old : report.notes));
-  }, [spec, frame, size, images, fontsReady, resources]);
+  }, [spec, frame, size, images, fontsReady, resources, theme]);
 
   const seconds = (frame / FPS).toFixed(2);
   return (

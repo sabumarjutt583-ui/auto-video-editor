@@ -1,5 +1,6 @@
 import type { GraphicSpec, Layer } from "../spec/schema.ts";
 import { poseOf } from "./anim.ts";
+import { withThemeDefaults } from "./defaults.ts";
 import type { Area, Canvas2D, FrameReport, RenderContext, RenderNote } from "./context.ts";
 import { drawLowerThird, drawQuoteCard } from "./draw/cards.ts";
 import { drawChart } from "./draw/chart.ts";
@@ -92,7 +93,8 @@ function draw(spec: GraphicSpec, frame: number, ctx: Canvas2D, rc: RenderContext
   const note = (n: RenderNote): void => {
     if (!report.notes.some((x) => x.layerId === n.layerId && x.kind === n.kind)) report.notes.push(n);
   };
-  for (const layer of spec.layers) {
+  for (const original of spec.layers) {
+    const layer = withThemeDefaults(original, rc.theme);
     const timing = layerTiming(layer, spec.duration, t);
     if (!timing.visible) continue;
     const pose = poseOf(layer, timing, rc.width, rc.height);

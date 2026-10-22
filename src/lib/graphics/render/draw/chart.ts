@@ -2,7 +2,7 @@ import type { Layer } from "../../spec/schema.ts";
 import type { Area, Canvas2D, RenderContext } from "../context.ts";
 import { formatChartValue } from "../format.ts";
 import { resolveColor } from "../theme.ts";
-import { type DrawEnv, lerp, phase, withAlpha, withLayerAlpha } from "./common.ts";
+import { type DrawEnv, headingText, lerp, lineThickness, phase, withAlpha, withLayerAlpha } from "./common.ts";
 import { drawLabel, textWidth } from "./label.ts";
 import { roundedRect } from "./path.ts";
 
@@ -19,7 +19,7 @@ function drawTitle(ctx: Canvas2D, layer: ChartLayer, area: Area, env: DrawEnv): 
   if (!layer.title) return area;
   const h = Math.min(area.h * 0.14, env.rc.height * 0.075);
   withLayerAlpha(ctx, phase(env.timing.local, 0, 0.4), () => {
-    drawLabel(ctx, layer.title ?? "", { x: area.x, y: area.y, w: area.w, h }, { size: h / 1.25, weight: 700, color: resolveColor("text", env.rc.theme), align: "left", valign: "middle", shadow: true }, layer.id, env.rc, env.note);
+    drawLabel(ctx, headingText(layer.title ?? "", env.rc), { x: area.x, y: area.y, w: area.w, h }, { size: h / 1.25, weight: env.rc.theme.headingWeight, color: resolveColor("text", env.rc.theme), align: "left", valign: "middle", shadow: true }, layer.id, env.rc, env.note);
   });
   return { x: area.x, y: area.y + h * 1.25, w: area.w, h: area.h - h * 1.25 };
 }
@@ -142,7 +142,7 @@ function drawLineChart(ctx: Canvas2D, layer: ChartLayer, plot: Area, env: DrawEn
   let remaining = total * progress;
   const reached = cumulative.map((d) => d <= total * progress + 1e-6);
   ctx.save();
-  ctx.lineWidth = Math.max(2.5, rc.height * 0.008);
+  ctx.lineWidth = lineThickness(Math.max(2.5, rc.height * 0.008), rc);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.strokeStyle = color;

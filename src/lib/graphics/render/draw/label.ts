@@ -137,9 +137,9 @@ export function drawRuns(ctx: Canvas2D, runs: readonly Run[], area: Area, style:
   ctx.direction = layout.rtl ? "rtl" : "ltr";
   ctx.textBaseline = "middle";
   ctx.textAlign = layout.rtl ? "right" : "left";
-  if (style.shadow !== false) {
-    ctx.shadowColor = "rgba(0,0,0,0.45)";
-    ctx.shadowBlur = layout.size * 0.12;
+  if (style.shadow !== false && rc.theme.shadow > 0) {
+    ctx.shadowColor = `rgba(0,0,0,${rc.theme.shadow})`;
+    ctx.shadowBlur = layout.size * 0.12 * (rc.theme.shadow / 0.45);
     ctx.shadowOffsetY = layout.size * 0.04;
   }
   const total = layout.lines.reduce((n, line) => n + line.reduce((m, p) => m + graphemes(p.text).length, 0), 0);

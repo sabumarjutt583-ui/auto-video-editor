@@ -24,7 +24,7 @@ function file(name: string, extra: Partial<MediaFile> = {}): MediaFile {
 }
 
 function editorOf(media: MediaFile[]): EditorData {
-  return { media, motion: [], timeChoices: {}, placeholder: "hold", overrides: {}, captions: readCaptions(null), audio: readAudio(null), render: readRender(null) };
+  return { media, motion: [], timeChoices: {}, placeholder: "hold", overrides: {}, captions: readCaptions(null), audio: readAudio(null), render: readRender(null), brandKitId: "" };
 }
 
 test("file names: timecode, scene number, bare number, nothing", () => {
@@ -165,7 +165,7 @@ test("a gap is only reported between neighbouring scenes", () => {
 
 test("the editor data of an old or damaged project is repaired", () => {
   const empty = readEditor({ editor: null });
-  assert.deepEqual(empty, { media: [], motion: [], timeChoices: {}, placeholder: "hold", overrides: {}, captions: readCaptions(null), audio: readAudio(null), render: readRender(null) });
+  assert.deepEqual(empty, { media: [], motion: [], timeChoices: {}, placeholder: "hold", overrides: {}, captions: readCaptions(null), audio: readAudio(null), render: readRender(null), brandKitId: "" });
   const messy = readEditor({ editor: { media: [{ path: "media/a.png", name: "a.png", kind: "video", width: "x" }, 5, { nope: 1 }], placeholder: "nonsense", overrides: { S01: { kenBurns: "pan_left", speed: 7, transition: "bad" } }, timeChoices: { S01: "file", S02: "maybe" } } as never });
   assert.equal(messy.media.length, 1);
   assert.equal(messy.media[0]?.width, 0);

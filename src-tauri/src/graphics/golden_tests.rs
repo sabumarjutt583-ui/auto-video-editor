@@ -32,6 +32,9 @@ fn bundle() -> Option<PathBuf> {
     }
 }
 
+/// One browser at a time: several Chromium windows starting together make each other time out on a busy computer.
+static SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 async fn open() -> Option<(Session, PathBuf)> {
     let exe = test_browser().or_else(|| {
         eprintln!("skipped: no Chromium found (set AVE_TEST_CHROME)");
@@ -58,6 +61,7 @@ async fn open() -> Option<(Session, PathBuf)> {
 
 #[tokio::test]
 async fn every_case_matches_its_golden_image() {
+    let _serial = SERIAL.lock().await;
     let Some((session, work)) = open().await else { return };
     let update = std::env::var_os("UPDATE_GOLDEN").is_some();
     let dir = golden_dir();
@@ -102,6 +106,7 @@ async fn every_case_matches_its_golden_image() {
 
 #[tokio::test]
 async fn every_bundled_flag_decodes_and_draws() {
+    let _serial = SERIAL.lock().await;
     let Some((session, work)) = open().await else { return };
     let problems = session.eval("window.__graphics.flagProblems()").await.expect("flag check");
     assert_eq!(problems.as_array().map(|a| a.len()), Some(0), "flags that do not draw: {problems}");
@@ -111,6 +116,7 @@ async fn every_bundled_flag_decodes_and_draws() {
 
 #[tokio::test]
 async fn nothing_is_painted_outside_the_layers_and_notes_are_reported() {
+    let _serial = SERIAL.lock().await;
     let Some((session, work)) = open().await else { return };
     let list = session.eval("window.__graphics.cases()").await.expect("cases");
     let names: Vec<String> = list.as_array().unwrap().iter().map(|c| c["name"].as_str().unwrap().to_string()).collect();
@@ -129,6 +135,7 @@ async fn nothing_is_painted_outside_the_layers_and_notes_are_reported() {
 
 #[tokio::test]
 async fn the_export_worker_draws_exactly_the_same_pixels_as_the_preview() {
+    let _serial = SERIAL.lock().await;
     let Some((session, work)) = open().await else { return };
     let list = session.eval("window.__graphics.cases()").await.expect("cases");
     let names: Vec<String> = list.as_array().unwrap().iter().map(|c| c["name"].as_str().unwrap().to_string()).collect();
@@ -175,6 +182,7 @@ mod end_to_end {
         if !sidecars_for_tests() {
             return;
         }
+        let _serial = SERIAL.lock().await;
         let Some((session, work)) = open().await else { return };
         let list = session.eval("window.__graphics.cases()").await.unwrap();
         let names: Vec<String> = list.as_array().unwrap().iter().map(|c| c["name"].as_str().unwrap().to_string()).collect();
@@ -209,6 +217,7 @@ mod end_to_end {
         if !sidecars_for_tests() {
             return;
         }
+        let _serial = SERIAL.lock().await;
         let Some((session, work)) = open().await else { return };
         let list = session.eval("window.__graphics.cases()").await.unwrap();
         let names: Vec<String> = list.as_array().unwrap().iter().map(|c| c["name"].as_str().unwrap().to_string()).collect();

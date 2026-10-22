@@ -9,8 +9,8 @@ import {
   type Ctx, type Fail, type Infer, type Parser,
 } from "./parse.ts";
 
-const COLOR = /^(primary|secondary|accent|text|muted|background|#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?)$/;
-const color = opt(str({ max: 10, pattern: COLOR, expects: "must be a colour name (primary, secondary, accent, text, muted, background) or #RRGGBB" }));
+const COLOR = /^(primary|secondary|accent|text|muted|background|success|danger|#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?)$/;
+const color = opt(str({ max: 10, pattern: COLOR, expects: "must be a colour name (primary, secondary, accent, text, muted, background, success, danger) or #RRGGBB" }));
 const text = (max: number = LIMITS.maxTextChars) => str({ min: 1, max });
 const optText = (max: number = LIMITS.maxTextChars) => opt(str({ min: 1, max }));
 const unit = (def: number) => num({ min: 0, max: 1, def });

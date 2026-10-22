@@ -6,7 +6,7 @@ import { frameAt } from "../../lib/motion/request";
 import { requestCancel } from "../../store/jobStore";
 import type { MotionGraphic, Project, Scene } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
-import { GraphicLab, GraphicPreview, useGraphicExport } from "../graphics";
+import { BrandKitPanel, GraphicLab, GraphicPreview, useBrandKit, useGraphicExport } from "../graphics";
 import { Button, Checkbox, Field, TextInput } from "../ui";
 import type { MotionView } from "./useMotion";
 
@@ -43,7 +43,8 @@ function Preview({ dir, graphic }: { dir: string; graphic: MotionGraphic }) {
 /** Motion graphics written by the AI for the selected scene. */
 export function MotionPanel({ project, dir, graphics, scene, view, backgroundUrl }: MotionPanelProps) {
   const [idea, setIdea] = useState("");
-  const exporter = useGraphicExport(project, dir);
+  const brand = useBrandKit(project);
+  const exporter = useGraphicExport(project, dir, brand.theme);
   const busy = view.job !== null;
   const mine = scene ? graphics.filter((g) => g.sceneId === scene.id) : [];
   const others = graphics.filter((g) => g.sceneId !== scene?.id);
@@ -74,7 +75,7 @@ export function MotionPanel({ project, dir, graphics, scene, view, backgroundUrl
       {view.error && <ErrorNotice error={view.error} />}
       {[...mine, ...others].map((g) => (
         <div key={g.id} className="flex flex-col gap-2 rounded-xl border border-line bg-surface-2 p-3">
-          {g.kind === "spec" && g.spec ? <GraphicPreview spec={g.spec} aspect={project.settings.aspectRatio} backgroundUrl={backgroundUrl ?? null} /> : dir && g.frames > 0 && <Preview dir={dir} graphic={g} />}
+          {g.kind === "spec" && g.spec ? <GraphicPreview spec={g.spec} aspect={project.settings.aspectRatio} backgroundUrl={backgroundUrl ?? null} theme={brand.theme} /> : dir && g.frames > 0 && <Preview dir={dir} graphic={g} />}
           <div className="flex items-center justify-between text-xs text-muted">
             <span>{g.sceneId} · from {g.start.toFixed(1)} s · {g.duration.toFixed(1)} s{g.kind === "spec" ? " · drawn by the app" : g.idea ? ` · ${g.idea}` : ""}</span>
             <span className="flex gap-1">
@@ -89,7 +90,8 @@ export function MotionPanel({ project, dir, graphics, scene, view, backgroundUrl
         </div>
       ))}
       {graphics.length === 0 && !view.job && <p className="text-xs text-muted">No motion graphics yet.</p>}
-      <GraphicLab aspect={project.settings.aspectRatio} backgroundUrl={backgroundUrl ?? null} {...(scene ? { scene } : {})} exporter={exporter} />
+      <BrandKitPanel view={brand} />
+      <GraphicLab aspect={project.settings.aspectRatio} backgroundUrl={backgroundUrl ?? null} {...(scene ? { scene } : {})} exporter={exporter} theme={brand.theme} />
     </section>
   );
 }

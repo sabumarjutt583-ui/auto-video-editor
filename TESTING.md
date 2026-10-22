@@ -136,6 +136,10 @@ Manual checks (the screen itself was not run in the sandbox, and no real Gemini/
 
 `cargo test` 429 / `--features admin` 445 passed, no warnings; `npm run test:ts` 310 passed; `tsc` clean; `npm run build` ok (the drawing worker is a 13 kB asset). The automatic checklist above passes. The by-hand acceptance parts (section 3) were not repeated: they need the real app window. To check by hand after phase 3: Auto Editor > Motion > "Graphic preview (new engine)" > pick "Big number" > "Add to S01" > render: the graphic appears at the start of the scene, below the captions. Needs one try on Windows (WebView2) and macOS (WKWebView), because the raw IPC call and the Web Worker only exist inside the real webview.
 
+### Motion graphics, phase 6 (2026-10-22, Linux sandbox)
+
+`npm run test:ts` 351 passed (brand kit tests, project choice); `cargo test` 431 and `cargo test --features admin` 447 passed incl. 6 brand-kit golden pictures and the settings test; the Chromium golden tests now run one browser at a time (they timed out when several started together); `tsc`, `npm run build`, `cargo build` (also `--features admin`) 0 warnings. Check by hand: Auto Editor > Motion > "Brand kit": pick Bold News, the four samples change colour, corners and capital letters; change a colour and Save as my kit; "Match the visual style" picks Monochrome for the Noir style.
+
 ### Motion graphics, phase 5 (2026-10-22, Linux sandbox)
 
 `npm run test:ts` 339 passed (11 new layer tests); `cargo test` 430 and `cargo test --features admin` 446 passed incl. ~70 new golden pictures and the worker == page check (exact; map and flag within edge anti-aliasing); `npm run test:scripts` 9 passed; `tsc`, `npm run build`, `cargo build` (also `--features admin`) 0 warnings. Check by hand: Auto Editor > Motion > "Graphic preview (new engine)" > pick a chart, map or counter sample.

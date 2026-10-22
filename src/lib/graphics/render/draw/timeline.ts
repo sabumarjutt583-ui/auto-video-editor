@@ -1,7 +1,7 @@
 import type { Layer } from "../../spec/schema.ts";
 import type { Area, Canvas2D } from "../context.ts";
 import { resolveColor } from "../theme.ts";
-import { type DrawEnv, phase, withAlpha, withLayerAlpha } from "./common.ts";
+import { type DrawEnv, lineThickness, phase, withAlpha, withLayerAlpha } from "./common.ts";
 import { drawLabel } from "./label.ts";
 
 type TimelineLayer = Extract<Layer, { type: "timeline" }>;
@@ -18,7 +18,7 @@ export function drawTimeline(ctx: Canvas2D, layer: TimelineLayer, area: Area, en
   const dot = Math.max(5, Math.min(rc.height * 0.014, 14));
   const horizontal = layer.orientation === "horizontal";
   const along = (i: number): number => (n === 1 ? 0.5 : i / (n - 1));
-  const lineWidth = Math.max(3, rc.height * 0.007);
+  const lineWidth = lineThickness(Math.max(3, rc.height * 0.007), rc);
 
   if (horizontal) {
     const y = area.y + area.h / 2;

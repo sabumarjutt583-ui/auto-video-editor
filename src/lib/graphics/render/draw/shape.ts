@@ -1,6 +1,7 @@
 import type { Layer } from "../../spec/schema.ts";
 import type { Area, Canvas2D, RenderContext } from "../context.ts";
 import { resolveColor } from "../theme.ts";
+import { lineThickness } from "./common.ts";
 import { roundedRect } from "./path.ts";
 
 type ShapeLayer = Extract<Layer, { type: "shape" }>;
@@ -15,7 +16,7 @@ export function drawShape(ctx: Canvas2D, layer: ShapeLayer, area: Area, rc: Rend
     ctx.lineTo(area.x + area.w, area.y + area.h / 2);
     ctx.lineCap = "round";
     ctx.strokeStyle = stroke ?? fill ?? resolveColor("primary", rc.theme);
-    ctx.lineWidth = lineWidth > 0 ? lineWidth : Math.max(2, rc.height * 0.004);
+    ctx.lineWidth = lineWidth > 0 ? lineWidth : lineThickness(Math.max(2, rc.height * 0.004), rc);
     ctx.stroke();
     return;
   }

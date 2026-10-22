@@ -3,12 +3,16 @@ import type { GraphicSpec } from "../../spec/schema.ts";
 import { GEO_CASES, type GeoAssets } from "./geoCases.ts";
 import type { Canvas2D } from "../context.ts";
 import type { RenderOptions } from "../renderFrame.ts";
+import { BOLD_NEWS, CLEAN_DOCUMENTARY, SOFT_STORY, suggestKit, themeOfKit, type BrandKit } from "../../brand/index.ts";
+import type { Theme } from "../theme.ts";
 
 export interface GoldenCase {
   name: string;
   spec: GraphicSpec;
   frame: number;
   options?: RenderOptions;
+  /** Brand kit look (the default theme when missing). */
+  theme?: Theme;
   /** Draws the picture itself instead of `renderFrame` (maps and flags, whose layers come in phase 5). */
   custom?: (ctx: Canvas2D, width: number, height: number, assets: GeoAssets) => void;
 }
@@ -133,5 +137,19 @@ add("labels_devanagari_counter_hold", [timed({ id: "c", type: "counter", box: { 
 
 // Maps and flags are drawn by helpers (their layers come in phase 5); the spec is a placeholder.
 for (const item of GEO_CASES) cases.push({ name: item.name, spec: make(item.name, [text("map")]), frame: 0, custom: item.draw });
+
+// Brand kits: the same four sample graphics (lower third, counter, list, map) in each kit. They have no entrance of their own, so the
+// kit's default entrance runs; frame 60 (2 s) is fully in.
+const SAMPLER = [
+  { id: "lt", type: "lowerThird", box: { x: 0.04, y: 0.52, w: 0.46, h: 0.2 }, title: "Dr. Amina Khan", subtitle: "Climate scientist", icon: { set: "lucide", name: "users" } },
+  { id: "co", type: "counter", box: { x: 0.52, y: 0.06, w: 0.44, h: 0.4 }, from: 0, to: 1200000, format: "grouped", size: 0.2, label: "Total views" },
+  { id: "li", type: "list", box: { x: 0.04, y: 0.76, w: 0.5, h: 0.22 }, style: "checks", items: [{ text: "Fast" }, { text: "Clear" }] },
+  { id: "ma", type: "map", box: { x: 0.04, y: 0.04, w: 0.46, h: 0.44 }, region: "world", projection: "naturalEarth", countries: [{ code: "PK", label: "Pakistan" }], pins: [], routes: [], camera: [] },
+  { id: "ch", type: "chart", box: { x: 0.56, y: 0.5, w: 0.4, h: 0.46 }, kind: "bar", rows: [{ label: "A", value: 3 }, { label: "B", value: 5 }, { label: "C", value: 4 }] },
+];
+const kitCase = (kit: BrandKit): void => {
+  cases.push({ name: `brand_${kit.id}_sampler`, spec: make(`brand_${kit.id}`, SAMPLER, 3), frame: 60, theme: themeOfKit(kit) });
+};
+for (const kit of [CLEAN_DOCUMENTARY, BOLD_NEWS, SOFT_STORY, suggestKit("noir").kit, suggestKit("anime").kit, suggestKit("cyberpunk").kit]) kitCase(kit);
 
 export const GOLDEN_CASES: readonly GoldenCase[] = cases;

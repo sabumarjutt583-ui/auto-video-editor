@@ -1,5 +1,5 @@
 import { FONTS, type FontInfo } from "../../captions/fonts.ts";
-import { DEFAULT_THEME } from "../render/theme.ts";
+import { DEFAULT_THEME, type Theme } from "../render/theme.ts";
 import { detectScript, type Script } from "../render/script.ts";
 import type { GraphicSpec } from "../spec/schema.ts";
 
@@ -34,10 +34,10 @@ export function scriptsOf(spec: GraphicSpec): Script[] {
 }
 
 /** The bundled fonts a graphic needs: the main font of each script it uses, and Noto Sans as the fallback. */
-export function fontsFor(spec: GraphicSpec): FontInfo[] {
+export function fontsFor(spec: GraphicSpec, theme: Theme = DEFAULT_THEME): FontInfo[] {
   const wanted = new Set<string>(["Noto Sans"]);
   for (const script of scriptsOf(spec)) {
-    const first = /"([^"]+)"/.exec(DEFAULT_THEME.fonts[script]);
+    const first = /"([^"]+)"/.exec(theme.fonts[script]);
     if (first?.[1]) wanted.add(first[1]);
   }
   return FONTS.filter((font) => wanted.has(font.family));

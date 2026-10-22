@@ -10,7 +10,7 @@ import type { GeoAssets } from "./geoCases.ts";
 import type { Canvas2D, RenderContext } from "../context.ts";
 import { drawFlagPicture } from "../draw/geo.ts";
 import { renderFrame } from "../renderFrame.ts";
-import { DEFAULT_THEME } from "../theme.ts";
+import { DEFAULT_THEME, type Theme } from "../theme.ts";
 import { GOLDEN_CASES, GOLDEN_SIZE } from "./cases.ts";
 
 const FONT_FILES: ReadonlyArray<readonly [string, string, string]> = [
@@ -41,12 +41,12 @@ function testPicture(): HTMLCanvasElement {
 
 let assets: GeoAssets | null = null;
 
-function context(width: number, height: number): RenderContext {
+function context(width: number, height: number, theme: Theme = DEFAULT_THEME): RenderContext {
   const picture = testPicture();
   return {
     width,
     height,
-    theme: DEFAULT_THEME,
+    theme,
     image: (src) => (src === "test.png" ? picture : undefined),
     icon: iconShape,
     flag: (code) => assets?.flags.get(code.toUpperCase()),
@@ -75,7 +75,7 @@ function drawCase(index: number): { canvas: HTMLCanvasElement; ctx: CanvasRender
     item.custom(ctx as Canvas2D, canvas.width, canvas.height, assets);
     return { canvas, ctx, notes: [] };
   }
-  const report = renderFrame(item.spec, item.frame, ctx as Canvas2D, context(canvas.width, canvas.height), item.options);
+  const report = renderFrame(item.spec, item.frame, ctx as Canvas2D, context(canvas.width, canvas.height, item.theme), item.options);
   return { canvas, ctx, notes: report.notes.map((n) => `${n.layerId}:${n.kind}`) };
 }
 
@@ -194,14 +194,14 @@ const api = {
       };
       worker.onerror = (e) => reject(new Error(e.message));
     });
-    worker.postMessage({ type: "init", spec: item.spec, width, height, fonts, images: flags, icons: await iconsOfSpec(item.spec), maps: await mapDataOfSpec(item.spec) });
+    worker.postMessage({ type: "init", spec: item.spec, width, height, fonts, images: flags, icons: await iconsOfSpec(item.spec), maps: await mapDataOfSpec(item.spec), theme: item.theme ?? DEFAULT_THEME });
     await ready;
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) throw new Error("no 2d context");
-    const rc = context(width, height);
+    const rc = context(width, height, item.theme);
     const total = Math.round(item.spec.duration * 30);
     let identical = 0;
     let maxDiff = 0;

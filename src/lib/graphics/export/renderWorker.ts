@@ -3,7 +3,7 @@
 import type { MapData, MapResolution } from "../geo/mapData.ts";
 import type { IconShape, RenderContext } from "../render/context.ts";
 import { renderFrame } from "../render/renderFrame.ts";
-import { DEFAULT_THEME } from "../render/theme.ts";
+import type { Theme } from "../render/theme.ts";
 import type { GraphicSpec } from "../spec/schema.ts";
 
 export interface WorkerFont {
@@ -13,7 +13,7 @@ export interface WorkerFont {
 }
 
 export type ToWorker =
-  | { type: "init"; spec: GraphicSpec; width: number; height: number; fonts: WorkerFont[]; images: Record<string, ImageBitmap>; icons: Record<string, IconShape>; maps: Partial<Record<MapResolution, MapData>> }
+  | { type: "init"; spec: GraphicSpec; width: number; height: number; fonts: WorkerFont[]; images: Record<string, ImageBitmap>; icons: Record<string, IconShape>; maps: Partial<Record<MapResolution, MapData>>; theme: Theme }
   | { type: "frame"; n: number };
 
 export type FromWorker =
@@ -48,7 +48,7 @@ self.onmessage = async (event: MessageEvent<ToWorker>) => {
       const icons = message.icons;
       const maps = message.maps;
       rc = {
-        width: message.width, height: message.height, theme: DEFAULT_THEME,
+        width: message.width, height: message.height, theme: message.theme,
         image: (src) => images[src],
         icon: (set, name) => icons[`${set}:${name}`],
         flag: (code) => images[`flag:${code.toUpperCase()}`],

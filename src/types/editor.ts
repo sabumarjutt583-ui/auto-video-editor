@@ -214,6 +214,8 @@ export interface EditorData {
   captions: CaptionData;
   audio: AudioData;
   render: RenderData;
+  /** The brand kit of this project's graphics: a kit id, `match-style`, or empty = the app's kit (Settings). */
+  brandKitId: string;
 }
 
 /** What `scan_media` returns for one file (nothing is copied yet). */

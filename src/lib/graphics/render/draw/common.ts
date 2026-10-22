@@ -43,6 +43,15 @@ export function drawPanel(ctx: Canvas2D, area: Area, radius: number, fill: strin
   ctx.restore();
 }
 
+/** A corner radius of the built-in design, scaled by the brand kit. */
+export const cornerRadius = (base: number, rc: RenderContext): number => base * rc.theme.radius;
+
+/** A line thickness of the built-in design, scaled by the brand kit. */
+export const lineThickness = (base: number, rc: RenderContext): number => base * rc.theme.strokeWidth;
+
+/** A title as the brand kit writes it (capital letters or as given). */
+export const headingText = (text: string, rc: RenderContext): string => (rc.theme.headingCase === "upper" ? text.toUpperCase() : text);
+
 /** Runs `paint` with the current alpha multiplied by `alpha` (skipped when invisible). */
 export function withLayerAlpha(ctx: Canvas2D, alpha: number, paint: () => void): void {
   if (alpha <= 0.002) return;

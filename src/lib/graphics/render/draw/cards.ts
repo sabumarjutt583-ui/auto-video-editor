@@ -2,7 +2,7 @@ import type { Layer } from "../../spec/schema.ts";
 import type { Area, Canvas2D, IconShape } from "../context.ts";
 import { isRtlText } from "../script.ts";
 import { resolveColor } from "../theme.ts";
-import { type DrawEnv, drawPanel, phase, withAlpha, withLayerAlpha } from "./common.ts";
+import { cornerRadius, type DrawEnv, drawPanel, headingText, phase, withAlpha, withLayerAlpha } from "./common.ts";
 import { drawIconShape } from "./icon.ts";
 import { drawLabel } from "./label.ts";
 import { roundedRect } from "./path.ts";
@@ -18,7 +18,7 @@ export function drawLowerThird(ctx: Canvas2D, layer: LowerThirdLayer, area: Area
   const { rc, note, timing } = env;
   const local = timing.local;
   const rtl = isRtlText(layer.title, layer.subtitle ?? "");
-  const radius = Math.min(area.h * 0.22, 18);
+  const radius = cornerRadius(Math.min(area.h * 0.22, 18), rc);
   const accent = resolveColor("accent", rc.theme);
   const stripe = phase(local, 0, 0.35, "easeOut");
   drawPanel(ctx, area, radius, resolveColor("secondary", rc.theme), 0.94);
@@ -61,10 +61,10 @@ export function drawLowerThird(ctx: Canvas2D, layer: LowerThirdLayer, area: Area
     ctx.translate((1 - reveal) * -area.h * 0.25 * (rtl ? -1 : 1), 0);
     if (layer.subtitle) {
       const titleSize = Math.min(area.h * 0.36, rc.height * 0.06);
-      drawLabel(ctx, layer.title, { x: textArea.x, y: area.y + area.h * 0.1, w: textArea.w, h: area.h * 0.45 }, { size: titleSize, weight: 700, color: resolveColor("text", rc.theme), align, valign: "bottom", shadow: false }, layer.id, rc, note);
+      drawLabel(ctx, headingText(layer.title, rc), { x: textArea.x, y: area.y + area.h * 0.1, w: textArea.w, h: area.h * 0.45 }, { size: titleSize, weight: rc.theme.headingWeight, color: resolveColor("text", rc.theme), align, valign: "bottom", shadow: false }, layer.id, rc, note);
       drawLabel(ctx, layer.subtitle, { x: textArea.x, y: area.y + area.h * 0.58, w: textArea.w, h: area.h * 0.34 }, { size: titleSize * 0.62, weight: 400, color: resolveColor("muted", rc.theme), align, valign: "top", shadow: false }, layer.id, rc, note);
     } else {
-      drawLabel(ctx, layer.title, { x: textArea.x, y: area.y, w: textArea.w, h: area.h }, { size: Math.min(area.h * 0.42, rc.height * 0.07), weight: 700, color: resolveColor("text", rc.theme), align, valign: "middle", shadow: false, maxLines: 2 }, layer.id, rc, note);
+      drawLabel(ctx, headingText(layer.title, rc), { x: textArea.x, y: area.y, w: textArea.w, h: area.h }, { size: Math.min(area.h * 0.42, rc.height * 0.07), weight: rc.theme.headingWeight, color: resolveColor("text", rc.theme), align, valign: "middle", shadow: false, maxLines: 2 }, layer.id, rc, note);
     }
   });
 }
@@ -76,7 +76,7 @@ export function drawQuoteCard(ctx: Canvas2D, layer: QuoteLayer, area: Area, env:
   const rtl = isRtlText(layer.quote, layer.author ?? "");
   const align = rtl ? "right" : "left";
   const accent = resolveColor("accent", rc.theme);
-  const radius = Math.min(area.h * 0.1, 22);
+  const radius = cornerRadius(Math.min(area.h * 0.1, 22), rc);
   drawPanel(ctx, area, radius, resolveColor("secondary", rc.theme), 0.94);
   const pad = Math.min(area.w, area.h) * 0.08;
   const markSize = Math.min(area.h * 0.34, rc.height * 0.16);
