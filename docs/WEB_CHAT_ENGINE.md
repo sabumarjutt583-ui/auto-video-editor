@@ -75,3 +75,10 @@ copy-paste mode (6).
 - Soft failures ("encountering an error", "hard time fulfilling", READY missing): wait 30 s, ONE new thread with setup,
   same batch once; a second failure stops with Gemini's reply in Details. Usage limit: the account rests and the batch
   moves to the next account (own thread + setup).
+
+## Part 5: script text and scene length (done)
+- The narration of every scene is the user's script (`alignScript`: the script's wording wins over the recognised
+  speech); the chat messages use `scene.text`. Without a script the Scenes step shows "narration comes from speech
+  recognition".
+- Scenes shorter than `sceneSettings.minSeconds` (default 2.0, 0 = off) are joined to the previous scene (to the next
+  if first) in all modes; ids and timecodes are renumbered (src/lib/scenes/short.ts, tests in short.test.ts).

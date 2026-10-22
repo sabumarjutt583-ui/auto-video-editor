@@ -107,6 +107,11 @@ export function ScenesStep({ project }: { project: Project }) {
         }}
       />
       {job && <JobBar job={job} />}
+      {project.script.trim() === "" && scenes.length > 0 && (
+        <p className="text-sm text-muted" role="status">
+          No script was given, so the narration text comes from speech recognition (it may contain small mistakes). Paste your script in the Timing step to use your exact words.
+        </p>
+      )}
 
       {pending && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/40 bg-warning/10 px-5 py-4" role="alertdialog" aria-label="Rebuild the scenes">

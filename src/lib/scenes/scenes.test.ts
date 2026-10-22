@@ -22,7 +22,7 @@ function speak(text: string, wordSeconds = 0.4, pause = 0.5): { words: TimedWord
   return { words, duration: time + 0.2 };
 }
 
-const SETTINGS: SceneSettings = { mode: "sentence", sentencesPerScene: 1, targetSeconds: 5, maxVideoSeconds: 8 };
+const SETTINGS: SceneSettings = { mode: "sentence", sentencesPerScene: 1, targetSeconds: 5, maxVideoSeconds: 8, minSeconds: 0 };
 
 function assertNoGaps(scenes: readonly Scene[], duration: number) {
   assert.ok(scenes.length > 0);

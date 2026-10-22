@@ -3,6 +3,7 @@ import type { TimedWord } from "../timing/types.ts";
 import type { Scene, SceneSettings } from "../../types/project.ts";
 import { assembleScenes } from "./assemble.ts";
 import { groupByCount, groupBySeconds, makeUnits, type Unit } from "./units.ts";
+import { mergeShortScenes, DEFAULT_MIN_SECONDS } from "./short.ts";
 import { splitLongVideoScenes } from "./video.ts";
 
 /** What AI mode falls back to when Gemini's grouping cannot be used. */
@@ -43,5 +44,6 @@ export function buildFromSentenceGroups({ words, voiceDuration, settings }: Buil
 
 function finish(scenes: Scene[], words: readonly TimedWord[], sentences: readonly Sentence[], voiceDuration: number, settings: SceneSettings): Scene[] {
   // New scenes are images. Video scenes are split when the user switches them (see edit.ts).
-  return splitLongVideoScenes(scenes, words, sentences, voiceDuration, settings.maxVideoSeconds);
+  const merged = mergeShortScenes(scenes, words, sentences, voiceDuration, settings.minSeconds ?? DEFAULT_MIN_SECONDS);
+  return splitLongVideoScenes(merged, words, sentences, voiceDuration, settings.maxVideoSeconds);
 }

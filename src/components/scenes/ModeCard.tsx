@@ -88,6 +88,12 @@ export function ModeCard({ settings, busy, onChange, onMaxVideo }: ModeCardProps
         <p className="text-sm text-muted">Gemini reads the sentences and starts a new scene where the picture should change. Needs a Gemini key in Settings.</p>
       )}
 
+      <Field label="Shortest scene (seconds)" htmlFor="min-scene" hint="A scene shorter than this is joined to the scene before it (0 = off).">
+        <div className="w-28">
+          <NumberField id="min-scene" value={settings.minSeconds ?? 2} min={0} max={10} step={0.5} disabled={busy} onChange={(seconds) => onChange({ ...settings, minSeconds: seconds })} />
+        </div>
+      </Field>
+
       <Field label="Longest video scene (seconds)" htmlFor="max-video" hint="A video scene longer than this is split into parts such as S05a and S05b.">
         <div className="w-28">
           <NumberField id="max-video" value={settings.maxVideoSeconds} min={2} max={30} step={0.5} onChange={onMaxVideo} />

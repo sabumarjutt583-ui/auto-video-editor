@@ -161,11 +161,13 @@ pub struct SceneSettings {
     pub target_seconds: f64,
     /// Video scenes longer than this are split into a/b parts.
     pub max_video_seconds: f64,
+    /// Scenes shorter than this are joined to a neighbour (seconds).
+    pub min_seconds: f64,
 }
 
 impl Default for SceneSettings {
     fn default() -> Self {
-        Self { mode: SceneMode::Sentence, sentences_per_scene: 1, target_seconds: 5.0, max_video_seconds: 8.0 }
+        Self { mode: SceneMode::Sentence, sentences_per_scene: 1, target_seconds: 5.0, max_video_seconds: 8.0, min_seconds: 2.0 }
     }
 }
 

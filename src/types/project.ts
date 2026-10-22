@@ -95,6 +95,8 @@ export interface SceneSettings {
   targetSeconds: number;
   /** Video scenes longer than this are split into a/b parts. */
   maxVideoSeconds: number;
+  /** Scenes shorter than this are joined to a neighbour (seconds). */
+  minSeconds?: number;
 }
 
 export type OutputType = "image" | "video" | "image_motion";
