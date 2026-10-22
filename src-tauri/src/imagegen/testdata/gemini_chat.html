@@ -4,10 +4,28 @@
 <a aria-label="Google Account: Test (test@example.com)" href="#">Account</a>
 <main id="chat"></main>
 <rich-textarea><div class="ql-editor" role="textbox" contenteditable="true" aria-label="Enter a prompt for Gemini"></div></rich-textarea>
+<button aria-label="Open upload file menu" id="plus">+</button>
+<div id="menu" hidden><button data-test-id="local-images-files-uploader-button" id="upl">Upload files</button></div>
+<div id="previews"></div>
 <button aria-label="Send message" id="send">Send</button>
 <script>
   var input = document.querySelector('.ql-editor');
   var chat = document.getElementById('chat');
+  var previews = document.getElementById('previews');
+  document.getElementById('plus').addEventListener('click', function () { document.getElementById('menu').hidden = false; });
+  document.getElementById('upl').addEventListener('click', function () {
+    var picker = document.createElement('input');
+    picker.type = 'file';
+    picker.multiple = true;
+    picker.addEventListener('change', function () {
+      for (var i = 0; i < picker.files.length; i++) {
+        var tile = document.createElement('uploader-file-preview');
+        tile.textContent = picker.files[i].name;
+        previews.appendChild(tile);
+      }
+    });
+    picker.click();
+  });
   document.getElementById('send').addEventListener('click', function () {
     var prompt = input.innerText.trim();
     if (!prompt) return;
@@ -21,7 +39,9 @@
       return;
     }
     if (prompt.indexOf('[never]') >= 0) { response.remove(); return; }
-    var full = prompt.indexOf('[code]') >= 0 ? 'Here you go:' : 'Echo: ' + prompt;
+    var files = previews.children.length;
+    previews.innerHTML = '';
+    var full = prompt.indexOf('[code]') >= 0 ? 'Here you go:' : (files > 0 ? 'Echo with ' + files + ' files: ' : 'Echo: ') + prompt;
     var i = 0;
     var timer = setInterval(function () {
       i += 6;

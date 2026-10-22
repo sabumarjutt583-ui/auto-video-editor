@@ -8,6 +8,7 @@ mod audio;
 mod captions;
 mod clock;
 mod commands;
+mod custom_style;
 mod ffmpeg;
 mod ffmpeg_job;
 mod imagegen;
@@ -81,6 +82,13 @@ macro_rules! handler {
             commands::styles::save_custom_style,
             commands::styles::delete_custom_style,
             commands::styles::set_custom_style_thumbnail,
+            commands::custom_style::prepare_style_image,
+            commands::custom_style::analyze_style,
+            commands::custom_style::save_style_with_refs,
+            commands::custom_style::load_style_refs,
+            commands::custom_style::duplicate_custom_style,
+            commands::custom_style::export_style_package,
+            commands::custom_style::import_style_package,
             commands::timing::read_text_file,
             commands::timing::transcribe_voice,
             commands::audio::apply_silence_removal,
@@ -169,6 +177,13 @@ macro_rules! handler {
             commands::styles::save_custom_style,
             commands::styles::delete_custom_style,
             commands::styles::set_custom_style_thumbnail,
+            commands::custom_style::prepare_style_image,
+            commands::custom_style::analyze_style,
+            commands::custom_style::save_style_with_refs,
+            commands::custom_style::load_style_refs,
+            commands::custom_style::duplicate_custom_style,
+            commands::custom_style::export_style_package,
+            commands::custom_style::import_style_package,
             commands::timing::read_text_file,
             commands::timing::transcribe_voice,
             commands::audio::apply_silence_removal,

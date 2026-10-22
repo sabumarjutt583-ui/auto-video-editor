@@ -1,10 +1,12 @@
-import { ArrowLeft, Plus, Search, X } from "lucide-react";
+import { ArrowLeft, FileUp, Plus, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { cn } from "../../lib/cn";
 import { galleryTabs, moveFocus, TAB_ALL, TAB_FAVORITES, TAB_MINE, TAB_RECENT, visibleStyles } from "../../lib/styleGallery";
+import { toAppError } from "../../lib/errors";
 import { isComplete } from "../../lib/styleModel";
-import type { StyleProfile } from "../../types";
+import type { AppError, StyleProfile } from "../../types";
+import { ErrorNotice } from "../ErrorNotice";
 import { Button, IconButton, INPUT_CLASSES } from "../ui";
 import { StyleCard } from "./StyleCard";
 import { StyleDetails } from "./StyleDetails";
@@ -17,6 +19,8 @@ interface StyleGalleryProps {
   onSelect: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onCreate: () => void;
+  /** Adds a style from an .avstyle file; resolves to a sentence for the person, rejects with the error. */
+  onImport: () => Promise<string>;
   onClose: () => void;
 }
 
@@ -27,10 +31,13 @@ const EMPTY_TEXT: Record<string, string> = {
 };
 
 /** The Style Gallery: a big window with every style as a picture card. Click a card to use that style. */
-export function StyleGallery({ styles, selectedId, favorites, recent, onSelect, onToggleFavorite, onCreate, onClose }: StyleGalleryProps) {
+export function StyleGallery({ styles, selectedId, favorites, recent, onSelect, onToggleFavorite, onCreate, onImport, onClose }: StyleGalleryProps) {
   const [tab, setTab] = useState(TAB_ALL);
   const [query, setQuery] = useState("");
   const [detailsId, setDetailsId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+  const [importError, setImportError] = useState<AppError | null>(null);
   const grid = useRef<HTMLUListElement>(null);
   const search = useRef<HTMLInputElement>(null);
 
@@ -38,7 +45,7 @@ export function StyleGallery({ styles, selectedId, favorites, recent, onSelect, 
   const shown = useMemo(() => visibleStyles({ styles, tab, query, favorites, recent }), [styles, tab, query, favorites, recent]);
   const details = detailsId ? (styles.find((s) => s.id === detailsId) ?? null) : null;
   const withCreate = tab === TAB_MINE && query.trim() === "";
-  const total = shown.length + (withCreate ? 1 : 0);
+  const total = shown.length + (withCreate ? 2 : 0);
 
   useEffect(() => {
     search.current?.focus();
@@ -54,6 +61,19 @@ export function StyleGallery({ styles, selectedId, favorites, recent, onSelect, 
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [detailsId, onClose]);
+
+  async function importStyle() {
+    setImporting(true);
+    setImportNotice(null);
+    setImportError(null);
+    try {
+      setImportNotice(await onImport());
+    } catch (caught) {
+      setImportError(toAppError(caught, "The style file could not be imported."));
+    } finally {
+      setImporting(false);
+    }
+  }
 
   function focusCard(index: number) {
     grid.current?.querySelector<HTMLElement>(`[data-card-index="${index}"]`)?.focus();
@@ -136,6 +156,16 @@ export function StyleGallery({ styles, selectedId, favorites, recent, onSelect, 
             </div>
 
             <div className="flex-1 overflow-y-auto p-5">
+              {importNotice && (
+                <p className="mb-3 text-sm text-success" role="status">
+                  {importNotice}
+                </p>
+              )}
+              {importError && (
+                <div className="mb-3">
+                  <ErrorNotice error={importError} />
+                </div>
+              )}
               {total === 0 && (
                 <p className="py-10 text-center text-sm text-muted">{query.trim() !== "" ? `No style matches “${query}”.` : (EMPTY_TEXT[tab] ?? "No styles here.")}</p>
               )}
@@ -162,6 +192,20 @@ export function StyleGallery({ styles, selectedId, favorites, recent, onSelect, 
                     >
                       <Plus size={26} aria-hidden />
                       <span className="text-sm font-medium">Create style</span>
+                    </button>
+                  </li>
+                )}
+                {withCreate && (
+                  <li className="flex">
+                    <button
+                      type="button"
+                      data-card-index={shown.length + 1}
+                      onClick={() => void importStyle()}
+                      disabled={importing}
+                      className="flex min-h-40 w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line text-muted outline-none transition-colors hover:border-accent hover:text-fg focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <FileUp size={26} aria-hidden />
+                      <span className="text-sm font-medium">{importing ? "Importing…" : "Import style file"}</span>
                     </button>
                   </li>
                 )}

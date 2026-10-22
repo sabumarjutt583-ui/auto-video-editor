@@ -92,6 +92,11 @@ impl ImageGen {
     /// Asks Gemini's chat one question with the next free Google account. Accounts that hit a limit rest
     /// and the question moves on to the next one, so several accounts share the work.
     pub async fn chat_ask(&self, prompt: &str) -> Result<ChatReply, AppError> {
+        self.chat_ask_images(prompt, &[]).await
+    }
+
+    /// Like `chat_ask`, with pictures (files on this computer) uploaded into the question.
+    pub async fn chat_ask_images(&self, prompt: &str, images: &[std::path::PathBuf]) -> Result<ChatReply, AppError> {
         let settings = self.engine.settings();
         let config = self.engine.config();
         if !settings.consent_given(config.major().unwrap_or(1)) {
@@ -103,7 +108,7 @@ impl ImageGen {
         for _ in 0..attempts {
             let Some(id) = self.engine.with_accounts(|accounts, now| accounts.claim_chat(now)) else { break };
             let result = match self.real.worker(&id, &settings) {
-                Ok(worker) => worker.chat(prompt, timeout).await,
+                Ok(worker) => worker.chat(prompt, images, timeout).await,
                 Err(error) => Err(error),
             };
             let error = match result {

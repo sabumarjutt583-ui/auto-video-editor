@@ -62,6 +62,14 @@ export function SettingsPage() {
         testModel={settings?.geminiModel}
       />
 
+      <ApiKeyCard
+        provider="openai"
+        title="Look at pictures (OpenAI, optional)"
+        description="An alternative to Gemini for studying reference pictures when you make a custom style."
+        linkLabel="Get an OpenAI key"
+        link="openai_keys"
+      />
+
       <ImageGeneratorCard />
 
       {settings ? (

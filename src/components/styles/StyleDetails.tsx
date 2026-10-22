@@ -1,4 +1,4 @@
-import { Copy, Pencil, Trash2 } from "lucide-react";
+import { Copy, Download, Pencil, ScanSearch, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { missingFields, REQUIRED_FIELDS } from "../../lib/styleModel";
@@ -12,6 +12,10 @@ interface StyleDetailsProps {
   onDuplicate: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** Own styles only: study the reference pictures again. */
+  onReanalyze?: () => void;
+  /** Own styles only: save the style and its pictures as one .avstyle file. */
+  onExport?: () => void;
   /** Hide Duplicate, Edit and Delete (the gallery only lets you look). */
   readOnly?: boolean;
 }
@@ -26,7 +30,7 @@ function Block({ label, text }: { label: string; text: string }) {
 }
 
 /** The main parts of a style, and what is still missing when it is a placeholder. */
-export function StyleDetails({ style, inUse, onDuplicate, onEdit, onDelete, readOnly = false }: StyleDetailsProps) {
+export function StyleDetails({ style, inUse, onDuplicate, onEdit, onDelete, onReanalyze, onExport, readOnly = false }: StyleDetailsProps) {
   const [more, setMore] = useState(false);
   const missing = missingFields(style);
   const complete = missing.length === 0;
@@ -43,7 +47,7 @@ export function StyleDetails({ style, inUse, onDuplicate, onEdit, onDelete, read
           {!complete && <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning">Incomplete</span>}
         </div>
         {!readOnly && (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button icon={Copy} onClick={onDuplicate}>
             Duplicate
           </Button>
@@ -52,6 +56,16 @@ export function StyleDetails({ style, inUse, onDuplicate, onEdit, onDelete, read
               <Button icon={Pencil} onClick={onEdit}>
                 Edit
               </Button>
+              {onReanalyze && (
+                <Button icon={ScanSearch} onClick={onReanalyze}>
+                  Re-analyze
+                </Button>
+              )}
+              {onExport && (
+                <Button icon={Download} onClick={onExport}>
+                  Export
+                </Button>
+              )}
               <Button variant="danger" icon={Trash2} onClick={onDelete}>
                 Delete
               </Button>

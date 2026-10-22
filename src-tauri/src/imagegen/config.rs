@@ -77,6 +77,14 @@ pub struct ChatSelectors {
     pub code_block: String,
     /// Appears under an answer only when it is finished.
     pub done: String,
+    /// The "+" button that opens the upload menu.
+    pub attach: String,
+    /// The menu entry that uploads files from the computer.
+    pub upload_item: String,
+    /// The file input (when the page already has one, the menu is not needed).
+    pub file_input: String,
+    /// One element per picture that finished uploading into the message.
+    pub attachment: String,
 }
 
 impl Default for ChatSelectors {
@@ -88,6 +96,10 @@ impl Default for ChatSelectors {
             response_text: "message-content".into(),
             code_block: "code-block pre".into(),
             done: "button[aria-label=\"Good response\"]".into(),
+            attach: "button[aria-label=\"Open upload file menu\"]".into(),
+            upload_item: "button[data-test-id=\"local-images-files-uploader-button\"]".into(),
+            file_input: "input[type=\"file\"]".into(),
+            attachment: "uploader-file-preview".into(),
         }
     }
 }
@@ -102,11 +114,13 @@ pub struct ChatTiming {
     pub poll_ms: u64,
     /// Fallback: an answer that did not change for this long counts as finished.
     pub stable_ms: u64,
+    /// How long uploaded pictures may take to show up in the message box.
+    pub upload_ms: u64,
 }
 
 impl Default for ChatTiming {
     fn default() -> Self {
-        Self { page_ready_ms: 30_000, send_enable_ms: 8_000, reply_start_ms: 25_000, poll_ms: 700, stable_ms: 9_000 }
+        Self { page_ready_ms: 30_000, send_enable_ms: 8_000, reply_start_ms: 25_000, poll_ms: 700, stable_ms: 9_000, upload_ms: 45_000 }
     }
 }
 
@@ -288,7 +302,7 @@ mod tests {
         assert!(EngineConfig::parse("not json").is_err());
         let no_ratio = BUNDLED_JSON.replace("{ratio}", "16-9");
         assert!(EngineConfig::parse(&no_ratio).is_err());
-        let bad_version = BUNDLED_JSON.replace("\"1.1\"", "\"x\"");
+        let bad_version = BUNDLED_JSON.replace("\"1.2\"", "\"x\"");
         assert!(EngineConfig::parse(&bad_version).is_err());
     }
 

@@ -3,6 +3,7 @@ pub mod ai;
 pub mod audio;
 pub mod blocking;
 pub mod captions;
+pub mod custom_style;
 pub mod engine;
 pub mod error;
 pub mod files;

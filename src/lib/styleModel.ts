@@ -14,6 +14,9 @@ export const CATEGORIES = [
   "Educational & Science",
 ] as const;
 
+/** The category new custom styles are put in by default (the gallery shows them under My Styles). */
+export const MY_STYLES = "My Styles";
+
 /** The fields that must be filled before a style can be used for generation, with their labels. */
 export const REQUIRED_FIELDS: readonly { key: StyleTextField; label: string; hint: string }[] = [
   { key: "core_identity", label: "Core identity", hint: "What this style is, in a few sentences." },

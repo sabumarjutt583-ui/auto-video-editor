@@ -19,6 +19,7 @@ const MAX_PATH_LENGTH: usize = 1024;
 pub const DEFAULT_GEMINI_MODEL: &str = "gemini-3.8-flash";
 pub const DEFAULT_WHISPER_MODEL: &str = "whisper-large-v3-turbo";
 pub const DEFAULT_GROQ_TEXT_MODEL: &str = "llama-3.3-70b-versatile";
+pub const DEFAULT_OPENAI_MODEL: &str = "gpt-4.1-mini";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AspectRatio {
@@ -47,6 +48,8 @@ pub struct Settings {
     pub groq_whisper_model: String,
     pub fallback_to_groq: bool,
     pub groq_text_model: String,
+    /// The OpenAI model that looks at reference pictures when making a custom style (needs an OpenAI key).
+    pub openai_model: String,
     /// Write texts with Gemini's web chat (the Google accounts of the Image Generator) instead of the Gemini API key.
     pub text_via_chat: bool,
     /// Empty lines after every prompt in Copy all and Export TXT (1 to 3).
@@ -86,6 +89,7 @@ impl Default for Settings {
             groq_whisper_model: DEFAULT_WHISPER_MODEL.to_string(),
             fallback_to_groq: false,
             groq_text_model: DEFAULT_GROQ_TEXT_MODEL.to_string(),
+            openai_model: DEFAULT_OPENAI_MODEL.to_string(),
             text_via_chat: false,
             export_empty_lines: 2,
             export_include_ids: true,
@@ -131,6 +135,8 @@ impl Settings {
         let groq_text_model = clean_model_name(&self.groq_text_model, true)
             .ok_or_else(|| invalid("The Groq text model name is not valid."))?;
 
+        let openai_model = clean_model_name(&self.openai_model, false).ok_or_else(|| invalid("The OpenAI model name is not valid."))?;
+
         let export_folder = self.export_folder.trim().to_string();
         if export_folder.chars().count() > MAX_PATH_LENGTH || export_folder.contains('\0') {
             return Err(invalid("The export folder path is not valid."));
@@ -167,6 +173,7 @@ impl Settings {
             gemini_model,
             groq_whisper_model,
             groq_text_model,
+            openai_model,
             export_folder,
             ..self
         })
@@ -247,6 +254,7 @@ mod tests {
         assert_eq!(settings.groq_whisper_model, "whisper-large-v3-turbo");
         assert!(!settings.fallback_to_groq);
         assert!(!settings.text_via_chat, "the API key is the default");
+        assert_eq!(settings.openai_model, DEFAULT_OPENAI_MODEL);
         assert_eq!((settings.export_empty_lines, settings.export_include_ids), (2, true));
         assert_eq!(settings.default_aspect_ratio, AspectRatio::Landscape);
         assert_eq!(settings.default_quality, Quality::P1080);
@@ -310,6 +318,16 @@ mod tests {
         assert!(bad_gemini.validated().is_err());
         let bad_groq = Settings { groq_text_model: "".into(), ..Settings::default() };
         assert!(bad_groq.validated().is_err());
+        let bad_openai = Settings { openai_model: "gpt 4".into(), ..Settings::default() };
+        assert!(bad_openai.validated().is_err());
+        let tidy = Settings { openai_model: " gpt-4.1 ".into(), ..Settings::default() }.validated().unwrap();
+        assert_eq!(tidy.openai_model, "gpt-4.1");
+    }
+
+    #[test]
+    fn an_old_settings_file_without_the_openai_model_still_loads() {
+        let settings: Settings = serde_json::from_str(r#"{"geminiModel":"gemini-3.8-flash"}"#).unwrap();
+        assert_eq!(settings.openai_model, DEFAULT_OPENAI_MODEL);
     }
 
     #[test]

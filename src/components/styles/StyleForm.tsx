@@ -17,7 +17,7 @@ interface StyleFormProps {
   onClose: () => void;
 }
 
-const AREA_CLASSES =
+export const AREA_CLASSES =
   "w-full resize-y rounded-lg border border-line bg-surface-2 p-3 text-sm text-fg placeholder:text-muted/70 transition-colors hover:border-accent/40 focus:border-accent";
 
 /** Create or edit a custom style. Every field of the profile can be filled in. */

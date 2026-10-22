@@ -1,5 +1,5 @@
 {
-  "configVersion": "1.1",
+  "configVersion": "1.2",
   "toolUrl": "https://share.gemini.google/rqUWVwvowbjG",
   "signInUrl": "https://accounts.google.com/ServiceLogin?continue={continueUrl}",
   "signInContinueUrl": "https://gemini.google.com/app",
@@ -42,9 +42,13 @@
       "response": "model-response",
       "responseText": "message-content",
       "codeBlock": "code-block pre",
-      "done": "button[aria-label=\"Good response\"]"
+      "done": "button[aria-label=\"Good response\"]",
+      "attach": "button[aria-label=\"Open upload file menu\"]",
+      "uploadItem": "button[data-test-id=\"local-images-files-uploader-button\"]",
+      "fileInput": "input[type=\"file\"]",
+      "attachment": "uploader-file-preview"
     },
-    "timing": { "pageReadyMs": 30000, "sendEnableMs": 8000, "replyStartMs": 25000, "pollMs": 700, "stableMs": 9000 },
+    "timing": { "pageReadyMs": 30000, "sendEnableMs": 8000, "replyStartMs": 25000, "pollMs": 700, "stableMs": 9000, "uploadMs": 45000 },
     "limitTexts": ["reached your limit", "usage limit", "limit for today", "try again tomorrow", "come back later", "reached the limit"],
     "errorTexts": ["something went wrong", "i'm having trouble", "couldn't complete"]
   },

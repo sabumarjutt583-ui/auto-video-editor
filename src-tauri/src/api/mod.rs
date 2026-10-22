@@ -6,6 +6,7 @@ pub mod client;
 pub mod error;
 pub mod gemini;
 pub mod groq;
+pub mod openai;
 
 /// Checks and tidies a model name typed by the user. Returns `None` if it is not usable.
 ///

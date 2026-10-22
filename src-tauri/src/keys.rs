@@ -15,6 +15,7 @@ const MAX_KEY_LENGTH: usize = 512;
 pub enum Provider {
     Groq,
     Gemini,
+    OpenAi,
 }
 
 impl Provider {
@@ -23,6 +24,7 @@ impl Provider {
         match self {
             Provider::Groq => "groq-api-key",
             Provider::Gemini => "gemini-api-key",
+            Provider::OpenAi => "openai-api-key",
         }
     }
 }
@@ -141,7 +143,8 @@ mod tests {
     fn providers_use_lowercase_names_on_the_wire() {
         assert_eq!(serde_json::to_string(&Provider::Groq).unwrap(), "\"groq\"");
         assert_eq!(serde_json::from_str::<Provider>("\"gemini\"").unwrap(), Provider::Gemini);
-        assert!(serde_json::from_str::<Provider>("\"openai\"").is_err());
+        assert_eq!(serde_json::from_str::<Provider>("\"openai\"").unwrap(), Provider::OpenAi);
+        assert!(serde_json::from_str::<Provider>("\"claude\"").is_err());
     }
 
     #[test]
@@ -153,5 +156,7 @@ mod tests {
     #[test]
     fn each_provider_has_its_own_keychain_entry() {
         assert_ne!(Provider::Groq.account(), Provider::Gemini.account());
+        assert_ne!(Provider::OpenAi.account(), Provider::Gemini.account());
+        assert_ne!(Provider::OpenAi.account(), Provider::Groq.account());
     }
 }

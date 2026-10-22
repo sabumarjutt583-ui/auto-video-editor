@@ -6,7 +6,7 @@ use crate::commands::blocking::run_blocking;
 use crate::commands::error::AppError;
 use crate::styles::{self, StyleLibrary, StyleProfile};
 
-fn custom_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
+pub fn custom_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
     let folder = app.path().app_data_dir().map_err(|e| AppError::new("The app data folder could not be found.", e.to_string()))?;
     Ok(folder.join("styles"))
 }
@@ -56,7 +56,12 @@ pub async fn save_custom_style(app: AppHandle, style: StyleProfile) -> Result<St
 #[tauri::command]
 pub async fn delete_custom_style(app: AppHandle, id: String) -> Result<(), AppError> {
     let custom = custom_dir(&app)?;
-    run_blocking(move || styles::delete_custom(&custom, &id)).await
+    run_blocking(move || {
+        styles::delete_custom(&custom, &id)?;
+        crate::custom_style::refs::remove(&custom, &id);
+        Ok(())
+    })
+    .await
 }
 
 /// Makes the thumbnail of one of the user's own styles from a picture (any size; cropped to 4:3).

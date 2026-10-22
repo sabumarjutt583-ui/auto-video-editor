@@ -119,11 +119,27 @@ Open **SFX Library** in the left menu. Sounds are grouped by kind (whoosh, hit, 
 
 At the bottom, **Check for library update** downloads new sounds and styles if the publisher put some online. The app checks automatically when it starts. If a new package is damaged, nothing changes. **Go back to the version before** undoes an update.
 
+### Make your own style from pictures
+
+Open the **Style Gallery**, go to **My Styles** and press **Create style** (or use **Create custom style** next to the style picker).
+
+1. Type a **name** and choose a **category** (My Styles is the default).
+2. Add **3 or 4 pictures** that share one look: drop them on the window or click the dashed card. PNG, JPG or WebP, up to 10 MB each. Remove one with the X.
+3. Write a few words about the look, the mood or what to keep (**Description**, recommended).
+4. Choose what studies the pictures: **Gemini** or **OpenAI** (they need a key in Settings) or the **Gemini web chat** (your Google accounts, no key).
+5. Press **Analyze with AI**. The AI describes only the look the pictures have in common, not what is in them. If its first answer breaks a writing rule, it is asked once more automatically.
+6. **Review**: every field can be changed. **Regenerate** asks the AI again. **Test style** writes 3 sample prompts so you can see the style at work. Then **Save style**.
+
+The style appears in **My Styles** with the first picture as its thumbnail and can be used everywhere, in projects and in Quick prompts. Your pictures are kept with the style: choose it and press **Re-analyze** to study them again. **Edit**, **Duplicate** and **Delete** work as for other styles. **Export** saves the style and its pictures as one `.avstyle` file; **Import style file** (in My Styles) adds such a file, for example from a friend, as a new style.
+
+If the web chat shows a captcha or "unusual activity" page, the account is paused and you finish the check yourself in its window, as for the Image Generator.
+
 ## Settings
 
 **Text engine.** Scene groups, characters and prompts are written by Gemini. Choose *Gemini API key* (fast, daily limit) or *Web chat (free)*, which uses the Google accounts of the Image Generator and needs no key.
 
 - **API keys**: paste, **Save**, **Test Key**, **Delete**. Keys are kept only in your computer's secure keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service). They are never written to files or logs.
+- **OpenAI key** (optional): only used to let an OpenAI model look at pictures when you make a custom style.
 - **Models**, **defaults** (aspect ratio, quality, export folder), **Video encoding**, **Library updates**, **Updates**, **Help and logs**.
 
 ### Updating the app

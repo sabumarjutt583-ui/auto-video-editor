@@ -179,18 +179,18 @@ impl FreeWorker {
     }
 
     /// Asks Gemini's chat one question (a fresh chat in an extra tab of this account's browser).
-    pub async fn chat(&self, prompt: &str, timeout: Duration) -> Result<ChatReply, GenError> {
+    pub async fn chat(&self, prompt: &str, images: &[std::path::PathBuf], timeout: Duration) -> Result<ChatReply, GenError> {
         self.inner.chat_busy.fetch_add(1, Ordering::SeqCst);
-        let result = self.chat_inner(prompt, timeout).await;
+        let result = self.chat_inner(prompt, images, timeout).await;
         self.inner.chat_busy.fetch_sub(1, Ordering::SeqCst);
         self.touch();
         result
     }
 
-    async fn chat_inner(&self, prompt: &str, timeout: Duration) -> Result<ChatReply, GenError> {
+    async fn chat_inner(&self, prompt: &str, images: &[std::path::PathBuf], timeout: Duration) -> Result<ChatReply, GenError> {
         let (session, _, _) = self.ready().await?;
         let _turn = self.inner.chat_lock.lock().await;
-        chat::ask(&session, &self.config().engine, prompt, timeout).await
+        chat::ask_with_images(&session, &self.config().engine, prompt, images, timeout).await
     }
 
     fn start_poller(&self) {

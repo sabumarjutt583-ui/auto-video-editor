@@ -7,6 +7,7 @@
 //! Like the image tool, a page that needs a person (captcha, terms, sign-in) is never worked around:
 //! it becomes an error that pauses the account and is shown to the user.
 
+use std::path::PathBuf;
 use std::time::Duration;
 
 use serde_json::{json, Value};
@@ -200,8 +201,12 @@ async fn wait_for_answer(session: &Session, tab: &Tab, engine: &EngineConfig, ti
     }
 }
 
-/// Asks one question in a fresh chat and returns the finished answer.
-pub async fn ask(session: &Session, engine: &EngineConfig, prompt: &str, timeout: Duration) -> Result<ChatReply, GenError> {
+/// The most pictures one question may carry.
+pub const MAX_IMAGES: usize = 4;
+
+/// Asks one question in a fresh chat and returns the finished answer. The pictures (files on this computer) are uploaded into the message first,
+/// through the page's own upload button.
+pub async fn ask_with_images(session: &Session, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration) -> Result<ChatReply, GenError> {
     let prompt = prompt.trim();
     if prompt.is_empty() {
         return Err(GenError::new(ErrorKind::BadRequest, "The prompt is empty."));
@@ -209,16 +214,89 @@ pub async fn ask(session: &Session, engine: &EngineConfig, prompt: &str, timeout
     if prompt.chars().count() > MAX_PROMPT_CHARS {
         return Err(GenError::new(ErrorKind::BadRequest, format!("The prompt is too long for the chat ({} characters, the limit is {MAX_PROMPT_CHARS}).", prompt.chars().count())));
     }
+    if images.len() > MAX_IMAGES || images.iter().any(|p| !p.is_absolute() || !p.is_file()) {
+        return Err(GenError::new(ErrorKind::BadRequest, "The pictures for the chat could not be found."));
+    }
     let tab = session.open_tab().await.map_err(|e| from_cdp(&e, "Opening a chat tab"))?;
-    let result = ask_in(session, &tab, engine, prompt, timeout).await;
+    let result = ask_in(session, &tab, engine, prompt, images, timeout).await;
     session.close_tab(&tab).await;
     result
 }
 
-async fn ask_in(session: &Session, tab: &Tab, engine: &EngineConfig, prompt: &str, timeout: Duration) -> Result<ChatReply, GenError> {
+/// The remote object id of the first element an expression gives (None when it gives nothing).
+async fn object_id(session: &Session, tab: &Tab, expression: &str) -> Result<Option<String>, GenError> {
+    let mut params = json!({ "expression": expression, "returnByValue": false });
+    if let Some(id) = tab.frame.context_id {
+        params["contextId"] = json!(id);
+    }
+    let result = session.cdp.call("Runtime.evaluate", params, Some(&tab.frame.session)).await.map_err(|e| from_cdp(&e, "Finding the upload button"))?;
+    Ok(result.pointer("/result/objectId").and_then(Value::as_str).map(str::to_string))
+}
+
+async fn click(session: &Session, tab: &Tab, selector: &str) -> Result<bool, GenError> {
+    let expression = format!("(function () {{ var b = document.querySelector({}); if (!b) return false; b.click(); return true; }})()", js(selector));
+    Ok(session.eval_in(&tab.frame, &expression).await.map_err(|e| from_cdp(&e, "Opening the upload menu"))? == Value::Bool(true))
+}
+
+/// Finds the page's file input. The page makes it only when the upload entry is used and then opens the system
+/// file window; that window is held back (the input is remembered instead) so the files can be handed over directly.
+async fn find_file_input(session: &Session, tab: &Tab, chat: &ChatConfig) -> Result<String, GenError> {
+    let s = &chat.selectors;
+    let hook = "(function () { if (window.__avPick !== undefined) return true; window.__avPick = null; var original = HTMLInputElement.prototype.click; HTMLInputElement.prototype.click = function () { if (this.type === 'file') { window.__avPick = this; return; } return original.apply(this, arguments); }; return true; })()";
+    session.eval_in(&tab.frame, hook).await.map_err(|e| from_cdp(&e, "Preparing the upload"))?;
+    if let Some(id) = object_id(session, tab, &format!("document.querySelector({})", js(&s.file_input))).await? {
+        return Ok(id);
+    }
+    if !click(session, tab, &s.attach).await? {
+        return Err(GenError::new(ErrorKind::NoImage, "Gemini's upload button was not found. The chat page may have changed."));
+    }
+    let deadline = tokio::time::Instant::now() + Duration::from_millis(chat.timing.send_enable_ms);
+    let mut item_clicked = false;
+    loop {
+        if !item_clicked {
+            item_clicked = click(session, tab, &s.upload_item).await?;
+        }
+        if let Some(id) = object_id(session, tab, "window.__avPick || document.querySelector('input[type=file]')").await? {
+            return Ok(id);
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(GenError::new(ErrorKind::NoImage, "Gemini's upload menu did not open as expected. The chat page may have changed."));
+        }
+        tokio::time::sleep(Duration::from_millis(200)).await;
+    }
+}
+
+/// Uploads the pictures into the message and waits until the page shows all of them.
+async fn attach_images(session: &Session, tab: &Tab, engine: &EngineConfig, images: &[PathBuf]) -> Result<(), GenError> {
+    let chat = &engine.chat;
+    let input = find_file_input(session, tab, chat).await?;
+    let files: Vec<String> = images.iter().map(|p| p.to_string_lossy().into_owned()).collect();
+    session.cdp.call("DOM.setFileInputFiles", json!({ "files": files, "objectId": input }), Some(&tab.frame.session)).await.map_err(|e| from_cdp(&e, "Uploading the pictures"))?;
+    if chat.selectors.attachment.trim().is_empty() {
+        tokio::time::sleep(Duration::from_secs(4)).await;
+        return Ok(());
+    }
+    let count = format!("document.querySelectorAll({}).length", js(&chat.selectors.attachment));
+    let deadline = tokio::time::Instant::now() + Duration::from_millis(chat.timing.upload_ms);
+    loop {
+        let seen = session.eval_in(&tab.frame, &count).await.map_err(|e| from_cdp(&e, "Checking the uploaded pictures"))?.as_u64().unwrap_or(0);
+        if seen as usize >= images.len() {
+            return Ok(());
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(diagnose(session, tab, engine, "Gemini did not accept the pictures.").await);
+        }
+        tokio::time::sleep(Duration::from_millis(chat.timing.poll_ms)).await;
+    }
+}
+
+async fn ask_in(session: &Session, tab: &Tab, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration) -> Result<ChatReply, GenError> {
     let chat = &engine.chat;
     session.navigate_tab(tab, &chat.url, Duration::from_millis(chat.timing.page_ready_ms)).await.map_err(|e| from_cdp(&e, "Opening Gemini's chat"))?;
     wait_for_input(session, tab, engine).await?;
+    if !images.is_empty() {
+        attach_images(session, tab, engine, images).await?;
+    }
     type_and_send(session, tab, chat, prompt).await?;
     let state = wait_for_answer(session, tab, engine, timeout).await?;
     let code = if state.code.is_empty() { code_from_markdown(&state.text) } else { state.code.clone() };

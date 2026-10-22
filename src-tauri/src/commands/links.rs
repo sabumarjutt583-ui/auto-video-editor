@@ -13,6 +13,7 @@ use crate::commands::error::AppError;
 pub enum ExternalLink {
     GroqKeys,
     GeminiKeys,
+    OpenaiKeys,
 }
 
 impl ExternalLink {
@@ -20,6 +21,7 @@ impl ExternalLink {
         match self {
             ExternalLink::GroqKeys => "https://console.groq.com/keys",
             ExternalLink::GeminiKeys => "https://aistudio.google.com/apikey",
+            ExternalLink::OpenaiKeys => "https://platform.openai.com/api-keys",
         }
     }
 }

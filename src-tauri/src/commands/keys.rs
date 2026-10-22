@@ -2,7 +2,7 @@
 
 use tauri::AppHandle;
 
-use crate::api::{gemini, groq};
+use crate::api::{gemini, groq, openai};
 use crate::commands::blocking::run_blocking;
 use crate::commands::error::AppError;
 use crate::keys::{self, KeyStatus, Provider};
@@ -26,7 +26,7 @@ pub async fn delete_key(provider: Provider) -> Result<(), AppError> {
 }
 
 /// Checks the saved key with a tiny real request. Groq: list the models.
-/// Gemini: send "Reply with OK" to `model` (or the saved Gemini model).
+/// OpenAI: list the models. Gemini: send "Reply with OK" to `model` (or the saved Gemini model).
 #[tauri::command]
 pub async fn test_key(
     app: AppHandle,
@@ -37,6 +37,7 @@ pub async fn test_key(
 
     match provider {
         Provider::Groq => groq::test_key(&key).await?,
+        Provider::OpenAi => openai::test_key(&key).await?,
         Provider::Gemini => {
             let model = match model {
                 Some(model) => model,

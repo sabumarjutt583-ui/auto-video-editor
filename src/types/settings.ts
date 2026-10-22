@@ -7,6 +7,8 @@ export interface AppSettings {
   groqWhisperModel: string;
   fallbackToGroq: boolean;
   groqTextModel: string;
+  /** The OpenAI model that looks at reference pictures when making a custom style. */
+  openaiModel: string;
   /** Write texts with Gemini's web chat (Google accounts) instead of the Gemini API key. */
   textViaChat: boolean;
   /** Empty lines after every prompt in Copy all and Export TXT (1 to 3). */

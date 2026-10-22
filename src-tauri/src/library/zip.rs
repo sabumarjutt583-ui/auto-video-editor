@@ -305,7 +305,6 @@ pub fn read_zip(data: &[u8]) -> Result<Vec<ZipEntry>, String> {
 }
 
 /// Makes a zip with every entry stored (not compressed).
-#[cfg(any(feature = "admin", test))]
 pub fn write_stored(entries: &[ZipEntry]) -> Vec<u8> {
     let mut out: Vec<u8> = Vec::new();
     let mut central: Vec<u8> = Vec::new();

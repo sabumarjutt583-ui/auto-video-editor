@@ -25,7 +25,7 @@ interface ApiKeyCardProps {
   description: string;
   linkLabel: string;
   link: ExternalLink;
-  /** Gemini only: the model name currently chosen in the settings, used for the test. */
+  /** Gemini only: the model name currently chosen in the settings, used for the test (OpenAI and Groq lists need none). */
   testModel?: string;
 }
 

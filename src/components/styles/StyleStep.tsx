@@ -1,6 +1,8 @@
 import { Palette, Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { duplicateCustomStyle, exportStylePackage, importStylePackage, loadStyleRefs } from "../../lib/customStyle/api";
+import { pickFile, pickSavePath } from "../../lib/dialog";
 import { toAppError } from "../../lib/errors";
 import { addRecent, toggleId } from "../../lib/styleGallery";
 import { blankStyle, duplicateStyle, isComplete, newCustomId } from "../../lib/styleModel";
@@ -11,6 +13,8 @@ import { useStyleStore } from "../../store/styleStore";
 import type { AppError, Project, StyleProfile } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
 import { Button, Card } from "../ui";
+import { CreateStyleModal } from "./custom/CreateStyleModal";
+import type { CreatorStart } from "./custom/useStyleCreator";
 import { StyleDetails } from "./StyleDetails";
 import { StyleForm } from "./StyleForm";
 import { StyleCurrentCard } from "./StyleCurrentCard";
@@ -27,6 +31,8 @@ export function StyleSection({ project }: { project: Project }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [pictureError, setPictureError] = useState<AppError | null>(null);
+  const [creator, setCreator] = useState<CreatorStart | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const settings = useSettingsStore((state) => state.settings);
   const updateSettings = useSettingsStore((state) => state.update);
   const favorites = settings?.styleFavorites ?? [];
@@ -42,6 +48,7 @@ export function StyleSection({ project }: { project: Project }) {
 
   function choose(id: string) {
     setViewing(id);
+    setNotice(null);
     setConfirmDelete(false);
     const style = styles.find((item) => item.id === id);
     // Only a finished style can be used. An unfinished one can still be looked at.
@@ -78,6 +85,80 @@ export function StyleSection({ project }: { project: Project }) {
     setViewing(saved.id);
   }
 
+  /** A style that was saved from the Create window (or edited there) is used right away, like one saved from the form. */
+  function savedFromCreator(saved: StyleProfile) {
+    setCreator(null);
+    setConfirmDelete(false);
+    if (isComplete(saved)) {
+      update({ styleId: saved.id });
+      updateSettings({ recentStyles: addRecent(recent, saved.id) });
+    }
+    setViewing(saved.id);
+  }
+
+  async function editCurrent() {
+    if (!current) return;
+    setPictureError(null);
+    try {
+      const refs = await loadStyleRefs(current.id);
+      // A style made from pictures is edited in the Create window; one written by hand keeps the simple form.
+      if (refs) setCreator({ mode: "edit", style: current, refs, step: "review" });
+      else setForm({ mode: "edit", style: current });
+    } catch (caught) {
+      setPictureError(toAppError(caught, "The style could not be opened."));
+    }
+  }
+
+  async function reanalyzeCurrent() {
+    if (!current) return;
+    setPictureError(null);
+    try {
+      setCreator({ mode: "edit", style: current, refs: await loadStyleRefs(current.id), step: "form" });
+    } catch (caught) {
+      setPictureError(toAppError(caught, "The style could not be opened."));
+    }
+  }
+
+  async function duplicateCurrent() {
+    if (!current) return;
+    const copy = duplicateStyle(current, ids);
+    setPictureError(null);
+    try {
+      // An own style with pictures is copied with its pictures; any other style opens the form first.
+      if (!current.builtin && (await loadStyleRefs(current.id))) {
+        const saved = await duplicateCustomStyle(current.id, copy);
+        await load();
+        setViewing(saved.id);
+        setNotice(`Made “${saved.name}”.`);
+      } else {
+        setForm({ mode: "duplicate", style: copy });
+      }
+    } catch (caught) {
+      setPictureError(toAppError(caught, "The style could not be copied."));
+    }
+  }
+
+  async function exportCurrent() {
+    if (!current) return;
+    setPictureError(null);
+    try {
+      const path = await pickSavePath("Export style", `${current.name}.avstyle`, "Style file", ["avstyle"]);
+      if (!path) return;
+      setNotice(`Saved ${await exportStylePackage(current.id, path)}`);
+    } catch (caught) {
+      setPictureError(toAppError(caught, "The style could not be exported."));
+    }
+  }
+
+  async function importFromFile(): Promise<string> {
+    const path = await pickFile("Choose a style file", "Style file", ["avstyle"]);
+    if (!path) return "";
+    const imported = await importStylePackage(path);
+    await load();
+    setViewing(imported.id);
+    return `Imported “${imported.name}”. It is in My Styles.`;
+  }
+
   async function deleteCurrent() {
     if (!current || current.builtin) return;
     await remove(current.id);
@@ -96,12 +177,17 @@ export function StyleSection({ project }: { project: Project }) {
       )}
 
       {pictureError && <ErrorNotice error={pictureError} />}
+      {notice && (
+        <p className="text-sm text-success" role="status">
+          {notice}
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-72 flex-1">
           <StyleCurrentCard style={usedStyle} onChange={() => setGalleryOpen(true)} />
         </div>
-        <Button icon={Plus} onClick={() => setForm({ mode: "create", style: blankStyle() })}>
+        <Button icon={Plus} onClick={() => setCreator({ mode: "create" })}>
           Create custom style
         </Button>
       </div>
@@ -116,8 +202,9 @@ export function StyleSection({ project }: { project: Project }) {
           onToggleFavorite={(id) => updateSettings({ styleFavorites: toggleId(favorites, id) })}
           onCreate={() => {
             setGalleryOpen(false);
-            setForm({ mode: "create", style: blankStyle() });
+            setCreator({ mode: "create" });
           }}
+          onImport={importFromFile}
           onClose={() => setGalleryOpen(false)}
         />
       )}
@@ -137,8 +224,10 @@ export function StyleSection({ project }: { project: Project }) {
         <StyleDetails
           style={current}
           inUse={project.styleId === current.id}
-          onDuplicate={() => setForm({ mode: "duplicate", style: duplicateStyle(current, ids) })}
-          onEdit={() => setForm({ mode: "edit", style: current })}
+          onDuplicate={() => void duplicateCurrent()}
+          onEdit={() => void editCurrent()}
+          onReanalyze={() => void reanalyzeCurrent()}
+          onExport={() => void exportCurrent()}
           onDelete={() => setConfirmDelete(true)}
         />
       )}
@@ -153,6 +242,18 @@ export function StyleSection({ project }: { project: Project }) {
             </Button>
           </div>
         </div>
+      )}
+
+      {creator && (
+        <CreateStyleModal
+          start={creator}
+          onSaved={savedFromCreator}
+          onClose={() => setCreator(null)}
+          onManual={() => {
+            setCreator(null);
+            setForm({ mode: "create", style: blankStyle() });
+          }}
+        />
       )}
 
       {form && (
