@@ -67,6 +67,7 @@ export type {
   SceneOverride,
   SfxCategory,
   SfxCue,
+  MotionGraphic,
   SfxIntensity,
   SfxReason,
   SfxSound,

@@ -24,7 +24,7 @@ function file(name: string, extra: Partial<MediaFile> = {}): MediaFile {
 }
 
 function editorOf(media: MediaFile[]): EditorData {
-  return { media, timeChoices: {}, placeholder: "hold", overrides: {}, captions: readCaptions(null), audio: readAudio(null), render: readRender(null) };
+  return { media, motion: [], timeChoices: {}, placeholder: "hold", overrides: {}, captions: readCaptions(null), audio: readAudio(null), render: readRender(null) };
 }
 
 test("file names: timecode, scene number, bare number, nothing", () => {
