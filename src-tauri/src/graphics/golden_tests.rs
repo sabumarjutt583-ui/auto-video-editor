@@ -260,3 +260,48 @@ mod end_to_end {
         let _ = std::fs::remove_dir_all(&work);
     }
 }
+
+/// End-to-end review pictures: the plans written by `src/lib/graphics/e2e/e2e.test.ts` (tests/output/<project>/plan.json) are drawn in
+/// Chromium, ten frames per project, on a backdrop with a grey subject and a caption bar. The pictures go to tests/output/<project>/
+/// for a look by eye (not committed). Skipped when there are no plans (run `npm run test:ts` first), no Chromium or no Node.
+#[tokio::test]
+async fn end_to_end_projects_save_ten_sample_frames_each() {
+    let out = root().join("tests").join("output");
+    let Ok(read) = std::fs::read_dir(&out) else {
+        eprintln!("skipped: no plans in tests/output (run npm run test:ts first)");
+        return;
+    };
+    let mut plans: Vec<(PathBuf, Value)> = read
+        .flatten()
+        .filter_map(|e| {
+            let plan = e.path().join("plan.json");
+            let value = serde_json::from_str::<Value>(&std::fs::read_to_string(&plan).ok()?).ok()?;
+            Some((e.path(), value))
+        })
+        .collect();
+    if plans.is_empty() {
+        eprintln!("skipped: no plan.json files");
+        return;
+    }
+    plans.sort_by(|a, b| a.0.cmp(&b.0));
+    let _serial = SERIAL.lock().await;
+    let Some((session, work)) = open().await else { return };
+    for (dir, plan) in &plans {
+        let graphics = plan["graphics"].as_array().expect("graphics");
+        assert!(!graphics.is_empty(), "{}: no graphics", dir.display());
+        // Ten frames: spread over the graphics, each at a different moment (the middle of its time on screen, then other moments).
+        let moments = [0.5, 0.2, 0.8, 0.35, 0.65, 0.1, 0.9, 0.45, 0.55, 0.3];
+        for (n, moment) in moments.iter().enumerate() {
+            let g = &graphics[n % graphics.len()];
+            let duration = g["spec"]["duration"].as_f64().unwrap_or(3.0);
+            let frame = ((duration * 30.0 * moment) as u64).min((duration * 30.0) as u64 - 1);
+            let job = serde_json::json!({ "spec": g["spec"], "frame": frame, "width": plan["width"], "height": plan["height"], "subject": plan["subject"], "caption": plan["caption"] });
+            let result: Value = session.eval(&format!("window.__graphics.sampleFrame({})", serde_json::to_string(&job.to_string()).unwrap())).await.expect("sample frame");
+            let bytes = result["png"].as_str().and_then(|s| s.strip_prefix("data:image/png;base64,")).and_then(base64::decode).expect("png");
+            assert!(bytes.len() > 2000, "{}: frame {n} looks empty", dir.display());
+            std::fs::write(dir.join(format!("frame_{:02}.png", n + 1)), bytes).unwrap();
+        }
+    }
+    session.stop().await;
+    let _ = std::fs::remove_dir_all(&work);
+}

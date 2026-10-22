@@ -330,6 +330,7 @@ mod tests {
         assert!(!settings.fallback_to_groq);
         assert!(!settings.text_via_chat, "the API key is the default");
         assert_eq!(settings.openai_model, DEFAULT_OPENAI_MODEL);
+        assert!(settings.graphic_presets.is_empty() && settings.brand_kits.is_empty(), "files from before the graphics system still load");
         assert_eq!((settings.export_empty_lines, settings.export_include_ids), (2, true));
         assert_eq!(settings.default_aspect_ratio, AspectRatio::Landscape);
         assert_eq!(settings.default_quality, Quality::P1080);
@@ -403,6 +404,7 @@ mod tests {
     fn an_old_settings_file_without_the_openai_model_still_loads() {
         let settings: Settings = serde_json::from_str(r#"{"geminiModel":"gemini-3.8-flash"}"#).unwrap();
         assert_eq!(settings.openai_model, DEFAULT_OPENAI_MODEL);
+        assert!(settings.graphic_presets.is_empty() && settings.brand_kits.is_empty(), "files from before the graphics system still load");
     }
 
     #[test]

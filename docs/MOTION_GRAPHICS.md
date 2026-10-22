@@ -193,6 +193,69 @@ A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphi
 | 10 (done) | timeline editing + presets | Motion graphics phase 10: editing and presets |
 | 11 (done) | SFX for graphics | Motion graphics phase 11: graphic sound effects |
 | 12 (done) | cache + parallel | Motion graphics phase 12: cache and parallel render |
-| 13 | end-to-end tests + docs | Motion graphics phase 13: end-to-end tests and docs |
+| 13 (done) | end-to-end tests + docs | Motion graphics phase 13: end-to-end tests and docs |
 
 Every phase ends with: all old and new tests, `npx tsc -b`, `npm run build`, `cargo build` with zero warnings (also `--features admin`), then commit + push (no force). TESTING.md is run after phases 3, 7 and 13.
+
+## 7. Final architecture (after phase 13)
+
+```
+script + word timings
+   |  src/lib/graphics/director   rules find triggers (numbers, money, %, dates, places, people, lists, quotes, comparisons; en/ur/ko/ja)
+   v                              density picks scenes -> AI answers GraphicSpec JSON per batch of 20 -> validate/repair -> retry once -> rule fallback
+   |  src/lib/graphics/placement  caption zone + safe margins + subject (saliency or AI vision) -> grid search, shrink, or skip
+   v
+   |  src/lib/graphics/quality    timing, overlap, reading, fit, contrast, font, glyph, placement (with safe auto-fix)
+   v
+GraphicSpec (src/lib/graphics/spec, schema v1)  ---  one renderer: src/lib/graphics/render (renderFrame, 30 fps, no random/Date/network)
+   |                                                  used by the preview, the export worker and the tests
+   |  cache key = SHA-256(spec, renderer version, brand kit, fonts, assets version, size, fps)        src/lib/graphics/cache + Rust graphics/cache.rs
+   v
+Worker draws frames -> raw IPC -> FFmpeg rawvideo pipe -> <project>/graphics/<id>/clip.mov (PNG codec, RGBA, lossless)   Rust graphics/export.rs
+   v
+Render: overlays (clip, start, fps) -> filter_complex, above the video, below the ASS captions; graphic sounds join the SFX mix
+```
+
+Why MOV + PNG: the small LGPL FFmpeg has the `png` encoder and the `mov` muxer, but neither ProRes 4444 nor VP9 with alpha. PNG in MOV is lossless, keeps alpha exactly and decodes with the decoder the app already has. The only added FFmpeg part is the `rawvideo` demuxer.
+
+Where things are stored: `MotionGraphic` entries in `Project.editor.motion` (`kind: "spec"`, `clipPath`, `spec`, `origin`, `colors`); brand kits and presets in the settings file; clips in the project; the cache in app_data/graphics-cache.
+
+## 8. GraphicSpec reference (schema v1)
+
+A spec is `{ schemaVersion: 1, id, name?, duration (0.3-20 s), seed?, brand?, layers[1..16] }`. Positions are fractions of the frame (0..1), times are seconds, the frame rate is 30. Every layer has `id, type, box {x,y,w,h}, start, duration?, enter?, exit?, opacity`.
+
+| Layer type | Main fields |
+|---|---|
+| text, richText | text (max 120 chars) / runs[1..8] (text, weight, color), size, align, maxLines |
+| image | src (a relative file of the project, never a web address), fit, radius |
+| icon | icon {set: lucide or tabler, name}, color |
+| shape | shape (rect, roundRect, circle, line), fill, stroke, strokeWidth, radius |
+| counter | from, to, decimals, prefix, suffix, format (plain, grouped, compact), label, size, color |
+| chart | kind (bar, line, pie, donut), title, unit, rows[1..12] {label, value}, highlight |
+| timeline | orientation, events[2..8] {label, date} |
+| map | region, projection, countries[<=30], pins[<=12], routes[<=6], camera keys[<=8] (a map needs at least one country, pin or route) |
+| lowerThird, quoteCard, list, progressBar, particles, kineticText, flag | see section 5f and schema.ts |
+
+Animations: enter presets none, fade, slideUp, slideDown, slideLeft, slideRight, scale, pop, wipe, typewriter; exit presets without pop and typewriter; easings linear, easeOut, easeInOut, easeOutBack, easeOutExpo, spring. Colours are names (primary, secondary, accent, text, muted, background, success, danger) or #RRGGBB. `validateSpec` is strict (used for tests and edits); `repairSpec` clamps and drops what it can (used for everything the AI writes). The limits are in `LIMITS` (spec/limits.ts); the Rust mirror is src-tauri/src/graphics/spec.rs; shared fixtures are in spec/fixtures/.
+
+## 9. How to add a new layer type
+
+Do all of these together (a test fails when one is missing):
+1. **Schema**: add the name to `LAYER_TYPES` and write the layer object in spec/schema.ts (reuse `base`); add it to the union.
+2. **Rust mirror**: add the variant to `enum Layer` in src-tauri/src/graphics/spec.rs.
+3. **Fixture**: add a layer of the new type to spec/fixtures/all_layers.json (the TS and Rust fixture tests read the same file).
+4. **Renderer**: write render/draw/<type>.ts (use `DrawEnv`; no Math.random, Date or network) and add the `case` in render/renderFrame.ts. Report problems as notes (truncated, shrunk, missing-*), never by throwing.
+5. **Golden images**: add cases (enter, hold, exit) to render/harness/cases.ts and run `UPDATE_GOLDEN=1 cargo test golden`; look at the new PNGs before committing.
+6. **Editing**: if the layer has texts, numbers, icons or countries, add them to editing/fields.ts so the inspector can edit them.
+7. **Director**: if the AI may use it as a main graphic, `MAIN_TYPES` (director/guide.ts) is made from `LAYER_TYPES`, so the AI is offered the new type automatically; describe how to use it in director/guide.ts and check the director tests.
+8. **Quality and sound**: texts are found by quality/checks.ts through `textsOf` (export/fonts.ts); add the type there if it carries text. A new sound rule goes in audio/graphicSfx.ts.
+9. **Cache**: bump `RENDERER_VERSION` (spec/limits.ts) when the drawing of an existing type changes, so old cached clips are not reused.
+10. **Docs**: this section 8 table, and the tests above.
+
+## 10. End-to-end tests (phase 13)
+
+- Fixtures: tests/fixtures/e2e/{documentary_en, story_ur, story_ko, short_en_9x16}.json (a script per scene; word times are made at 0.42 s per word) and tests/fixtures/legacy_project.json (a project from before this system).
+- `src/lib/graphics/e2e/e2e.test.ts`: for each project runs the director (with an AI that gives no usable answer, so the rule fallback makes the graphics), placement against a subject and the caption zone, the quality checks with the real Noto glyph tables and the safe fixes, and the timing checks (inside the scene, exact frame counts at 30 fps). It writes tests/output/<project>/plan.json (not committed).
+- `cargo test end_to_end`: draws ten frames per project in Chromium on a backdrop with a grey subject and a caption bar, into tests/output/<project>/frame_01..10.png for a look by eye (the caption bar is drawn last, so it is always on top). Skipped without Chromium or plans.
+- `src/lib/graphics/e2e/legacy.test.ts` and the settings test: old projects and old settings files open, and old AI-written graphics still become the same overlays.
+- Real video renders (frame-exact length, captions burned in over graphics) are covered by the Rust render tests and the 5-second smoke test (src-tauri/src/smoke_test.rs), which includes a transparent graphic clip.

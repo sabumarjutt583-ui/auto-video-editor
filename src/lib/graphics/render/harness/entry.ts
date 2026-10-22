@@ -5,13 +5,15 @@
 import { loadCities } from "../../geo/cities.ts";
 import { loadMapData, mapDataOfSpec } from "../../geo/mapData.ts";
 import { FLAG_CODES, flagCodesOf, flagKey, loadFlagBitmaps } from "../../library/flags.ts";
-import { ensureIcons, iconsOfSpec, iconShape } from "../../library/icons.ts";
+import { ensureIcons, iconRefsOf, iconsOfSpec, iconShape } from "../../library/icons.ts";
 import type { GeoAssets } from "./geoCases.ts";
 import type { Canvas2D, RenderContext } from "../context.ts";
 import { drawFlagPicture } from "../draw/geo.ts";
 import { renderFrame } from "../renderFrame.ts";
 import { DEFAULT_THEME, type Theme } from "../theme.ts";
 import { GOLDEN_CASES, GOLDEN_SIZE } from "./cases.ts";
+import type { GraphicSpec } from "../../spec/schema.ts";
+import type { Box } from "../../placement/geometry.ts";
 
 const FONT_FILES: ReadonlyArray<readonly [string, string, string]> = [
   ["Noto Sans", "NotoSans-Regular.ttf", "400"], ["Noto Sans", "NotoSans-Bold.ttf", "700"],
@@ -250,6 +252,48 @@ const api = {
     const chunk = 0x8000;
     for (let i = 0; i < data.length; i += chunk) text += String.fromCharCode(...data.subarray(i, i + chunk));
     return btoa(text);
+  },
+  /**
+   * A review picture for the end-to-end projects: a backdrop with a grey subject and a caption bar, and one frame of a graphic on top.
+   * `job` is JSON: { spec, frame, width, height, subject, caption }.
+   */
+  async sampleFrame(job: string): Promise<{ png: string; notes: string[] }> {
+    const j = JSON.parse(job) as { spec: GraphicSpec; frame: number; width: number; height: number; subject: Box | null; caption: Box | null };
+    const { width, height } = j;
+    await ensureIcons(iconRefsOf(j.spec));
+    const out = document.createElement("canvas");
+    out.width = width;
+    out.height = height;
+    const ctx = out.getContext("2d");
+    if (!ctx) throw new Error("no 2d context");
+    const back = ctx.createLinearGradient(0, 0, width, height);
+    back.addColorStop(0, "#1f2a44");
+    back.addColorStop(1, "#3b2a4a");
+    ctx.fillStyle = back;
+    ctx.fillRect(0, 0, width, height);
+    if (j.subject) {
+      ctx.fillStyle = "rgba(200,200,210,0.55)";
+      ctx.beginPath();
+      ctx.ellipse((j.subject.x + j.subject.w / 2) * width, (j.subject.y + j.subject.h / 2) * height, (j.subject.w / 2) * width, (j.subject.h / 2) * height, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const layer = document.createElement("canvas");
+    layer.width = width;
+    layer.height = height;
+    const lctx = layer.getContext("2d");
+    if (!lctx) throw new Error("no 2d context");
+    const report = renderFrame(j.spec, j.frame, lctx as Canvas2D, context(width, height));
+    ctx.drawImage(layer, 0, 0);
+    if (j.caption) {
+      // Captions are drawn last: they are always on top of a graphic.
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(j.caption.x * width, j.caption.y * height, j.caption.w * width, j.caption.h * height);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `${Math.round(height * 0.04)}px "Noto Sans"`;
+      ctx.textAlign = "center";
+      ctx.fillText("CAPTIONS", (j.caption.x + j.caption.w / 2) * width, (j.caption.y + j.caption.h * 0.65) * height);
+    }
+    return { png: out.toDataURL("image/png"), notes: report.notes.map((n) => `${n.layerId}:${n.kind}`) };
   },
   /** The share of fully transparent pixels of a case (nothing is painted outside the layers). */
   transparentShare(index: number): number {

@@ -1,0 +1,16 @@
+{
+  "name": "short_en_9x16",
+  "title": "30-second 9:16 Short",
+  "language": "English",
+  "aspect": "9:16",
+  "minSeconds": 25,
+  "maxSeconds": 45,
+  "minGraphics": 1,
+  "scenes": [
+    "Did you know Japan has about 125 million people living on four main islands?",
+    "Tokyo alone has 14 million, and trains there carry over 40 million passengers every day.",
+    "A bowl of ramen costs around 1,000 yen, which is about 7 dollars.",
+    "Here are three things to try. First, sushi. Second, ramen. Third, tempura.",
+    "Follow for more facts about Asia, Europe and America."
+  ]
+}

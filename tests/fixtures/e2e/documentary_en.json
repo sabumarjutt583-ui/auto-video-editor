@@ -1,0 +1,31 @@
+{
+  "name": "documentary_en",
+  "title": "2-minute English documentary with numbers, places, names and a list",
+  "language": "English",
+  "aspect": "16:9",
+  "minSeconds": 105,
+  "maxSeconds": 140,
+  "minGraphics": 5,
+  "scenes": [
+    "In 1969 the United States spent about 25.4 billion dollars to put two men on the Moon.",
+    "Mission control in Houston followed every second while 400,000 people worked on the project.",
+    "Dr. Margaret Hamilton wrote the flight software that kept the computers from crashing.",
+    "Here are three reasons the landing succeeded. First, careful testing. Second, a brave crew. Third, steady leadership.",
+    "The spacecraft left Florida on July 16 and travelled 384,000 kilometres to the Moon.",
+    "Neil Armstrong said: \"That's one small step for man, one giant leap for mankind.\"",
+    "Back on Earth, about 600 million people watched from Tokyo, London, Cairo and Karachi.",
+    "In Japan the broadcast reached nearly 95 percent of homes with a television set.",
+    "Costs were huge, yet the programme created thousands of new inventions and jobs.",
+    "Prices of computer chips fell 50 percent within five years because of the demand.",
+    "Russia had launched the first satellite in 1957, which started the space race.",
+    "By 1972 the American programme had sent twelve people to walk on the surface.",
+    "Today India, China and Europe also plan missions, and the budget is much smaller than in 1969.",
+    "The sea of Tranquility stayed quiet, and the footprints are still there without any wind.",
+    "Engineers compare the old computers with a phone, which is millions of times faster.",
+    "The crew landed with only about 25 seconds of fuel left, a risk few people knew about.",
+    "Scientists later brought back 382 kilograms of rock that taught us how the Moon formed.",
+    "Many countries signed a treaty in 1967 that keeps space open for peaceful use.",
+    "Now private companies in America and Europe want to return before 2030.",
+    "The story shows what a nation can do when it chooses one clear goal and works together."
+  ]
+}

@@ -33,3 +33,4 @@ src-tauri/gen/
 
 # Reference code from a third party (read-only, never pushed)
 vendor/
+tests/output/

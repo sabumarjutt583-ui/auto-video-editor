@@ -18,6 +18,7 @@ cargo build --features admin                 # no warnings (admin build)
 cargo test                                   # Rust tests (needs the sidecar for the FFmpeg ones: npm run setup:ffmpeg)
 cargo test smoke_test -- --nocapture         # 5-second project with every feature (CI runs it with the installer FFmpeg)
 cargo test --features admin                  # adds the Admin Edition tests
+cargo test end_to_end                        # motion graphics: 4 projects, 10 review frames each into tests/output (run npm run test:ts first, it writes the plans)
 cargo test golden                            # motion graphics: every layer / enter / exit preset / script drawn in Chromium and compared with src/lib/graphics/render/golden/*.png (UPDATE_GOLDEN=1 rewrites them: look at them first)
 cargo test imagegen                          # Image Generator: queue, scheduler, real Chromium against a fake Gemini page (needs Chromium; skips when none is found)
 cargo test --release performance_20_minutes -- --ignored --nocapture   # 20 min, 200 scenes, 1080p (slow)
@@ -168,3 +169,18 @@ Check by hand: add a counter graphic and a sliding title; Audio tab > Sound effe
 
 ### Motion graphics phase 12 (cache and parallel drawing)
 Check by hand: make graphics with the AI director (several are drawn at once); edit a text and change it back (the second draw is instant); Settings > Graphics cache shows a count and size; Clear cache empties it and graphics already in the project still render.
+
+### Motion graphics phase 13: full automatic run (2026-10-22, Linux sandbox, headless)
+
+| Check | Result |
+|---|---|
+| `npx tsc -b` | clean |
+| `npm run test:ts` | 435 passed, 0 failed, 0 skipped (incl. 5 end-to-end project tests, 3 old-project tests, 7 graphic-sound tests, 6 cache tests, 18 editing tests) |
+| `npm run test:scripts` / `styles:check` | 9 passed / 58 passed, all 51 styles complete |
+| `npm run build` | ok |
+| `cargo build` (user / admin) | 0 warnings / 0 warnings |
+| `cargo test` (user / admin) | 439 / 455 passed, 0 failed, 1 ignored (the 20-minute performance test) |
+| `cargo test smoke_test` | passed (5-second render with every feature and a transparent graphic clip) |
+| `cargo test end_to_end` | passed: 10 review frames for each of the 4 projects written to tests/output and looked at by eye (graphics clear of the subject, captions on top) |
+
+By hand, not done here (no Windows PC, no desktop window, no real Google account or API keys in the sandbox): sections 3 and 4 above (acceptance by phase, 20-minute performance render), the Windows installer, real AI answers for the director, real audio playback of the graphic sounds, and the new editing screens (Graphics track, inspector, presets) used with a mouse. Their checks are written in this file under each phase.
