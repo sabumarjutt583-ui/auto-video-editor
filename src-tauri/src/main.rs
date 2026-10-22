@@ -11,6 +11,7 @@ mod commands;
 mod custom_style;
 mod ffmpeg;
 mod ffmpeg_job;
+mod graphics;
 mod imagegen;
 mod jobs;
 mod keys;

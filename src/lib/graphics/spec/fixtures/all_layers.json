@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "all",
+  "duration": 10,
+  "seed": 42,
+  "brand": "news",
+  "layers": [
+    { "id": "t", "type": "text", "box": { "x": 0.1, "y": 0.05, "w": 0.8, "h": 0.1 }, "text": "Hello", "size": 0.06, "weight": "bold", "align": "center", "maxLines": 2, "color": "#FFFFFF" },
+    { "id": "i", "type": "icon", "box": { "x": 0.1, "y": 0.2, "w": 0.05, "h": 0.05 }, "icon": { "set": "tabler", "name": "flame" } },
+    { "id": "s", "type": "shape", "box": { "x": 0.1, "y": 0.3, "w": 0.2, "h": 0.05 }, "shape": "line", "stroke": "primary", "strokeWidth": 0.005 },
+    { "id": "c", "type": "counter", "box": { "x": 0.1, "y": 0.4, "w": 0.3, "h": 0.1 }, "from": 0, "to": 1250.5, "decimals": 1, "prefix": "$", "format": "grouped", "label": "Revenue" },
+    { "id": "ch", "type": "chart", "box": { "x": 0.5, "y": 0.2, "w": 0.4, "h": 0.3 }, "kind": "bar", "title": "Sales", "unit": "M", "rows": [ { "label": "A", "value": 10 }, { "label": "B", "value": 25 } ], "highlight": 1 },
+    { "id": "tl", "type": "timeline", "box": { "x": 0.1, "y": 0.55, "w": 0.8, "h": 0.15 }, "orientation": "horizontal", "events": [ { "label": "Start", "date": "1990" }, { "label": "End", "date": "2020" } ] },
+    { "id": "m", "type": "map", "box": { "x": 0.1, "y": 0.1, "w": 0.5, "h": 0.4 }, "region": "asia", "projection": "mercator", "countries": [ { "code": "pk", "label": "Pakistan" } ], "pins": [ { "name": "Karachi", "lat": 24.86, "lon": 67.01 } ], "routes": [ { "from": { "lat": 24.86, "lon": 67.01 }, "to": { "lat": 35.68, "lon": 139.69 } } ] },
+    { "id": "lt", "type": "lowerThird", "box": { "x": 0.05, "y": 0.75, "w": 0.4, "h": 0.1 }, "title": "Name", "subtitle": "Role", "icon": { "set": "lucide", "name": "user" } },
+    { "id": "q", "type": "quoteCard", "box": { "x": 0.1, "y": 0.3, "w": 0.8, "h": 0.3 }, "quote": "To be or not to be", "author": "Someone" },
+    { "id": "l", "type": "list", "box": { "x": 0.1, "y": 0.3, "w": 0.5, "h": 0.4 }, "style": "checks", "items": [ { "text": "One" }, { "text": "Two", "icon": { "set": "lucide", "name": "check" } } ] },
+    { "id": "p", "type": "progressBar", "box": { "x": 0.1, "y": 0.8, "w": 0.6, "h": 0.04 }, "from": 0, "to": 0.75, "label": "Done", "showPercent": true },
+    { "id": "pa", "type": "particles", "box": { "x": 0, "y": 0, "w": 1, "h": 1 }, "kind": "confetti", "count": 120 },
+    { "id": "k", "type": "kineticText", "box": { "x": 0.1, "y": 0.4, "w": 0.8, "h": 0.2 }, "words": ["Fast", "and", "clear"], "style": "pop" },
+    { "id": "f", "type": "flag", "box": { "x": 0.8, "y": 0.05, "w": 0.1, "h": 0.07 }, "country": "JP", "shape": "rect", "label": "Japan" }
+  ]
+}

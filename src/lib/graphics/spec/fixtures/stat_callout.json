@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "g1",
+  "name": "Stat callout",
+  "duration": 4,
+  "seed": 7,
+  "brand": "default",
+  "layers": [
+    { "id": "card", "type": "shape", "box": { "x": 0.05, "y": 0.1, "w": 0.4, "h": 0.2 }, "shape": "roundRect", "fill": "background", "opacity": 0.8, "enter": { "preset": "slideLeft", "duration": 0.5 } },
+    { "id": "icon", "type": "icon", "box": { "x": 0.07, "y": 0.12, "w": 0.06, "h": 0.1 }, "icon": { "set": "lucide", "name": "users" }, "color": "accent" },
+    { "id": "num", "type": "counter", "box": { "x": 0.15, "y": 0.12, "w": 0.28, "h": 0.1 }, "from": 0, "to": 8000000000, "format": "compact", "suffix": "+", "start": 0.3, "duration": 3.2 }
+  ]
+}

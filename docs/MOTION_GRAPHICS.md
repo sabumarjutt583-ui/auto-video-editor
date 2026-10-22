@@ -72,12 +72,20 @@ One renderer for preview and export (R5). Cache key = hash(spec + rendererVersio
 - No automatic conversion: an AI-written HTML file cannot be turned into layers. "Make it again" on a legacy graphic offers "as Custom (AI HTML)" or "with the new engine".
 - Orphan folders (`motion/<id>/` without a record) are found and offered for deletion in "Clear cache" (phase 12).
 
+## 5b. GraphicSpec v1 (phase 1)
+
+- Files: `src/lib/graphics/spec/{parse,limits,catalog,schema,index}.ts` (+ `spec.test.ts`, fixtures in `fixtures/*.json`), Rust mirror `src-tauri/src/graphics/spec.rs` (same fixtures are read by a Rust test).
+- `parse.ts` is a tiny schema library (no dependency): `num`, `str`, `oneOf`, `obj`, `arr`, `opt`, `variant`, `refine`. Output types are inferred, so the TypeScript types cannot drift from the validator.
+- `validateSpec(input)` = strict: every problem is an error with a path (`layers[2].to must be a number`), nothing is changed. `repairSpec(input)` = clamps numbers, cuts text, removes control characters, drops unknown fields and layers that cannot be repaired, moves boxes inside the picture, renames repeated ids, fits layer times into the graphic; it fails only when nothing usable is left. A repaired spec always passes `validateSpec` (tested with 800 random mutations). `describeIssues` makes short lines for the AI retry message.
+- Layer types (14): text, icon, shape, counter, chart, timeline, map, lowerThird, quoteCard, list, progressBar, particles, kineticText, flag. Positions are fractions of the frame, times are seconds from the graphic start, frame rate is fixed 30 fps (not in the spec). Limits are in `limits.ts` (max 20 s, 16 layers, 120 characters of text, 12 chart rows, 300 particles ...).
+- Icon and country names are checked through `Catalog` (`defaultCatalog` accepts well-formed Lucide/Tabler names and ISO country codes; phase 4 plugs in the real icon index).
+
 ## 6. Phase checklist (commit per phase)
 
 | Phase | Result | Commit message |
 |---|---|---|
 | 0 | this document | Motion graphics phase 0: audit and plan |
-| 1 | GraphicSpec schema, validator, repairSpec, Rust structs | Motion graphics phase 1: GraphicSpec schema and validation |
+| 1 (done) | GraphicSpec schema, validator, repairSpec, Rust structs | Motion graphics phase 1: GraphicSpec schema and validation |
 | 2 | renderer core (text, richText, shape, icon, image), timing engine, preview panel | Motion graphics phase 2: renderer core |
 | 3 | transparent export + composite + alpha tests | Motion graphics phase 3: transparent export and composite |
 | 4 | icons, flags, maps | Motion graphics phase 4: icons, flags and maps |
