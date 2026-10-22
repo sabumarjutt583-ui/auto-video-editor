@@ -37,3 +37,10 @@ export function listenImageGenState(handler: (snapshot: ImageGenSnapshot) => voi
 export function listenSavedImage(handler: (image: SavedImage) => void): Promise<UnlistenFn> {
   return listen<SavedImage>("imagegen-image", (event) => handler(event.payload));
 }
+
+export interface ChatAnswer {
+  text: string;
+  code: string[];
+}
+/** One question to Gemini's web chat (Google accounts, no API key). */
+export const imagegenChatAsk = (prompt: string) => invoke<ChatAnswer>("imagegen_chat_ask", { prompt });
