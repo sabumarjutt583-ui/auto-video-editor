@@ -108,6 +108,8 @@ If an account reaches its daily limit, only that account waits (the time is show
 
 In the Auto Editor, open the **Motion** tab, pick a scene and press **Make a motion graphic**. You can write what it should show (for example "a bar falling from 100 to 50") or leave it empty and the AI chooses what fits the words. It takes about a minute. It uses the Google accounts from Settings > Image Generator, so add at least one. Use the arrows to make it again, the slider to move it in time, and the tick to switch it off. It is added on top of the video when you render (not in the small preview). Graphics keep the shape of the video they were made for: a 16:9 graphic is not used in a Shorts (9:16) render.
 
+**Automatic graphics.** In the Motion tab press **Generate graphics**. The app finds numbers, money, percentages, dates, places, names, lists and quotes in your narration, the AI picks the few moments that deserve a graphic and the app draws them in your brand kit. Choose **Few, Normal or Many** first. Many scenes stay clean on purpose. **Only for S05** does one scene, and the round arrow on a graphic makes a new one. Graphics you made yourself are never replaced.
+
 **Brand kit.** In the Motion tab, open **Brand kit** to choose the look of your graphics: three ready-made kits (Clean Documentary, Bold News, Soft Story), kits that match your visual style (for example Noir gives grey tones and capital-letter titles), or your own. Change colours, round corners, line thickness, shadow and movement, watch the four sample pictures change, then press **Save as my kit**. **Use for all projects** makes it the default.
 
 ## SFX Library

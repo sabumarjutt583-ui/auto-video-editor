@@ -147,3 +147,7 @@ Manual checks (the screen itself was not run in the sandbox, and no real Gemini/
 ### Motion graphics, phase 4 (2026-10-22, Linux sandbox)
 
 `npm run test:ts` 328 passed (icons, countries, flags, maps, projections, cities, routes); `cargo test` 430 passed incl. 16 map/flag/icon golden pictures and "every bundled flag draws" in Chromium; `tsc`, `npm run build`, `cargo build` (also `--features admin`) clean. Check by hand: Auto Editor > Motion > "Graphic preview (new engine)" > an icon sample shows a Lucide icon. Maps and flags have no layer yet (phase 5).
+
+### Motion graphics phase 7 (AI graphics director)
+Check by hand: Auto Editor > Motion > Automatic graphics: press Generate graphics on a project with timing, the number of graphics follows Few/Normal/Many, every graphic starts on its spoken word, Cancel keeps finished graphics, the round arrow on a graphic replaces only that graphic, and a hand-made graphic stays.
+Results: `npm run test:ts` 362 passed (11 new director tests: detection en/ur/ko/ja, density, window, mocked AI with invalid JSON/retry/fallback/failed/cancel, banned names, variety), `test:scripts` 9, `styles:check` ok, `cargo test` 431 and `--features admin` 447 passed, `tsc`, `npm run build`, `cargo build` (also `--features admin`) 0 warnings.

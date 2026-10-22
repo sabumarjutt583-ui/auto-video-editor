@@ -141,6 +141,14 @@ A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphi
 - Limits and honest notes: only the bundled Noto fonts can be chosen (a typewriter or serif look needs a font file added to resources/fonts, which needs your OK); the logo is stored with the kit but no layer draws it yet; density and safe margins are used by the AI director (phase 7) and placement (phase 8); the kit used for a graphic is not stored with the graphic yet (phase 10 editing and phase 12 cache add it).
 - Tests: `src/lib/graphics/brand/brand.test.ts` (valid built-ins, readable text on every background, repair of broken values, every style has a kit, kit choice, theme, changing the kit changes fillStyle / fonts / letters / shadow / line width / default entrance in the drawn output) and six golden pictures `brand_*_sampler`.
 
+## 5h. AI graphics director (phase 7)
+- Code: src/lib/graphics/director/ (pure, tested). Step 1 is rules only: `detectTriggers(scene, places)` finds numbers (also written out and scaled: 3.5 million, 24 کروڑ, 5,100만, 1億2000万), money, percentages, dates and years, places (countries and cities from the bundled tables plus everyday aliases such as 한국, 米国, امریکہ), persons (titles), quotes, comparisons and one list per scene, in English, Urdu, Korean and Japanese. Times are the exact start of the first word (`exact`); a scene without timed words gets an estimated time.
+- Step 2 asks the AI (`generateText`, so Gemini, Groq backup or the web chat) in batches of 20 for ONE GraphicSpec per scene or null. The prompt has the scene text, the triggers (index = "i"), the style, the brand kit summary, the density, the allowed layer types and up to 30 icon names, and a list of the types used before (variety).
+- Density (`selectScenes`): low 10-25 %, normal 30-50 %, high 55-75 % of the scenes, at most 1/2/3 neighbours in a row, scenes under 1.8 s and scenes without a trigger stay clean. Same input gives the same choice. A single-scene request ignores the limit.
+- Window: starts on the spoken trigger, ends 0.1 s before the scene ends, 1.2-8 s, starts earlier when the trigger comes too late.
+- The AI is not trusted: JSON is extracted, the graphic goes through `repairSpec`, picture layers are removed, brand/artist names that the narration does not say are refused, the id is ours. A bad graphic is asked for once more with the problems; then a simple rule-made graphic (counter, text, map, lower third, quote) or none. A failed request keeps the finished batches; Cancel stops and keeps what was drawn.
+- UI: Motion tab > Automatic graphics (density Few/Normal/Many, defaults to the kit's, "Generate graphics", "Only for S05", Cancel) and a Regenerate button on every automatic graphic. Automatic graphics are `MotionGraphic.origin = "director"`; a new run replaces them, graphics made by hand are never touched.
+
 ## 6. Phase checklist (commit per phase)
 
 | Phase | Result | Commit message |
@@ -152,7 +160,7 @@ A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphi
 | 4 (done) | icons, flags, maps | Motion graphics phase 4: icons, flags and maps |
 | 5 (done) | advanced layers | Motion graphics phase 5: advanced layers |
 | 6 (done) | brand kit | Motion graphics phase 6: brand kit |
-| 7 | AI graphics director | Motion graphics phase 7: AI graphics director |
+| 7 (done) | AI graphics director | Motion graphics phase 7: AI graphics director |
 | 8 | placement | Motion graphics phase 8: smart placement |
 | 9 | quality checks | Motion graphics phase 9: quality checks |
 | 10 | timeline editing + presets | Motion graphics phase 10: editing and presets |

@@ -83,7 +83,7 @@ function readMotion(value: unknown): MotionGraphic | null {
     const clipPath = value.clipPath;
     const repaired = repairSpec(value.spec);
     if (typeof clipPath !== "string" || !insideProject(clipPath) || !clipPath.endsWith(".mov") || !repaired.ok) return null;
-    return { ...common, framesDir: "", htmlPath: "", kind: "spec", clipPath, spec: repaired.spec };
+    return { ...common, framesDir: "", htmlPath: "", kind: "spec", clipPath, spec: repaired.spec, ...(value.origin === "director" ? { origin: "director" as const } : {}) };
   }
   if (typeof value.framesDir !== "string" || !insideProject(value.framesDir)) return null;
   return { ...common, framesDir: value.framesDir, htmlPath: text(value.htmlPath, "") ?? "" };

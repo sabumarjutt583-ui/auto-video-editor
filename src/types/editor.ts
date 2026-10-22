@@ -203,6 +203,8 @@ export interface MotionGraphic {
   clipPath?: string;
   /** Spec graphics: what the clip shows (kept so it can be edited and drawn again). */
   spec?: GraphicSpec;
+  /** "director" = placed by the AI graphics director (regenerating replaces it); missing = made by hand. */
+  origin?: "director";
 }
 
 export interface EditorData {
