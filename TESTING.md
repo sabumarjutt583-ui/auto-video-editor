@@ -184,3 +184,16 @@ Check by hand: make graphics with the AI director (several are drawn at once); e
 | `cargo test end_to_end` | passed: 10 review frames for each of the 4 projects written to tests/output and looked at by eye (graphics clear of the subject, captions on top) |
 
 By hand, not done here (no Windows PC, no desktop window, no real Google account or API keys in the sandbox): sections 3 and 4 above (acceptance by phase, 20-minute performance render), the Windows installer, real AI answers for the director, real audio playback of the graphic sounds, and the new editing screens (Graphics track, inspector, presets) used with a mouse. Their checks are written in this file under each phase.
+
+### Web chat reliability, Manual mode, deleting (2026-10-22, Linux sandbox, headless)
+
+| Check | Result |
+|---|---|
+| `npx tsc -b` / `npm run build` | clean / ok |
+| `npm run test:ts` | 462 passed, 0 failed, 0 skipped (chat messages, parsing, verification, runner, manual mode, delete prompts, unlink pictures, short-scene merge, Korean script sample) |
+| `npm run test:scripts` | 9 passed |
+| `cargo build` (user / admin) | 0 warnings / 0 warnings |
+| `cargo test` | 447 passed, 0 failed, 1 ignored (the 20-minute performance test) |
+| Fake Gemini chat page (headless Chromium) | slow answer with Stop button (start window shorter than the wait), loaded once and sent once, soft failure, usage limit, no answer = `no_response`, long message waits for the pasted-text attachment, captcha page = flagged, signed-out = auth |
+
+Not done here (no Windows PC, no real Google account, no desktop window): the real Gemini page, the Recycle Bin on Windows (the move is tested with a fake bin; the `trash` crate does the real move), the full by-hand checklist of sections 3 and 4. Check by hand: web chat with the browser mode "hidden" shows no Chrome window; a 40-scene project writes 2 batches in one chat; Manual mode builds the same prompts from pasted answers; delete a picture and see it in the Recycle Bin; Undo after Clear all prompts.

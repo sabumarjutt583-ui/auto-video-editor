@@ -104,3 +104,10 @@ copy-paste mode (6).
   picture card (Project scenes and Only images). In project mode `unlinkPictures` clears `matchedFile`, the chosen
   file and the media-list entry, so the Auto Editor shows missing media; the card offers Regenerate.
 - New dependency: `trash` 5 (named in the task). Mentioned in CLAUDE.md.
+
+## Part 9: tests (done)
+- Fake chat page tests (src-tauri/src/imagegen/browser_tests.rs, testdata/gemini_chat.html): slow answer with Stop
+  visible (scaled: start window 4 s, answer element after 6 s), page loaded once and message sent once, soft failure,
+  limit, no answer, pasted-text attachment wait, captcha, signed out.
+- TS: chat.test.ts, manual.test.ts, delete.test.ts, unlink.test.ts, short.test.ts.
+- Not testable here: the real Gemini page (selectors in config.json `chat` block can be updated without a new app).

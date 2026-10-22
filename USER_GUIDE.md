@@ -104,6 +104,20 @@ The page has two modes. **Project scenes** makes one picture per scene of the op
 
 If an account reaches its daily limit, only that account waits (the time is shown); the others continue. If Google asks you to check something (captcha, "unusual activity"), the account is paused and you see the message: open the account's browser, do the check yourself, then Verify.
 
+## Writing prompts with the Gemini web chat, or by hand
+
+In the Prompt Generator (Project and Quick) you choose the **Engine**: **API key**, **Gemini web chat (automatic)** or **Manual (copy & paste)**.
+
+**Gemini web chat.** The app uses the Google accounts you added in Settings. It works in a hidden browser (no Chrome window appears). It sends one setup message, waits for `READY`, then sends your scenes in batches of 20 (change this in Settings, Text engine) in the same chat. While Gemini is thinking the app only waits ("Gemini is thinking... 42 s"); it never refreshes the page or sends a message twice. If Gemini gives a generic error, the app waits 30 seconds and tries once in a new chat. If that fails too, it stops and shows Gemini's reply in Details. Cancel stops after the current answer is finished.
+
+**Checked prompts.** Every prompt must end with your style's exact style lock and contain the exact looks of every character and the location text. If Gemini forgot something, the app adds it and marks the row **fixed** (hover to see what changed). A row marked **check** looks odd (for example very short) but was not changed.
+
+**Manual (copy & paste).** Press "Prepare messages". Copy message 1 (Setup) into any AI chat (Gemini, ChatGPT, Claude...), then each batch message in the same chat. Paste each answer into the box under the message and press **Use answer**. The app tells you if scene IDs are missing and gives you a follow-up message for them. No browser, account or key is needed.
+
+**Your words.** Scene text is your own script, not the speech recognition text (without a script the Scenes step says so). Scenes shorter than 2 seconds are joined to a neighbour (Scenes step, "Shortest scene").
+
+**Deleting.** Prompts step: the bin button on a row, the checkboxes with "Delete selected", and "Clear all prompts" (your script and scenes stay). An Undo bar stays for 10 seconds. Image Generator: delete one picture, the selected ones, or "Delete all images". Pictures go to the Recycle Bin / Trash and are not made again; in a project the scene shows as missing and you can press Regenerate.
+
 ## Motion graphics (free, written by the AI)
 
 In the Auto Editor, open the **Motion** tab, pick a scene and press **Make a motion graphic**. You can write what it should show (for example "a bar falling from 100 to 50") or leave it empty and the AI chooses what fits the words. It takes about a minute. It uses the Google accounts from Settings > Image Generator, so add at least one. Use the arrows to make it again, the slider to move it in time, and the tick to switch it off. It is added on top of the video when you render (not in the small preview). Graphics keep the shape of the video they were made for: a 16:9 graphic is not used in a Shorts (9:16) render.

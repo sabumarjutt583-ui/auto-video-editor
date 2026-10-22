@@ -26,10 +26,18 @@
     });
     picker.click();
   });
+  var sendButton = document.getElementById('send');
+  input.addEventListener('input', function () {
+    // A long text is turned into a pasted-text attachment: Send is blocked for a moment.
+    if (input.innerText.length > 2000 && !input.dataset.pasted) { input.dataset.pasted = '1'; sendButton.disabled = true; setTimeout(function () { sendButton.disabled = false; }, 1500); }
+  });
   document.getElementById('send').addEventListener('click', function () {
     var prompt = input.innerText.trim();
     if (!prompt) return;
     input.innerText = '';
+    fetch('/beacon');
+    if (prompt.indexOf('[captcha]') >= 0) { document.body.innerHTML = '<p>Our systems have detected unusual traffic from your computer network</p>'; return; }
+    if (prompt.indexOf('[signedout]') >= 0) { var acc = document.querySelector('a[aria-label^="Google Account"]'); if (acc) acc.remove(); var si = document.createElement('a'); si.href = 'https://accounts.google.com/ServiceLogin?x=1'; si.textContent = 'Sign in'; document.body.appendChild(si); return; }
     var stop = document.createElement('button');
     stop.setAttribute('aria-label', 'Stop response');
     document.body.appendChild(stop);
@@ -51,7 +59,7 @@
     window.__sends = (window.__sends || 0) + 1;
     setTimeout(function () { if (delay) chat.appendChild(response);
     var timer = setInterval(function () {
-      i += 6;
+      i += Math.max(6, Math.ceil(full.length / 25));
       content.innerText = full.slice(0, i);
       if (i >= full.length) {
         clearInterval(timer);

@@ -294,3 +294,38 @@ async fn a_generic_error_reply_is_a_soft_failure() {
     assert_eq!(error.kind, ErrorKind::SoftFailure);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_slow_answer_is_never_refreshed_or_sent_twice() {
+    let Some((worker, server, dir)) = worker("chat-once").await else { return };
+    let loads_before = server.chat_loads.load(std::sync::atomic::Ordering::SeqCst);
+    let reply = worker.chat("[think] only once", &[], Duration::from_secs(60)).await.expect("waited");
+    assert!(reply.text.contains("only once"));
+    assert_eq!(server.chat_sends.load(std::sync::atomic::Ordering::SeqCst), 1, "the message was sent once");
+    assert_eq!(server.chat_loads.load(std::sync::atomic::Ordering::SeqCst) - loads_before, 1, "the chat page was loaded once, never refreshed");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_long_message_waits_for_the_pasted_text_to_be_ready_before_sending() {
+    let Some((worker, server, dir)) = worker("chat-paste").await else { return };
+    let long = format!("[fast] {}", "word ".repeat(600));
+    let started = std::time::Instant::now();
+    let reply = worker.chat(&long, &[], Duration::from_secs(60)).await.expect("long message answered");
+    assert!(started.elapsed() >= Duration::from_millis(1400), "Send was pressed only after the attachment was ready");
+    assert!(reply.text.starts_with("Echo: [fast]"));
+    assert_eq!(server.chat_sends.load(std::sync::atomic::Ordering::SeqCst), 1);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_captcha_page_and_a_signed_out_chat_pause_the_account_and_are_not_worked_around() {
+    let Some((first, _server, dir)) = worker("chat-human").await else { return };
+    let captcha = first.chat("[captcha] hi", &[], Duration::from_secs(30)).await.expect_err("captcha");
+    assert_eq!(captcha.kind, ErrorKind::Flagged, "{}", captcha.message);
+    let Some((worker2, _server2, dir2)) = worker("chat-signedout").await else { return };
+    let signed_out = worker2.chat("[signedout] hi", &[], Duration::from_secs(30)).await.expect_err("signed out");
+    assert_eq!(signed_out.kind, ErrorKind::Auth, "{}", signed_out.message);
+    let _ = std::fs::remove_dir_all(dir);
+    let _ = std::fs::remove_dir_all(dir2);
+}

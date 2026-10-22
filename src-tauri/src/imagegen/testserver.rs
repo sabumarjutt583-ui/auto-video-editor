@@ -2,7 +2,7 @@
 //! `127.0.0.1:PORT/gemini` is the Gemini page; the tool is served from `localhost:PORT`, which the
 //! browser sees as another site, so it runs in its own process exactly like Google's sandboxed frame.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -17,6 +17,9 @@ const CHAT: &str = include_str!("testdata/gemini_chat.html");
 pub struct TestServer {
     pub port: u16,
     pub signed_in: Arc<AtomicBool>,
+    /// How often the fake chat page was loaded / a message was sent in it.
+    pub chat_loads: Arc<AtomicUsize>,
+    pub chat_sends: Arc<AtomicUsize>,
 }
 
 /// Keeps the block between `<!--NAME-->` and `<!--/NAME-->` or drops it.
@@ -37,10 +40,14 @@ impl TestServer {
         let port = listener.local_addr().expect("addr").port();
         let signed_in = Arc::new(AtomicBool::new(true));
         let flag = signed_in.clone();
+        let chat_loads = Arc::new(AtomicUsize::new(0));
+        let chat_sends = Arc::new(AtomicUsize::new(0));
+        let (loads, sends) = (chat_loads.clone(), chat_sends.clone());
         tokio::spawn(async move {
             loop {
                 let Ok((mut socket, _)) = listener.accept().await else { return };
                 let flag = flag.clone();
+                let (loads, sends) = (loads.clone(), sends.clone());
                 tokio::spawn(async move {
                     let mut buffer = vec![0u8; 8192];
                     let count = socket.read(&mut buffer).await.unwrap_or(0);
@@ -54,7 +61,14 @@ impl TestServer {
                             ("200 OK", page.replace("__TOOL_ORIGIN__", &format!("http://localhost:{port}")))
                         }
                         "/tool" => ("200 OK", TOOL.to_string()),
-                        "/chat" => ("200 OK", CHAT.to_string()),
+                        "/chat" => {
+                            loads.fetch_add(1, Ordering::SeqCst);
+                            ("200 OK", CHAT.to_string())
+                        }
+                        "/beacon" => {
+                            sends.fetch_add(1, Ordering::SeqCst);
+                            ("200 OK", String::new())
+                        }
                         "/favicon.ico" => ("404 Not Found", String::new()),
                         _ => ("404 Not Found", "not found".to_string()),
                     };
@@ -65,7 +79,7 @@ impl TestServer {
                 });
             }
         });
-        Self { port, signed_in }
+        Self { port, signed_in, chat_loads, chat_sends }
     }
 
     pub fn gemini_url(&self) -> String {
