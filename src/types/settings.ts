@@ -42,4 +42,6 @@ export interface AppSettings {
   brandKits: unknown[];
   /** The brand kit of the app (built-in, suggested or custom id). */
   brandKitId: string;
+  /** Graphics saved as presets (any JSON; `readPresets` checks them). */
+  graphicPresets: unknown[];
 }

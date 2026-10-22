@@ -1,4 +1,5 @@
 import { repairSpec } from "../graphics/spec/index.ts";
+import { cleanOverrides } from "../graphics/editing/colors.ts";
 import type { EditorData, KenBurns, MotionGraphic, MediaFile, Placeholder, SceneOverride, TimeChoice, Transition, VideoFit } from "../../types/editor.ts";
 import type { Project } from "../../types/project.ts";
 import { readAudio } from "../audio/read.ts";
@@ -65,6 +66,11 @@ function insideProject(path: string): boolean {
   return path !== "" && !path.startsWith("/") && !path.includes("..") && !path.includes("\\") && !/^[A-Za-z]:/.test(path);
 }
 
+function colorsOf(value: unknown): Pick<MotionGraphic, "colors"> {
+  const colors = cleanOverrides(value);
+  return Object.keys(colors).length > 0 ? { colors } : {};
+}
+
 function readMotion(value: unknown): MotionGraphic | null {
   if (!isObject(value) || typeof value.id !== "string" || typeof value.sceneId !== "string") return null;
   const common = {
@@ -83,7 +89,7 @@ function readMotion(value: unknown): MotionGraphic | null {
     const clipPath = value.clipPath;
     const repaired = repairSpec(value.spec);
     if (typeof clipPath !== "string" || !insideProject(clipPath) || !clipPath.endsWith(".mov") || !repaired.ok) return null;
-    return { ...common, framesDir: "", htmlPath: "", kind: "spec", clipPath, spec: repaired.spec, ...(value.origin === "director" ? { origin: "director" as const } : {}) };
+    return { ...common, framesDir: "", htmlPath: "", kind: "spec", clipPath, spec: repaired.spec, ...(value.origin === "director" ? { origin: "director" as const } : {}), ...colorsOf(value.colors) };
   }
   if (typeof value.framesDir !== "string" || !insideProject(value.framesDir)) return null;
   return { ...common, framesDir: value.framesDir, htmlPath: text(value.htmlPath, "") ?? "" };

@@ -84,11 +84,16 @@ pub struct Settings {
     pub brand_kits: Vec<serde_json::Value>,
     /// The brand kit of the app: a built-in, suggested or custom kit id.
     pub brand_kit_id: String,
+    /// Graphics the person saved as presets (JSON objects; the frontend checks them when it reads them).
+    pub graphic_presets: Vec<serde_json::Value>,
 }
 
 /// Most brand kits a person can keep, and the size of one kit as JSON text.
 const MAX_BRAND_KITS: usize = 50;
 const MAX_BRAND_KIT_BYTES: usize = 20_000;
+/// Most graphic presets, and the size of one preset as JSON text.
+const MAX_GRAPHIC_PRESETS: usize = 100;
+const MAX_GRAPHIC_PRESET_BYTES: usize = 30_000;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -116,6 +121,7 @@ impl Default for Settings {
             onboarding_done: false,
             brand_kits: Vec::new(),
             brand_kit_id: "clean_documentary".to_string(),
+            graphic_presets: Vec::new(),
         }
     }
 }
@@ -176,6 +182,9 @@ impl Settings {
 
         if self.brand_kits.len() > MAX_BRAND_KITS || self.brand_kits.iter().any(|kit| !kit.is_object() || kit.to_string().len() > MAX_BRAND_KIT_BYTES) {
             return Err(invalid("A brand kit is not valid or there are too many of them."));
+        }
+        if self.graphic_presets.len() > MAX_GRAPHIC_PRESETS || self.graphic_presets.iter().any(|p| !p.is_object() || p.to_string().len() > MAX_GRAPHIC_PRESET_BYTES) {
+            return Err(invalid("A graphic preset is not valid or there are too many of them."));
         }
         let brand_kit_id = self.brand_kit_id.trim().to_string();
         if brand_kit_id.is_empty() || brand_kit_id.len() > 60 || brand_kit_id.contains(char::is_control) {
@@ -292,6 +301,25 @@ mod tests {
         let mut empty_id = settings;
         empty_id.brand_kit_id = "  ".to_string();
         assert!(empty_id.validated().is_err());
+    }
+
+    #[test]
+    fn graphic_presets_are_kept_and_checked_for_size_and_shape() {
+        let mut settings = Settings::default();
+        assert!(settings.graphic_presets.is_empty());
+        settings.graphic_presets = vec![serde_json::json!({"id": "card", "name": "Card", "spec": {}, "samples": []})];
+        assert_eq!(settings.clone().validated().unwrap().graphic_presets.len(), 1);
+        let old: Settings = serde_json::from_str("{\"geminiModel\": \"gemini-3.8-flash\"}").unwrap();
+        assert!(old.graphic_presets.is_empty());
+        let mut bad = settings.clone();
+        bad.graphic_presets = vec![serde_json::json!("text")];
+        assert!(bad.validated().is_err());
+        let mut many = settings.clone();
+        many.graphic_presets = (0..101).map(|i| serde_json::json!({"id": format!("p{i}")})).collect();
+        assert!(many.validated().is_err());
+        let mut big = settings;
+        big.graphic_presets = vec![serde_json::json!({"name": "x".repeat(30_001)})];
+        assert!(big.validated().is_err());
     }
 
     #[test]

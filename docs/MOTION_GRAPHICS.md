@@ -160,6 +160,11 @@ A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphi
 - Checks: **timing** (inside the scene, ends 0.1 s before it; fix = trim/shift), **overlap** (two graphics that show at once AND cover each other; side by side is allowed; fix = shorten the earlier one), **reading** (0.3 s per word + 0.5 s, CJK about 2 characters per word; fix = extend within the scene), **fit** (the renderer's own "truncated" notes; fix = letters 10 % smaller, up to 3 times), **contrast** (text vs. the plate of the graphic or the real picture colour under it, at least 4.5:1; fix = a rounded dim plate behind the text, and white/black text if the plate is not enough), **font** (the kit's font for the script must be one that suits it, e.g. Urdu needs Noto Sans Arabic), **glyph** (every character must exist in one of the font files of the script's font list; empty boxes are an error), **placement** (phase 8 solver). Errors/warnings that cannot be repaired stay in the report.
 - App: src/components/graphics/quality/ (`useGraphicQuality`: loads the real fonts, builds the environment, runs the checks; `fix` redraws every changed graphic as a new clip and replaces it in one undoable edit; `QualityPanel` in the Motion tab; `RenderCheck` at the top of the Render dialog (report only, never blocks); a warning triangle on every graphic with an open problem). Picture colour comes from the 256 px preview picture of the scene (`frameToSource` maps the text box to the picture).
 
+## 5k. Editing and presets (phase 10)
+- Pure logic src/lib/graphics/editing/ (+editing.test.ts, 18 tests): `fields` (texts/numbers/icon/country of a spec, `setField` re-validates strictly), `animation` (enter/exit presets), `colors` (per-graphic overrides on top of the kit; stored as `MotionGraphic.colors`), `move` (drag snaps to safe-area edges and centre, never enters the caption zone), `retime` (edges snap to word times, min 1.2 s, ends 0.1 s before the scene end), `presets` (texts become `{{n}}` placeholders; `fillPreset`; `presetExamples` gives the AI up to 3 as `channelExamples`), `list`.
+- App: store/graphicSelectionStore, components/editor/timeline/GraphicsTrack (Graphics row between Video and Captions: click selects and seeks, drag moves, drag an edge changes the time), components/graphics/editing/{useGraphicEditing,GraphicInspector,PresetsPanel}. Every change goes through `applyEdit`, so undo/redo works. A change that alters the picture draws a new clip with a new id (clip files are never overwritten); a pure time move only changes `start`. Presets live in settings `graphicPresets` (max 100, Rust-checked).
+- Limit: undo/redo is not unit-tested (stores cannot be imported in node tests); it relies on `applyEdit`.
+
 ## 6. Phase checklist (commit per phase)
 
 | Phase | Result | Commit message |
@@ -174,7 +179,7 @@ A brand kit is the look every graphic of a channel shares. Code: `src/lib/graphi
 | 7 (done) | AI graphics director | Motion graphics phase 7: AI graphics director |
 | 8 (done) | placement | Motion graphics phase 8: smart placement |
 | 9 (done) | quality checks | Motion graphics phase 9: quality checks |
-| 10 | timeline editing + presets | Motion graphics phase 10: editing and presets |
+| 10 (done) | timeline editing + presets | Motion graphics phase 10: editing and presets |
 | 11 | SFX for graphics | Motion graphics phase 11: graphic sound effects |
 | 12 | cache + parallel | Motion graphics phase 12: cache and parallel render |
 | 13 | end-to-end tests + docs | Motion graphics phase 13: end-to-end tests and docs |

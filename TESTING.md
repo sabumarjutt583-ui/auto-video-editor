@@ -159,3 +159,6 @@ Results phase 8: `npm run test:ts` 380 passed (18 placement tests: caption zone 
 ### Motion graphics phase 9 (quality checks)
 Check by hand: Motion tab > Quality check > Check graphics on a project with white text over a bright picture: contrast is listed; Fix what can be fixed adds a dark plate and the problem goes (the graphic is drawn again). Korean text with a Latin-only kit font is listed as missing letters. Open Render video: the Graphics check box shows the same list above the buttons and does not stop the render.
 Results phase 9: `npm run test:ts` 396 passed (15 quality tests incl. real Noto font glyph coverage), `test:scripts` 9, `styles:check` ok, `tsc`, `npm run build`, `cargo build` (also admin) 0 warnings; no Rust code changed (cargo test 432 / 448 from phase 8).
+
+### Motion graphics phase 10 (editing and presets)
+Check by hand: click a block on the Graphics track (Motion tab opens with the inspector); drag its edges (snaps to word times) and move it; edit a text and press Apply changes; drag the preview picture (it cannot enter the caption zone); change entrance/exit and colours; Duplicate, Remove, Ctrl+Z / Ctrl+Y; Save as preset, then insert it on another scene with new texts.

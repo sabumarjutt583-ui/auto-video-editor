@@ -6,7 +6,8 @@ import { frameAt } from "../../lib/motion/request";
 import { requestCancel } from "../../store/jobStore";
 import type { MotionGraphic, Project, Scene } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
-import { BrandKitPanel, DirectorPanel, GraphicLab, GraphicPreview, QualityPanel, useBrandKit, useGraphicDirector, useGraphicExport, useGraphicQuality } from "../graphics";
+import { BrandKitPanel, DirectorPanel, GraphicInspector, GraphicLab, GraphicPreview, QualityPanel, useBrandKit, useGraphicDirector, useGraphicExport, useGraphicQuality, PresetsPanel, type GraphicEditing } from "../graphics";
+import { useGraphicSelection } from "../../store/graphicSelectionStore";
 import { Button, Checkbox, Field, TextInput } from "../ui";
 import type { MotionView } from "./useMotion";
 
@@ -16,6 +17,7 @@ interface MotionPanelProps {
   graphics: readonly MotionGraphic[];
   scene: Scene | undefined;
   view: MotionView;
+  editing: GraphicEditing;
   /** A picture of the selected scene (shown behind the graphic preview). */
   backgroundUrl?: string | null;
 }
@@ -41,7 +43,10 @@ function Preview({ dir, graphic }: { dir: string; graphic: MotionGraphic }) {
 }
 
 /** Motion graphics written by the AI for the selected scene. */
-export function MotionPanel({ project, dir, graphics, scene, view, backgroundUrl }: MotionPanelProps) {
+export function MotionPanel({ project, dir, graphics, scene, view, editing, backgroundUrl }: MotionPanelProps) {
+  const selectedId = useGraphicSelection((x) => x.selectedId);
+  const select = useGraphicSelection((x) => x.select);
+  const chosen = graphics.find((g) => g.id === selectedId && g.kind === "spec" && g.spec);
   const [idea, setIdea] = useState("");
   const brand = useBrandKit(project);
   const exporter = useGraphicExport(project, dir, brand.theme);
@@ -57,6 +62,8 @@ export function MotionPanel({ project, dir, graphics, scene, view, backgroundUrl
       <p className="text-xs text-muted">Gemini writes a new animation for this scene: a chart, a title, a highlight, a map, anything that fits the words. It uses your Google accounts (Settings, Image Generator). The result is laid over the video when you render.</p>
       <DirectorPanel view={director} scene={scene} />
       <QualityPanel view={quality} />
+      {chosen && <GraphicInspector key={chosen.id} project={project} graphic={chosen} kit={brand.kit} theme={brand.theme} editing={editing} backgroundUrl={backgroundUrl ?? null} {...(chosen.origin === "director" ? { onRegenerate: () => void director.generate(new Set([chosen.sceneId])) } : {})} onRemoved={() => select(null)} />}
+      <PresetsPanel editing={editing} scene={scene} />
       {scene && (
         <>
           <Field label="What should it show? (optional, leave empty to let the AI decide)" htmlFor="motion-idea">
@@ -84,6 +91,7 @@ export function MotionPanel({ project, dir, graphics, scene, view, backgroundUrl
           <div className="flex items-center justify-between text-xs text-muted">
             <span>{badges.has(g.id) && <AlertTriangle className={`mr-1 inline h-3.5 w-3.5 ${badges.get(g.id)?.severity === "error" ? "text-danger" : "text-warning"}`} aria-label="Warning" />}{g.sceneId} · from {g.start.toFixed(1)} s · {g.duration.toFixed(1)} s{g.kind === "spec" ? (g.origin === "director" ? " · automatic" : " · drawn by the app") : g.idea ? ` · ${g.idea}` : ""}</span>
             <span className="flex gap-1">
+              {g.kind === "spec" && <button type="button" className="cursor-pointer rounded px-1 text-accent hover:underline" onClick={() => select(g.id)}>Edit</button>}
               {g.origin === "director" && <button type="button" className="cursor-pointer rounded p-1 hover:text-fg disabled:opacity-40" aria-label="Regenerate" title="Regenerate" disabled={director.job !== null} onClick={() => void director.generate(new Set([g.sceneId]))}><RefreshCw className="h-4 w-4" /></button>}
               {g.kind !== "spec" && <button type="button" className="cursor-pointer rounded p-1 hover:text-fg disabled:opacity-40" aria-label="Make it again" disabled={busy} onClick={() => { const s: Scene | undefined = project.scenes.find((x) => x.id === g.sceneId); if (s) void view.make(s, g.idea, g.id); }}><RefreshCw className="h-4 w-4" /></button>}
               <button type="button" className="cursor-pointer rounded p-1 hover:text-danger" aria-label="Delete" onClick={() => view.remove(g.id)}><Trash2 className="h-4 w-4" /></button>

@@ -205,6 +205,8 @@ export interface MotionGraphic {
   spec?: GraphicSpec;
   /** "director" = placed by the AI graphics director (regenerating replaces it); missing = made by hand. */
   origin?: "director";
+  /** Colours that replace the brand kit's for this graphic only (role -> #RRGGBB). */
+  colors?: Partial<Record<"primary" | "secondary" | "accent" | "text" | "muted" | "background", string>>;
 }
 
 export interface EditorData {

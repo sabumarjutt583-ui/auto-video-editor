@@ -179,4 +179,10 @@ describe("AI answers", () => {
     assert.match(p, /chart/);
     assert.match(p, /45%/);
   });
+  it("saved presets are offered to the AI as examples (at most 3)", () => {
+    const p = buildBatchPrompt({ scenes: [s1], icons: [], earlier: [], examples: ["{\"a\":1}", "{\"b\":2}", "{\"c\":3}", "{\"d\":4}"] });
+    assert.match(p, /channelExamples/);
+    assert.doesNotMatch(p, /\\"d\\"/);
+    assert.doesNotMatch(buildBatchPrompt({ scenes: [s1], icons: [], earlier: [] }), /channelExamples/);
+  });
 });

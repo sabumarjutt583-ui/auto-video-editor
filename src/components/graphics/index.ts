@@ -8,3 +8,4 @@ export { useGraphicDirector, type DirectorView } from "./director/useGraphicDire
 export { QualityPanel } from "./quality/QualityPanel";
 export { RenderCheck } from "./quality/RenderCheck";
 export { useGraphicQuality, type QualityView } from "./quality/useGraphicQuality";
+export { GraphicInspector, PresetsPanel, useGraphicEditing, type GraphicEditing } from "./editing";

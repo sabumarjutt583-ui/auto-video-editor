@@ -33,6 +33,8 @@ export interface DirectorArgs {
   call: (system: string, prompt: string) => Promise<string>;
   /** Icon names ("lucide:users") that fit a scene, best first. */
   icons: (scene: DirectorScene) => Promise<string[]>;
+  /** Short JSON examples of the person's saved graphics (presets), shown to the AI. */
+  examples?: readonly string[];
   /** Only these scenes (a per-scene request: the density limit does not apply). Missing = the whole project. */
   only?: ReadonlySet<string>;
   /** Types of graphics that stay in the project, to vary the new ones. */
@@ -106,7 +108,7 @@ export async function directGraphics(args: DirectorArgs): Promise<DirectorResult
     let pending = batch;
     try {
       for (let attempt = 0; attempt < 2 && pending.length > 0; attempt++) {
-        const prompt = buildBatchPrompt({ scenes: pending, icons: [...icons], earlier, ...(attempt > 0 ? { problems } : {}) });
+        const prompt = buildBatchPrompt({ scenes: pending, icons: [...icons], earlier, ...(args.examples ? { examples: args.examples } : {}), ...(attempt > 0 ? { problems } : {}) });
         const text = await call(system, prompt);
         const parsed = parseAnswer(text, pending.map((s) => s.id));
         const failing: DirectorScene[] = [];

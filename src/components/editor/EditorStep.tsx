@@ -14,7 +14,9 @@ import type { MediaFile, Project, Scene, SceneOverride } from "../../types";
 import { AudioPanel, useAudio, useSfxLibrary } from "../audio";
 import { CaptionsPanel, useCaptions } from "../captions";
 import { ErrorNotice } from "../ErrorNotice";
+import { useBrandKit, useGraphicEditing } from "../graphics";
 import { MotionPanel, useMotion } from "../motion";
+import { useGraphicSelection } from "../../store/graphicSelectionStore";
 import { RenderModal, useRender } from "../render";
 import { useMediaActions } from "../media/useMediaActions";
 import { SegmentedControl } from "../ui";
@@ -42,6 +44,10 @@ export function EditorStep({ project }: { project: Project }) {
   const library = useSfxLibrary();
   const audio = useAudio(project, editor, captions.lines, library);
   const motion = useMotion(project);
+  const brand = useBrandKit(project);
+  const graphicEditing = useGraphicEditing(project, dir, brand.theme);
+  const selectedGraphic = useGraphicSelection((x) => x.selectedId);
+  const selectGraphic = useGraphicSelection((x) => x.select);
   const [renderOpen, setRenderOpen] = useState(false);
   useEffect(() => {
     useSceneFocusStore.getState().set(project.id, selectedId);
@@ -132,7 +138,7 @@ export function EditorStep({ project }: { project: Project }) {
               )}
               {tab === "captions" && <CaptionsPanel project={project} view={captions} />}
               {tab === "audio" && <AudioPanel project={project} view={audio} library={library} />}
-              {tab === "motion" && <MotionPanel project={project} dir={dir} graphics={editor.motion} scene={selected} view={motion} backgroundUrl={selectedFile?.kind === "image" ? convertFileSrc(selectedFile.path) : null} />}
+              {tab === "motion" && <MotionPanel project={project} dir={dir} graphics={editor.motion} scene={selected} view={motion} editing={graphicEditing} backgroundUrl={selectedFile?.kind === "image" ? convertFileSrc(selectedFile.path) : null} />}
               {tab === "scene" && selected && (
                 <OverridesPanel
                   sceneId={selected.id}
@@ -147,7 +153,7 @@ export function EditorStep({ project }: { project: Project }) {
           </div>
           <div className="flex min-h-0 min-w-0 flex-col gap-4">
             <PreviewPlayer project={project} editor={editor} dir={dir} overlay={captions.overlay} />
-            <Timeline scenes={project.scenes} context={context} files={files} captionLines={captions.style.preset === "none" ? [] : captions.lines} audio={editor.audio} cues={audio.cues} selectedCue={audio.selectedCue} onSelectCue={(id) => { audio.selectCue(id); setTab("audio"); }} onMoveCue={(id, time) => audio.editCue(id, { time })} onDeleteCue={audio.deleteCue} selectedId={selected?.id ?? null} onSelect={setSelectedId} onBoundary={changeBoundary} onSwap={swap} />
+            <Timeline scenes={project.scenes} context={context} files={files} captionLines={captions.style.preset === "none" ? [] : captions.lines} audio={editor.audio} cues={audio.cues} selectedCue={audio.selectedCue} onSelectCue={(id) => { audio.selectCue(id); setTab("audio"); }} onMoveCue={(id, time) => audio.editCue(id, { time })} onDeleteCue={audio.deleteCue} selectedId={selected?.id ?? null} onSelect={setSelectedId} onBoundary={changeBoundary} onSwap={swap} graphics={editor.motion.filter((g) => g.kind === "spec")} selectedGraphic={selectedGraphic} limitsFor={graphicEditing.limitsFor} onSelectGraphic={(g) => { selectGraphic(g.id); setSelectedId(g.sceneId); setTab("motion"); }} onRetimeGraphic={(id, to) => void graphicEditing.retime(id, to)} />
           </div>
         </div>
       </div>

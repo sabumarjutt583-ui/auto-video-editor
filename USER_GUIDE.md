@@ -112,6 +112,8 @@ In the Auto Editor, open the **Motion** tab, pick a scene and press **Make a mot
 
 **Quality check.** In the Motion tab, **Check graphics** looks for text that does not fit, text that is hard to read on the picture, graphics that disappear too fast, letters the font cannot draw, graphics over a face or the captions, and graphics that overlap or leave their scene. **Fix what can be fixed** repairs the safe ones (a dark plate behind text, more time, a better place). A warning triangle marks graphics with a problem left. The same list appears when you press Render; it never stops the render.
 
+**Edit a graphic.** Graphics have their own **Graphics** row on the timeline. Click one to edit it: change its texts and numbers (press **Apply changes**), drag it on the preview picture, drag its edges on the timeline to change when it shows (it snaps to the spoken words), pick how it comes in and goes out, or give it its own colours. **Duplicate**, **Remove** and undo/redo work as everywhere else. **Save as preset** keeps a graphic in **My Presets** with its texts as blanks; add it to any scene with your own words. The AI sees your presets as examples of the look you like.
+
 **Brand kit.** In the Motion tab, open **Brand kit** to choose the look of your graphics: three ready-made kits (Clean Documentary, Bold News, Soft Story), kits that match your visual style (for example Noir gives grey tones and capital-letter titles), or your own. Change colours, round corners, line thickness, shadow and movement, watch the four sample pictures change, then press **Save as my kit**. **Use for all projects** makes it the default.
 
 ## SFX Library

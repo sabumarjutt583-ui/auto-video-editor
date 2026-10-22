@@ -111,7 +111,7 @@ export function useGraphicQuality(project: Project, dir: string | null, kit: Bra
       const redrawn = [];
       for (const [i, g] of result.changed.entries()) {
         const old = readEditor(useProjectStore.getState().project ?? project).motion.find((m) => m.id === g.id);
-        redrawn.push(await drawGraphic(project, dir, theme, { id: newGraphicId(), sceneId: g.sceneId, start: g.start, duration: g.duration, spec: g.spec, ...(old?.origin ? { origin: old.origin } : {}) }, `Drawing the repaired graphic ${i + 1} of ${result.changed.length}`));
+        redrawn.push(await drawGraphic(project, dir, theme, { id: newGraphicId(), sceneId: g.sceneId, start: g.start, duration: g.duration, spec: g.spec, ...(old?.origin ? { origin: old.origin } : {}), ...(old?.colors ? { colors: old.colors } : {}) }, `Drawing the repaired graphic ${i + 1} of ${result.changed.length}`));
       }
       if (redrawn.length > 0) {
         const data = readEditor(useProjectStore.getState().project ?? project);

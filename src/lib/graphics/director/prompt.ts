@@ -51,6 +51,8 @@ export interface BatchPromptInput {
   icons: readonly string[];
   /** Graphics chosen so far, to vary the types. */
   earlier: ReadonlyArray<{ id: string; type: string }>;
+  /** Graphics the person saved as presets, as short JSON examples of the look they like. */
+  examples?: readonly string[];
   /** Scene id -> what was wrong with the last answer (a retry). */
   problems?: Readonly<Record<string, string>>;
 }
@@ -74,6 +76,7 @@ export function buildBatchPrompt(input: BatchPromptInput): string {
     })),
   }));
   const body: Record<string, unknown> = { scenes, icons: input.icons.slice(0, 30), earlier: input.earlier.slice(-12) };
+  if (input.examples && input.examples.length > 0) body.channelExamples = { note: "Graphics this channel made and saved. Use their look (layout, entrances, text length) when one fits a scene; never copy their texts.", specs: input.examples.slice(0, 3) };
   if (input.problems && Object.keys(input.problems).length > 0) {
     body.problems = input.problems;
     body.note = "The graphics of these scenes could not be used. Fix them (the problems are listed) and answer again for these scenes only.";

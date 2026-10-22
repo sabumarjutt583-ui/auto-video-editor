@@ -5,6 +5,7 @@ import { isCancelled, toAppError } from "../../../lib/errors";
 import { readEditor } from "../../../lib/editor/model";
 import { buildPlaceIndex, detectTriggers, directGraphics, fallbackFor, type DirectorScene, type Placed, type TimedWord } from "../../../lib/graphics/director";
 import { kitSummary, type BrandKit, type Density } from "../../../lib/graphics/brand";
+import { presetExamples, readPresets } from "../../../lib/graphics/editing";
 import { captionZone, placeAll, safeArea } from "../../../lib/graphics/placement";
 import { loadCities } from "../../../lib/graphics/geo/cities";
 import { searchIcons } from "../../../lib/graphics/library/icons";
@@ -12,6 +13,7 @@ import type { Theme } from "../../../lib/graphics/render/theme";
 import { LANGUAGES } from "../../../lib/languages";
 import { applyEdit } from "../../../store/historyStore";
 import { runJob, selectJob, useJobStore, type JobInfo } from "../../../store/jobStore";
+import { useSettingsStore } from "../../../store/settingsStore";
 import { useProjectStore } from "../../../store/projectStore";
 import { useStyleStore } from "../../../store/styleStore";
 import type { AppError, MotionGraphic, Project } from "../../../types";
@@ -55,6 +57,7 @@ async function iconsFor(scene: DirectorScene): Promise<string[]> {
 export function useGraphicDirector(project: Project, dir: string | null, kit: BrandKit, theme: Theme): DirectorView {
   const job = useJobStore(selectJob(["graphics-plan", "placement", "graphic-export"]));
   const styles = useStyleStore((s) => s.styles);
+  const presetsRaw = useSettingsStore((s) => s.settings?.graphicPresets) ?? [];
   const [density, setDensity] = useState<Density>(kit.density);
   const [error, setError] = useState<AppError | null>(null);
   const [cancelled, setCancelled] = useState(false);
@@ -82,6 +85,7 @@ export function useGraphicDirector(project: Project, dir: string | null, kit: Br
           scenes, settings: { density, language, styleName, kitSummary: kitSummary(kit) }, ...(only ? { only } : {}), earlier,
           call: async (system, prompt) => (await generateText(prompt, system, true, jobId)).text,
           icons: iconsFor,
+          examples: presetExamples(readPresets(presetsRaw)),
         }),
       );
       // Placement: keep every graphic off the subject, the captions and the margins.

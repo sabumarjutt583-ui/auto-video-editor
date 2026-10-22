@@ -5,10 +5,12 @@ import { moveBoundaryToTime } from "../../../lib/editor/boundaries";
 import { clampZoom, fitZoom, MAX_PIXELS_PER_SECOND, MIN_PIXELS_PER_SECOND, sceneIndexAt } from "../../../lib/editor/timeline";
 import type { Context } from "../../../lib/scenes/edit";
 import { usePlaybackStore } from "../../../store/playbackStore";
-import type { AudioData, CaptionLine, MediaFile, Scene, SfxCue } from "../../../types";
+import type { TimeLimits } from "../../../lib/graphics/editing";
+import type { AudioData, CaptionLine, MediaFile, MotionGraphic, Scene, SfxCue } from "../../../types";
 import { IconButton } from "../../ui";
 import { usePlaybackControls } from "../usePlayback";
 import { CaptionsTrack } from "./CaptionsTrack";
+import { GraphicsTrack } from "./GraphicsTrack";
 import { MusicTrack } from "./MusicTrack";
 import { Playhead } from "./Playhead";
 import { Ruler } from "./Ruler";
@@ -18,7 +20,7 @@ import { TrackRow } from "./TrackRow";
 import { useTimelineDrag, type DragState } from "./useTimelineDrag";
 import { VideoTrack } from "./VideoTrack";
 
-const LABELS = ["Video", "Captions", "Music", "SFX"] as const;
+const LABELS = ["Video", "Graphics", "Captions", "Music", "SFX"] as const;
 
 interface TimelineProps {
   scenes: Scene[];
@@ -35,10 +37,15 @@ interface TimelineProps {
   onSelect: (sceneId: string) => void;
   onBoundary: (scenes: Scene[]) => void;
   onSwap: (fromIndex: number, toIndex: number) => void;
+  graphics: readonly MotionGraphic[];
+  selectedGraphic: string | null;
+  limitsFor: (g: MotionGraphic) => TimeLimits | null;
+  onSelectGraphic: (g: MotionGraphic) => void;
+  onRetimeGraphic: (id: string, to: { start: number; duration: number }) => void;
 }
 
-/** Zoomable tracks: Video, Captions, Music and SFX, with the playhead and draggable clip edges. */
-export function Timeline({ scenes, context, files, captionLines, audio, cues, selectedCue, onSelectCue, onMoveCue, onDeleteCue, selectedId, onSelect, onBoundary, onSwap }: TimelineProps) {
+/** Zoomable tracks: Video, Graphics, Captions, Music and SFX, with the playhead and draggable clip edges. */
+export function Timeline({ scenes, context, files, captionLines, audio, cues, selectedCue, onSelectCue, onMoveCue, onDeleteCue, selectedId, onSelect, onBoundary, onSwap, graphics, selectedGraphic, limitsFor, onSelectGraphic, onRetimeGraphic }: TimelineProps) {
   const controls = usePlaybackControls();
   const scroller = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLDivElement>(null);
@@ -137,7 +144,7 @@ export function Timeline({ scenes, context, files, captionLines, audio, cues, se
       </div>
       <div className="flex min-h-0">
         <div className="w-16 shrink-0 pt-6 text-[11px] text-muted" aria-hidden>
-          {[["Video", "4.5rem"], ["Captions", "2rem"], ["Music", "2.25rem"], ["SFX", "2.25rem"]].map(([label, height]) => (
+          {[["Video", "4.5rem"], ["Graphics", "2.75rem"], ["Captions", "2rem"], ["Music", "2.25rem"], ["SFX", "2.25rem"]].map(([label, height]) => (
             <div key={label} className="flex items-center border-b border-transparent" style={{ height }}>
               {label}
             </div>
@@ -173,13 +180,16 @@ export function Timeline({ scenes, context, files, captionLines, audio, cues, se
                   onCancel={cancel}
                 />
               </TrackRow>
-              <TrackRow label={LABELS[1]} height="2rem">
+              <TrackRow label={LABELS[1]} height="2.75rem">
+                <GraphicsTrack graphics={graphics} selectedId={selectedGraphic} limitsFor={limitsFor} onSelect={(g) => { onSelectGraphic(g); controls.seek(g.start); }} onRetime={onRetimeGraphic} />
+              </TrackRow>
+              <TrackRow label={LABELS[2]} height="2rem">
                 <CaptionsTrack lines={captionLines} onSeek={controls.seek} />
               </TrackRow>
-              <TrackRow label={LABELS[2]} height="2.25rem">
+              <TrackRow label={LABELS[3]} height="2.25rem">
                 <MusicTrack audio={audio} />
               </TrackRow>
-              <TrackRow label={LABELS[3]} height="2.25rem">
+              <TrackRow label={LABELS[4]} height="2.25rem">
                 <SfxTrack cues={cues} selectedId={selectedCue} onSelect={onSelectCue} onMove={onMoveCue} onDelete={onDeleteCue} />
               </TrackRow>
               <Playhead pixelsPerSecond={pixelsPerSecond} />
