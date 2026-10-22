@@ -95,3 +95,12 @@ copy-paste mode (6).
 - Prompts step: "Clear all prompts" (confirmation, keeps script/scenes/settings), a Delete button per row, row
   checkboxes + "Delete selected", and a 10-second Undo bar. Logic: src/lib/prompts/delete.ts (+delete.test.ts).
 - A prompt deleted while an answer is on its way (or while a manual batch is pending) is not brought back by it.
+
+## Part 8: delete images (done)
+- Rust: `imagegen_delete_images` (commands/imagegen.rs) -> `imagegen/delete.rs` (`trash_pictures`: only `media/<plain name>`,
+  moved to the system Recycle Bin / Trash with the `trash` crate, never deleted for good) + `Queue::remove_forced`
+  (also a job being made: its picture is then not saved). A file that could not be moved keeps its queue entry.
+- Frontend: DeleteImagesBar (Delete selected / Delete all images with a count confirmation), a delete button on every
+  picture card (Project scenes and Only images). In project mode `unlinkPictures` clears `matchedFile`, the chosen
+  file and the media-list entry, so the Auto Editor shows missing media; the card offers Regenerate.
+- New dependency: `trash` 5 (named in the task). Mentioned in CLAUDE.md.

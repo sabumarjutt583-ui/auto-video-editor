@@ -267,6 +267,43 @@ pub async fn imagegen_remove_jobs(ig: Ig<'_>, ids: Vec<String>) -> Result<usize,
     Ok(ig.engine.remove_jobs(&ids))
 }
 
+/// One picture to delete: the job id (scene id) and its saved file, if there is one.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteItem {
+    pub id: String,
+    pub file: Option<String>,
+}
+
+/// Deletes pictures: the files go to the Recycle Bin / Trash and their queue entries are removed (so they are not made or
+/// saved again, also after a restart). `project_id` for Project scenes, `folder` for Only images. A file that could not be
+/// moved keeps its queue entry.
+#[tauri::command]
+pub async fn imagegen_delete_images(
+    app: AppHandle,
+    ig: Ig<'_>,
+    project_id: Option<String>,
+    folder: Option<String>,
+    items: Vec<DeleteItem>,
+) -> Result<crate::imagegen::delete::DeleteReport, AppError> {
+    let dir = match (project_id, folder) {
+        (Some(id), _) => project_folder(&app, &id)?,
+        (None, Some(folder)) => checked_folder(&folder)?,
+        (None, None) => return Err(AppError::new("Nothing to delete.", "no project or folder")),
+    };
+    let files: Vec<String> = items.iter().filter_map(|i| i.file.clone()).collect();
+    let report = crate::commands::blocking::run_blocking({
+        let dir = dir.clone();
+        move || Ok(crate::imagegen::delete::trash_pictures(&dir, &files, &crate::imagegen::delete::SystemTrash))
+    })
+    .await?;
+    let gone = |file: &String| report.trashed.contains(file) || report.missing.contains(file);
+    let ids: Vec<String> = items.iter().filter(|i| i.file.as_ref().map_or(true, gone)).map(|i| i.id.clone()).collect();
+    let engine = ig.engine.clone();
+    crate::commands::blocking::run_blocking(move || Ok(engine.delete_jobs(&ids))).await?;
+    Ok(report)
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaInfo {

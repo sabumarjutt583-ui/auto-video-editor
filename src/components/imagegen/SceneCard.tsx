@@ -1,4 +1,4 @@
-import { Image as ImageIcon, Loader2, Pencil, RefreshCw } from "lucide-react";
+import { Image as ImageIcon, ImageOff, Loader2, Pencil, RefreshCw } from "lucide-react";
 
 import { jobStatusLabel } from "../../lib/imagegen/format";
 import { projectFileUrl } from "../../lib/media/urls";
@@ -15,6 +15,7 @@ interface SceneCardProps {
   onSelect: (selected: boolean) => void;
   onRegenerate: () => void;
   onEdit: () => void;
+  onDeleteImage?: () => void;
 }
 
 const STATUS_CLASSES = {
@@ -24,7 +25,7 @@ const STATUS_CLASSES = {
   failed: "bg-danger/15 text-danger",
 } as const;
 
-export function SceneCard({ scene, job, projectDir, timecode, selected, onSelect, onRegenerate, onEdit }: SceneCardProps) {
+export function SceneCard({ scene, job, projectDir, timecode, selected, onSelect, onRegenerate, onEdit, onDeleteImage }: SceneCardProps) {
   const url = job?.file && projectDir ? projectFileUrl(projectDir, job.file) : null;
   return (
     <li className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-3">
@@ -49,6 +50,7 @@ export function SceneCard({ scene, job, projectDir, timecode, selected, onSelect
       </p>
       {job?.status === "failed" && job.error && <p className="text-xs text-danger">{job.error}</p>}
       <div className="flex justify-end gap-1">
+        {onDeleteImage && job?.file && job.status === "completed" && <IconButton icon={ImageOff} label={`Delete picture ${scene.id}`} danger onClick={onDeleteImage} />}
         <IconButton icon={Pencil} label={`Edit prompt ${scene.id}`} onClick={onEdit} />
         <IconButton icon={RefreshCw} label={`Regenerate ${scene.id}`} disabled={scene.prompt.trim() === "" || scene.mediaType === "video"} onClick={onRegenerate} />
       </div>

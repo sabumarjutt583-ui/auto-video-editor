@@ -378,6 +378,11 @@ impl Engine {
         self.mutate_queue(|queue, _| queue.remove(ids))
     }
 
+    /// Deleted pictures: their jobs leave the queue for good (also one that is being made), so nothing is generated or saved again.
+    pub fn delete_jobs(&self, ids: &[String]) -> usize {
+        self.mutate_queue(|queue, _| queue.remove_forced(ids))
+    }
+
     fn mutate_queue<T: Default>(&self, change: impl FnOnce(&mut Queue, u64) -> T) -> T {
         let result = {
             let mut state = self.state();

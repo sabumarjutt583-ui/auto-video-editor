@@ -3,14 +3,16 @@ import { useEffect, useMemo, useState } from "react";
 
 import { toAppError } from "../../lib/errors";
 import { pickFolder } from "../../lib/dialog";
-import { imagegenPause, imagegenRemoveJobs, imagegenResume, imagegenRetryFailed, imagegenStartFolder } from "../../lib/imagegen/api";
+import { imagegenDeleteImages, imagegenPause, imagegenRemoveJobs, imagegenResume, imagegenRetryFailed, imagegenStartFolder } from "../../lib/imagegen/api";
 import { buildFolderJobs, parsePrompts } from "../../lib/imagegen/prompts";
+import { pictureItems } from "../../lib/imagegen/unlink";
 import { useImageGenStore } from "../../store/imagegenStore";
 import type { AppError } from "../../types";
 import type { PictureAspect } from "../../types/imagegen";
 import { ErrorNotice } from "../ErrorNotice";
 import { Button, SegmentedControl } from "../ui";
 import { Controls } from "./Controls";
+import { DeleteImagesBar } from "./DeleteImagesBar";
 import { FolderPictureCard } from "./FolderPictureCard";
 import { PromptEditModal } from "./PromptEditModal";
 import { useConsent } from "./useConsent";
@@ -114,6 +116,18 @@ export function OnlyImagesView() {
     });
   }
 
+  function deleteImages(only: ReadonlySet<string> | null) {
+    void guarded(async () => {
+      const items = pictureItems(jobs, only ?? undefined);
+      if (items.length === 0 || folder === "") return;
+      const report = await imagegenDeleteImages({ folder }, items);
+      setSelected(new Set());
+      const parts = [`${report.trashed.length} ${report.trashed.length === 1 ? "picture" : "pictures"} moved to the Recycle Bin.`];
+      if (report.failed.length > 0) parts.push(`${report.failed.length} could not be deleted (${report.failed[0]}).`);
+      setInfo(parts.join(" "));
+    });
+  }
+
   if (!snapshot) return storeError ? <ErrorNotice error={storeError} /> : <p className="text-sm text-muted">Loading…</p>;
 
   const stats = attached ? snapshot.stats : { total: 0, queued: 0, generating: 0, completed: 0, failed: 0 };
@@ -161,6 +175,7 @@ export function OnlyImagesView() {
           setSelected(new Set());
         }}
       />
+      <DeleteImagesBar total={pictureItems(jobs).length} selected={pictureItems(jobs, selected).length} busy={busy} onDelete={(which) => deleteImages(which === "all" ? null : selected)} />
       {info && <p role="status" className="text-sm text-muted">{info}</p>}
       {error && <ErrorNotice error={error} />}
       {storeError && <ErrorNotice error={storeError} />}
@@ -181,6 +196,7 @@ export function OnlyImagesView() {
             }
             onRegenerate={() => again(job.id)}
             onEdit={() => setEditing(job.id)}
+            onDeleteImage={() => deleteImages(new Set([job.id]))}
             onRemove={() => void guarded(async () => void (await imagegenRemoveJobs([job.id])))}
           />
         ))}

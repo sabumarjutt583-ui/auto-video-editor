@@ -7,6 +7,7 @@ pub mod accounts;
 pub mod browser;
 pub mod chat;
 pub mod config;
+pub mod delete;
 pub mod engine;
 #[cfg(test)]
 mod engine_tests;

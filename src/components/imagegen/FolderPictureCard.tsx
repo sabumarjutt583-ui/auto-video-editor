@@ -1,4 +1,4 @@
-import { Image as ImageIcon, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { Image as ImageIcon, ImageOff, Loader2, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { imagegenPreview } from "../../lib/imagegen/api";
@@ -21,10 +21,11 @@ interface FolderPictureCardProps {
   onRegenerate: () => void;
   onEdit: () => void;
   onRemove: () => void;
+  onDeleteImage?: () => void;
 }
 
 /** One picture of the "Only images" list: preview, status, prompt. */
-export function FolderPictureCard({ job, folder, selected, onSelect, onRegenerate, onEdit, onRemove }: FolderPictureCardProps) {
+export function FolderPictureCard({ job, folder, selected, onSelect, onRegenerate, onEdit, onRemove, onDeleteImage }: FolderPictureCardProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const file = job.status === "completed" ? job.file : null;
 
@@ -64,6 +65,7 @@ export function FolderPictureCard({ job, folder, selected, onSelect, onRegenerat
       </p>
       {job.status === "failed" && job.error && <p className="text-xs text-danger">{job.error}</p>}
       <div className="flex justify-end gap-1">
+        {onDeleteImage && job.file && job.status === "completed" && <IconButton icon={ImageOff} label={`Delete picture ${job.fileName}`} danger onClick={onDeleteImage} />}
         <IconButton icon={Pencil} label={`Edit prompt ${job.fileName}`} onClick={onEdit} />
         <IconButton icon={RefreshCw} label={`Make ${job.fileName} again`} disabled={job.status === "generating"} onClick={onRegenerate} />
         <IconButton icon={Trash2} label={`Remove ${job.fileName} from the list`} danger disabled={job.status === "generating"} onClick={onRemove} />

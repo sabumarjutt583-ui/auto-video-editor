@@ -27,6 +27,18 @@ export const imagegenPause = () => invoke<void>("imagegen_pause");
 export const imagegenResume = () => invoke<void>("imagegen_resume");
 export const imagegenRetryFailed = (ids: string[]) => invoke<number>("imagegen_retry_failed", { ids });
 export const imagegenRemoveJobs = (ids: string[]) => invoke<number>("imagegen_remove_jobs", { ids });
+export interface DeleteItem {
+  id: string;
+  file: string | null;
+}
+export interface DeleteReport {
+  trashed: string[];
+  missing: string[];
+  failed: string[];
+}
+/** Moves pictures to the Recycle Bin / Trash and removes their queue entries. `target` is the project or the "Only images" folder. */
+export const imagegenDeleteImages = (target: { projectId: string } | { folder: string }, items: DeleteItem[]) =>
+  invoke<DeleteReport>("imagegen_delete_images", { projectId: "projectId" in target ? target.projectId : null, folder: "folder" in target ? target.folder : null, items });
 export const imagegenReloadConfig = () => invoke<string>("imagegen_reload_config");
 export const imagegenMediaInfo = (projectId: string, paths: string[]) => invoke<(MediaInfo | null)[]>("imagegen_media_info", { projectId, paths });
 

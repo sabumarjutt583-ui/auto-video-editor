@@ -34,7 +34,13 @@ export type GenErrorKind =
   | "bad_request"
   | "server"
   | "storage"
-  | "unknown";
+  | "unknown"
+  | "no_response"
+  | "response_timeout"
+  | "soft_failure"
+  | "invalid_json"
+  | "missing_ids"
+  | "page_changed";
 
 export interface ImageJob {
   id: string;

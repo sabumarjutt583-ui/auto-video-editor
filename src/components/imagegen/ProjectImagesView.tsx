@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { toAppError } from "../../lib/errors";
-import { imagegenPause, imagegenResume, imagegenRetryFailed, imagegenStart } from "../../lib/imagegen/api";
+import { imagegenDeleteImages, imagegenPause, imagegenResume, imagegenRetryFailed, imagegenStart } from "../../lib/imagegen/api";
+import { pictureItems, unlinkPictures } from "../../lib/imagegen/unlink";
 import { buildJobs } from "../../lib/imagegen/mapping";
 import { projectDirPath } from "../../lib/media/api";
 import { formatTimecode } from "../../lib/scenes/timecode";
@@ -14,6 +15,7 @@ import type { AppError } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
 import { Button } from "../ui";
 import { Controls } from "./Controls";
+import { DeleteImagesBar } from "./DeleteImagesBar";
 import { PromptEditModal } from "./PromptEditModal";
 import { SceneCard } from "./SceneCard";
 import { useConsent } from "./useConsent";
@@ -120,6 +122,23 @@ export function ProjectImagesView() {
     });
   }
 
+  function deleteImages(only: ReadonlySet<string> | null) {
+    void guarded(async () => {
+      if (!project) return;
+      const items = pictureItems(snapshot?.jobs ?? [], only ?? undefined);
+      if (items.length === 0) return;
+      const report = await imagegenDeleteImages({ projectId: project.id }, items);
+      const gone = new Set([...report.trashed, ...report.missing]);
+      const fresh = useProjectStore.getState().project;
+      const patch = fresh ? unlinkPictures(fresh, gone) : null;
+      if (patch) update(patch);
+      setSelected(new Set());
+      const parts = [`${report.trashed.length} ${report.trashed.length === 1 ? "picture" : "pictures"} moved to the Recycle Bin. Press Regenerate to make new ones.`];
+      if (report.failed.length > 0) parts.push(`${report.failed.length} could not be deleted (${report.failed[0]}).`);
+      setInfo(parts.join(" "));
+    });
+  }
+
   function savePrompt(sceneId: string, prompt: string, regenerate: boolean) {
     update({ scenes: project?.scenes.map((s) => (s.id === sceneId ? { ...s, prompt, edited: true } : s)) ?? [] });
     setEditing(null);
@@ -150,6 +169,7 @@ export function ProjectImagesView() {
         onRegenerateSelected={() => begin([...selected], true)}
         onOpenEditor={() => navigate("/auto-editor")}
       />
+      <DeleteImagesBar total={pictureItems(forThisProject ? (snapshot?.jobs ?? []) : []).length} selected={pictureItems(forThisProject ? (snapshot?.jobs ?? []) : [], selected).length} busy={busy} onDelete={(which) => deleteImages(which === "all" ? null : selected)} />
       {info && <p role="status" className="text-sm text-muted">{info}</p>}
       {error && <ErrorNotice error={error} />}
       {storeError && <ErrorNotice error={storeError} />}
@@ -172,6 +192,7 @@ export function ProjectImagesView() {
             }
             onRegenerate={() => begin([scene.id], true)}
             onEdit={() => setEditing(scene.id)}
+            onDeleteImage={() => deleteImages(new Set([scene.id]))}
           />
         ))}
       </ul>

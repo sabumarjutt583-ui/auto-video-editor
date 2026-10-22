@@ -319,6 +319,13 @@ impl Queue {
         before - self.jobs.len()
     }
 
+    /// Removes jobs even while they are being made (their result is then dropped: the lease is no longer valid).
+    pub fn remove_forced(&mut self, ids: &[String]) -> usize {
+        let before = self.jobs.len();
+        self.jobs.retain(|j| !ids.contains(&j.id));
+        before - self.jobs.len()
+    }
+
     /// The earliest moment a delayed job becomes ready (0 when none waits).
     pub fn next_ready_at(&self, now: u64) -> u64 {
         self.jobs.iter().filter(|j| j.status == Status::Queued && j.next_attempt_at > now).map(|j| j.next_attempt_at).min().unwrap_or(0)
@@ -379,6 +386,22 @@ mod tests {
 
     fn claim(queue: &mut Queue, now: u64) -> Option<Job> {
         queue.claim_next(now, Some("a1"), &nothing_taken)
+    }
+
+    #[test]
+    fn deleted_jobs_are_gone_even_while_made_and_stay_gone_after_a_restart() {
+        let mut queue = Queue::default();
+        queue.add_jobs(wanted(&["S01", "S02", "S03"]), false, 10);
+        let running = claim(&mut queue, 11).unwrap();
+        assert_eq!(queue.remove(&[running.id.clone()]), 0, "the normal remove keeps a running job");
+        assert_eq!(queue.remove_forced(&[running.id.clone(), "S03".to_string()]), 2);
+        assert!(!queue.is_lease_valid(&running.id, running.lease.as_deref().unwrap_or("")), "its picture would not be saved");
+        let text = serde_json::to_string(&queue).unwrap();
+        let restored: Queue = serde_json::from_str(&text).unwrap();
+        assert_eq!(restored.jobs.len(), 1);
+        let mut again = restored;
+        assert!(claim(&mut again, 30).is_some_and(|j| j.id == "S02"));
+        assert!(claim(&mut again, 31).is_none());
     }
 
     #[test]
