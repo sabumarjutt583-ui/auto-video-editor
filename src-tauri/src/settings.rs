@@ -52,6 +52,8 @@ pub struct Settings {
     pub openai_model: String,
     /// Write texts with Gemini's web chat (the Google accounts of the Image Generator) instead of the Gemini API key.
     pub text_via_chat: bool,
+    /// Scenes per message in the web chat (5 to 25).
+    pub chat_batch_size: u8,
     /// Empty lines after every prompt in Copy all and Export TXT (1 to 3).
     pub export_empty_lines: u8,
     /// Write the id (S01_000.0-005.1 or P01) before every prompt in Copy all and Export TXT.
@@ -104,6 +106,7 @@ impl Default for Settings {
             groq_text_model: DEFAULT_GROQ_TEXT_MODEL.to_string(),
             openai_model: DEFAULT_OPENAI_MODEL.to_string(),
             text_via_chat: false,
+            chat_batch_size: 20,
             export_empty_lines: 2,
             export_include_ids: true,
             export_folder: String::new(),

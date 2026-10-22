@@ -56,3 +56,22 @@ copy-paste mode (6).
   (plus the shared `rate_limit`, `auth`, `flagged`, `network`). Never `no_image`.
 - On failure a screenshot + short page summary go to the log folder (`webchat-fail-<time>.jpg/.txt`).
 - Selectors and timings: resources/image-engine/config.json `chat` block (configVersion 1.3).
+
+## Part 4: conversation design (done)
+- Code: src/lib/prompts/chat/{messages,parse,verify,runner,threadStore,tauriTransport}.ts (+chat.test.ts); Rust
+  `imagegen_chat_thread` (ops.rs `chat_thread`, chat.rs `ask_thread`).
+- One thread per project / quick session (address + account stored in localStorage `chatThreads`); a new thread only
+  when none is stored, after a soft failure, after 15 batches, after a batch with more than 30% fixed rows, or when the
+  stored account is busy/resting.
+- Message 1 = SETUP (text-only line, task, full style profile, bible, rules, JSON format; ends "Reply with the single
+  word READY."). Every batch message starts with the reminder block (BATCH_ID, style lock, exact looks, JSON format).
+  Batch = 20 scenes (setting 5-25), reduced automatically to keep a message under 6,000 characters.
+- Before sending into a stored thread the page is read: if `BATCH_ID: <id>` is already there, the app waits for that
+  answer instead of sending again.
+- Answers: JSON from a code block, plain or with words around it; ids checked and reordered; missing ids asked once in
+  the same thread. Each prompt is verified: style lock last (partial lock replaced), exact character and location text,
+  banned words removed, length flagged. Changed rows get a "fixed" / "check" badge with the list as tooltip
+  (`Scene.fixNotes`).
+- Soft failures ("encountering an error", "hard time fulfilling", READY missing): wait 30 s, ONE new thread with setup,
+  same batch once; a second failure stops with Gemini's reply in Details. Usage limit: the account rests and the batch
+  moves to the next account (own thread + setup).

@@ -1,7 +1,7 @@
 import { MessageSquare } from "lucide-react";
 
 import type { AppSettings } from "../../types";
-import { Card, SegmentedControl } from "../ui";
+import { Card, NumberField, SegmentedControl } from "../ui";
 
 interface TextEngineCardProps {
   settings: AppSettings;
@@ -26,6 +26,12 @@ export function TextEngineCard({ settings, onChange }: TextEngineCardProps) {
           ? "Uses your Gemini key. Fast, but the key has a daily limit."
           : "Uses Gemini in the browser with the Google accounts of the Image Generator (Settings). No key needed. More accounts mean more questions per day. A little slower."}
       </p>
+      {value === "chat" && (
+        <label className="flex items-center gap-2 text-sm">
+          Scenes per message
+          <NumberField id="chat-batch-size" value={settings.chatBatchSize ?? 20} min={5} max={25} onChange={(n) => onChange({ chatBatchSize: n })} />
+        </label>
+      )}
     </Card>
   );
 }

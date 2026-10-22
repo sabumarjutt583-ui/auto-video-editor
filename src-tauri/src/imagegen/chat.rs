@@ -283,7 +283,19 @@ pub const MAX_IMAGES: usize = 4;
 
 /// Asks one question in a fresh chat and returns the finished answer. The pictures (files on this computer) are uploaded into the message first,
 /// through the page's own upload button.
+/// Where a question goes: a stored thread (conversation address) and the batch id to look for first.
+#[derive(Debug, Clone, Default)]
+pub struct ThreadOpts {
+    pub url: Option<String>,
+    pub batch_id: Option<String>,
+}
+
 pub async fn ask_full(session: &Session, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration, progress: Progress<'_>) -> Result<ChatReply, GenError> {
+    ask_thread(session, engine, prompt, images, timeout, progress, &ThreadOpts::default()).await.map(|(reply, _)| reply)
+}
+
+/// Like `ask_full`, in a stored thread when `opts.url` is set. Returns the answer and the thread's address.
+pub async fn ask_thread(session: &Session, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration, progress: Progress<'_>, opts: &ThreadOpts) -> Result<(ChatReply, String), GenError> {
     let prompt = prompt.trim();
     if prompt.is_empty() {
         return Err(GenError::new(ErrorKind::BadRequest, "The prompt is empty."));
@@ -296,9 +308,9 @@ pub async fn ask_full(session: &Session, engine: &EngineConfig, prompt: &str, im
     }
     logging::info(LOG, &format!("ask: opening a new chat tab ({} chars, {} pictures, timeout {} s)", prompt.chars().count(), images.len(), timeout.as_secs()));
     let tab = session.open_tab().await.map_err(|e| from_cdp(&e, "Opening a chat tab"))?;
-    let result = ask_in(session, &tab, engine, prompt, images, timeout, progress).await;
+    let result = ask_in(session, &tab, engine, prompt, images, timeout, progress, opts).await;
     match &result {
-        Ok(reply) => logging::info(LOG, &format!("ask: finished, answer {} chars, {} code blocks; closing the tab", reply.text.chars().count(), reply.code.len())),
+        Ok((reply, _)) => logging::info(LOG, &format!("ask: finished, answer {} chars, {} code blocks; closing the tab", reply.text.chars().count(), reply.code.len())),
         Err(error) => logging::warn(LOG, &format!("ask: failed ({:?}): {}; closing the tab", error.kind, error.message)),
     }
     session.close_tab(&tab).await;
@@ -372,19 +384,32 @@ async fn attach_images(session: &Session, tab: &Tab, engine: &EngineConfig, imag
     }
 }
 
-async fn ask_in(session: &Session, tab: &Tab, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration, progress: Progress<'_>) -> Result<ChatReply, GenError> {
+async fn ask_in(session: &Session, tab: &Tab, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration, progress: Progress<'_>, opts: &ThreadOpts) -> Result<(ChatReply, String), GenError> {
     let chat = &engine.chat;
-    logging::info(LOG, &format!("step: navigate to {}", chat.url));
-    session.navigate_tab(tab, &chat.url, Duration::from_millis(chat.timing.page_ready_ms)).await.map_err(|e| from_cdp(&e, "Opening Gemini's chat"))?;
+    let open_url = opts.url.as_deref().filter(|u| u.starts_with(chat.url.trim_end_matches("/app")) || u.starts_with("http://127.0.0.1")).unwrap_or(&chat.url);
+    logging::info(LOG, &format!("step: open {} chat", if opts.url.is_some() { "the stored" } else { "a new" }));
+    session.navigate_tab(tab, open_url, Duration::from_millis(chat.timing.page_ready_ms)).await.map_err(|e| from_cdp(&e, "Opening Gemini's chat"))?;
     wait_for_input(session, tab, engine).await?;
     if !images.is_empty() {
         attach_images(session, tab, engine, images).await?;
     }
     logging::info(LOG, "step: message box ready; inserting text and pressing Send");
-    let before = read_state(session, tab, chat).await?.answers;
-    type_and_send(session, tab, chat, prompt).await?;
-    logging::info(LOG, "step: sent; waiting for the answer");
-    let state = wait_for_answer(session, tab, engine, timeout, before, progress).await?;
+    let before_state = read_state(session, tab, chat).await?;
+    let before = before_state.answers;
+    // Our message may already be in this thread (an earlier run sent it): wait for its answer instead of sending again.
+    let already = match opts.batch_id.as_deref() {
+        Some(id) if opts.url.is_some() => count_in_page(session, tab, &format!("BATCH_ID: {id}")).await? > 0,
+        _ => false,
+    };
+    let state = if already {
+        logging::info(LOG, "step: this batch is already in the thread; waiting for its answer, not sending again");
+        wait_for_answer(session, tab, engine, timeout, before.saturating_sub(1), progress).await?
+    } else {
+        type_and_send(session, tab, chat, prompt).await?;
+        logging::info(LOG, "step: sent; waiting for the answer");
+        wait_for_answer(session, tab, engine, timeout, before, progress).await?
+    };
+    let url = session.eval_in(&tab.frame, "location.href").await.ok().and_then(|v| v.as_str().map(str::to_string)).unwrap_or_default();
     let code = if state.code.is_empty() { code_from_markdown(&state.text) } else { state.code.clone() };
     if let Some(error) = judge_answer(chat, &state.text, !code.is_empty()) {
         return Err(error);
@@ -392,7 +417,13 @@ async fn ask_in(session: &Session, tab: &Tab, engine: &EngineConfig, prompt: &st
     if let Some(error) = tool_page::human_error(engine, &clip(&state.page_text, 3000)).filter(|e| e.kind == ErrorKind::Flagged) {
         return Err(error);
     }
-    Ok(ChatReply { text: state.text, code })
+    Ok((ChatReply { text: state.text, code }, url))
+}
+
+/// How often a text appears on the page.
+async fn count_in_page(session: &Session, tab: &Tab, needle: &str) -> Result<usize, GenError> {
+    let expression = format!("(function () {{ var t = document.body ? document.body.innerText : ''; return t.split({}).length - 1; }})()", js(needle));
+    Ok(session.eval_in(&tab.frame, &expression).await.map_err(|e| from_cdp(&e, "Reading the chat page"))?.as_u64().unwrap_or(0) as usize)
 }
 
 #[cfg(test)]

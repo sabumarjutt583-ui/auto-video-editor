@@ -185,6 +185,28 @@ impl FreeWorker {
         self.chat_with(prompt, images, timeout, None).await
     }
 
+    /// A question in a stored thread (or a new one). Returns the answer and the thread's address.
+    pub async fn chat_thread(&self, prompt: &str, timeout: Duration, progress: chat::Progress<'_>, opts: &chat::ThreadOpts) -> Result<(ChatReply, String), GenError> {
+        self.inner.chat_busy.fetch_add(1, Ordering::SeqCst);
+        let result = self.thread_inner(prompt, timeout, progress, opts).await;
+        self.inner.chat_busy.fetch_sub(1, Ordering::SeqCst);
+        self.touch();
+        result
+    }
+
+    async fn thread_inner(&self, prompt: &str, timeout: Duration, progress: chat::Progress<'_>, opts: &chat::ThreadOpts) -> Result<(ChatReply, String), GenError> {
+        let (session, _, _) = self.ready().await?;
+        let _turn = self.inner.chat_lock.lock().await;
+        if self.mode() == Mode::Window {
+            let _ = session.minimize().await;
+        }
+        let result = chat::ask_thread(&session, &self.config().engine, prompt, &[], timeout, progress, opts).await;
+        if self.mode() == Mode::Window {
+            let _ = session.minimize().await;
+        }
+        result
+    }
+
     pub async fn chat_with(&self, prompt: &str, images: &[std::path::PathBuf], timeout: Duration, progress: chat::Progress<'_>) -> Result<ChatReply, GenError> {
         self.inner.chat_busy.fetch_add(1, Ordering::SeqCst);
         let result = self.chat_inner(prompt, images, timeout, progress).await;

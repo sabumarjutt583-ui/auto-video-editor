@@ -140,6 +140,39 @@ pub async fn imagegen_chat_ask(ig: Ig<'_>, prompt: String) -> Result<ChatAnswer,
     Ok(ChatAnswer { text: reply.text, code: reply.code })
 }
 
+/// The answer of a thread question.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThreadAnswer {
+    pub text: String,
+    pub code: Vec<String>,
+    pub account_id: String,
+    pub account_name: String,
+    pub thread_url: String,
+}
+
+/// One question in a Gemini chat thread (new when no account/url is given). Progress and Cancel go through the job `job_id`;
+/// Cancel is only looked at between questions, never in the middle of an answer.
+#[tauri::command]
+pub async fn imagegen_chat_thread(
+    app: tauri::AppHandle,
+    jobs: tauri::State<'_, crate::jobs::JobRegistry>,
+    ig: Ig<'_>,
+    prompt: String,
+    account_id: Option<String>,
+    thread_url: Option<String>,
+    batch_id: Option<String>,
+    job_id: String,
+) -> Result<ThreadAnswer, AppError> {
+    let job = jobs.begin(&job_id, "ai", crate::jobs::event_sink(app))?;
+    if job.is_cancelled() {
+        return Err(AppError::cancelled());
+    }
+    let report = |msg: String| job.progress(&msg, 30.0);
+    let answer = ig.chat_thread(&prompt, account_id.as_deref(), thread_url.as_deref(), batch_id.as_deref(), Some(&report)).await?;
+    Ok(ThreadAnswer { text: answer.reply.text, code: answer.reply.code, account_id: answer.account_id, account_name: answer.account_name, thread_url: answer.url })
+}
+
 #[tauri::command]
 pub async fn imagegen_test_image(ig: Ig<'_>, id: String) -> Result<TestImage, AppError> {
     ig.test_image(&id).await

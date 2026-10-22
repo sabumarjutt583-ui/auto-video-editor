@@ -78,6 +78,8 @@ pub struct Scene {
     /// Characters (ids from `characterBible`) and the location that appear in this scene.
     pub character_ids: Vec<String>,
     pub location_id: Option<String>,
+    /// What the app repaired in a prompt from the web chat, and things to check.
+    pub fix_notes: Vec<String>,
 }
 
 /// A person who must look the same in every prompt.

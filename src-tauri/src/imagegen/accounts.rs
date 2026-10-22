@@ -356,6 +356,20 @@ impl Accounts {
         Some(id)
     }
 
+    /// Takes a chat slot of ONE account (a chat thread lives in that account). False when it cannot take work now.
+    pub fn claim_chat_for(&mut self, id: &str, now: u64) -> bool {
+        let Some(account) = self.get(id) else { return false };
+        if !Self::can_take_work(account) {
+            return false;
+        }
+        let rt = self.runtime.get(id);
+        if rt.is_some_and(|r| r.phase.is_some() || r.chat_cooldown_until > now) {
+            return false;
+        }
+        self.rt(id).chat_active += 1;
+        true
+    }
+
     pub fn release_chat(&mut self, id: &str, ok: bool) {
         let rt = self.rt(id);
         rt.chat_active = rt.chat_active.saturating_sub(1);

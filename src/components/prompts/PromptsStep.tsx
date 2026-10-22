@@ -9,6 +9,9 @@ import { generateText } from "../../lib/ai";
 import { writeTextFile } from "../../lib/files";
 import { clampEmptyLines, copyBlock, copyLines, toCsv, toJson } from "../../lib/prompts/export";
 import { generatePrompts, reassemble, type PromptContext } from "../../lib/prompts/generate";
+import { runChatPrompts } from "../../lib/prompts/chat/runner";
+import { loadThread, saveThread } from "../../lib/prompts/chat/threadStore";
+import { webChatTransport } from "../../lib/prompts/chat/tauriTransport";
 import { needsMotion } from "../../lib/prompts/assemble";
 import { requestCancel, runJob, selectJob, useJobStore } from "../../store/jobStore";
 import { useProjectStore } from "../../store/projectStore";
@@ -39,7 +42,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
 
   const [error, setError] = useState<AppError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [batch, setBatch] = useState<{ number: number; total: number } | null>(null);
+  const [batch, setBatch] = useState<{ number: number; total: number; account?: string } | null>(null);
   const [ask, setAsk] = useState<Ask>(null);
   const [copied, setCopied] = useState(false);
   const [running, setRunning] = useState(false);
@@ -71,8 +74,25 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
       setAsk(null);
       setRunning(true);
       try {
-        const result = await runJob("ai", "Writing prompts with Gemini", (jobId) =>
-          generatePrompts({
+        const viaChat = appSettings?.textViaChat === true;
+        const result = await runJob("ai", "Writing prompts with Gemini", async (jobId) => {
+          const current = useProjectStore.getState().project?.scenes ?? scenes;
+          if (viaChat) {
+            const chatResult = await runChatPrompts({
+              scenes: current,
+              targetIds,
+              context,
+              transport: webChatTransport(jobId),
+              tag: project.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "P",
+              batchSize: Math.min(25, Math.max(5, appSettings?.chatBatchSize ?? 20)),
+              thread: loadThread(project.id),
+              onThread: (thread) => saveThread(project.id, thread),
+              onBatch: ({ batch: number, total, account }) => setBatch({ number, total, account }),
+              onScenes: (next) => update({ scenes: next }),
+            });
+            return { scenes: chatResult.scenes, failed: chatResult.failed ? { batch: chatResult.failed.batch, error: chatResult.failed.error } : null };
+          }
+          return generatePrompts({
             scenes: useProjectStore.getState().project?.scenes ?? scenes,
             targetIds,
             context,
@@ -80,11 +100,11 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
             call: async (system, prompt) => (await generateText(prompt, system, true, jobId)).text,
             onBatch: (number, total) => setBatch({ number, total }),
             onScenes: (next) => update({ scenes: next }),
-          }),
-        );
+          });
+        });
         update({ scenes: result.scenes });
         if (result.failed) {
-          setError(toAppError(result.failed.error, `Batch ${result.failed.batch} failed after 3 tries. The earlier batches were kept.`));
+          setError(toAppError(result.failed.error, `Batch ${result.failed.batch} failed. The earlier batches were kept.`));
         }
       } catch (caught) {
         if (isCancelled(caught)) setNotice("Cancelled. Prompts that were already written are kept.");
@@ -94,7 +114,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
         setBatch(null);
       }
     },
-    [context, scenes, update, appSettings?.textViaChat],
+    [context, scenes, update, appSettings?.textViaChat, appSettings?.chatBatchSize, project.id],
   );
 
   const generateMissing = () => void run(new Set(scenes.filter((s) => s.prompt.trim() === "" && !s.edited).map((s) => s.id)));
@@ -193,7 +213,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
 
       {job && (
         <div className="flex flex-col gap-2">
-          {batch && <p className="text-sm font-medium">Batch {batch.number} of {batch.total}</p>}
+          {batch && <p className="text-sm font-medium">Batch {batch.number} of {batch.total}{batch.account ? ` - account: ${batch.account}` : ""}</p>}
           <JobBar job={job} />
           <div>
             <Button onClick={() => requestCancel(job.id)}>Cancel</Button>

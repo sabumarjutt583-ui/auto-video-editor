@@ -44,6 +44,8 @@ export interface Scene {
   /** Characters (ids from characterBible) and the location that appear in this scene. */
   characterIds: string[];
   locationId: string | null;
+  /** What the app repaired in a prompt from the web chat ("added the style lock"), and things to check. */
+  fixNotes?: string[];
 }
 
 /** A person who must look the same in every prompt. */

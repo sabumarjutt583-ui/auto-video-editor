@@ -28,6 +28,11 @@ export function PromptRow({ scene, showMotion, busy, onPrompt, onMotion, onRegen
           <span className="flex items-center gap-1.5 text-xs text-muted">
             <MediaIcon size={13} aria-label={scene.mediaType} />
             {scene.duration > 0 && `${scene.duration.toFixed(1)} s`}
+            {(scene.fixNotes ?? []).length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent-fg" title={(scene.fixNotes ?? []).join("\n")}>
+                {(scene.fixNotes ?? []).some((n) => !n.startsWith("check:")) ? "fixed" : "check"}
+              </span>
+            )}
             {scene.edited && (
               <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent-fg" title="You edited this prompt. It is kept when you regenerate all.">
                 <Pencil size={10} aria-hidden /> edited

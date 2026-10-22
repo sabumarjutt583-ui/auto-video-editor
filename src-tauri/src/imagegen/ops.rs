@@ -36,6 +36,14 @@ pub struct TestImage {
 
 pub const TEST_PROMPT: &str = "A single ripe yellow banana on a plain white table, soft studio light, simple photograph";
 
+/// The answer of a thread question and where it lives.
+pub struct ThreadReply {
+    pub reply: ChatReply,
+    pub account_id: String,
+    pub account_name: String,
+    pub url: String,
+}
+
 pub fn to_app_error(error: &GenError) -> AppError {
     AppError::new(error.message.clone(), format!("{:?}", error.kind))
 }
@@ -135,6 +143,72 @@ impl ImageGen {
                 }
             });
             if matches!(error.kind, ErrorKind::RateLimit | ErrorKind::Auth | ErrorKind::Flagged | ErrorKind::Session | ErrorKind::Network | ErrorKind::Aborted) {
+                last = Some(error);
+            } else {
+                return Err(to_app_error(&error));
+            }
+        }
+        if let Some(error) = last {
+            return Err(to_app_error(&error));
+        }
+        let wait = self.engine.read_accounts(|accounts| accounts.next_chat_end(super::engine::now_ms()));
+        if wait > 0 {
+            let minutes = wait.saturating_sub(super::engine::now_ms()).div_ceil(60_000).max(1);
+            return Err(AppError::new(format!("Every Google account is resting after a usage limit. Try again in about {minutes} minute(s)."), "chat limit"));
+        }
+        Err(AppError::new("No Google account is ready. Add one in Settings, Google accounts, and press Sign in.", "no account for chat"))
+    }
+
+    /// One question in a chat thread. With `account` + `url` the question goes into that account's stored thread
+    /// (never to another account); otherwise the next free account starts a new thread.
+    pub async fn chat_thread(&self, prompt: &str, account: Option<&str>, url: Option<&str>, batch_id: Option<&str>, progress: chat::Progress<'_>) -> Result<ThreadReply, AppError> {
+        let settings = self.engine.settings();
+        let config = self.engine.config();
+        if !settings.consent_given(config.major().unwrap_or(1)) {
+            return Err(AppError::new("Please read and accept the Google account notice first (Settings, Image Generator).", "consent not accepted"));
+        }
+        let timeout = Duration::from_secs(u64::from(settings.timeout_sec).max(120));
+        let pinned = account.zip(url);
+        let attempts = if pinned.is_some() { 1 } else { self.engine.read_accounts(|a| a.file.accounts.len()).max(1) };
+        let mut last: Option<GenError> = None;
+        for _ in 0..attempts {
+            let id = match pinned {
+                Some((id, _)) => {
+                    if !self.engine.with_accounts(|accounts, now| accounts.claim_chat_for(id, now)) {
+                        return Err(AppError::new("The Google account of this chat is busy or resting.", "thread_account_unavailable"));
+                    }
+                    id.to_string()
+                }
+                None => match self.engine.with_accounts(|accounts, now| accounts.claim_chat(now)) {
+                    Some(id) => id,
+                    None => break,
+                },
+            };
+            let opts = chat::ThreadOpts { url: pinned.map(|(_, u)| u.to_string()), batch_id: batch_id.map(str::to_string) };
+            let result = match self.real.worker(&id, &settings) {
+                Ok(worker) => worker.chat_thread(prompt, timeout, progress, &opts).await,
+                Err(error) => Err(error),
+            };
+            let error = match result {
+                Ok((reply, url)) => {
+                    self.engine.with_accounts(|accounts, _| accounts.release_chat(&id, true));
+                    let account_name = self.engine.read_accounts(|a| a.get(&id).map(|x| x.name.clone()).unwrap_or_default());
+                    return Ok(ThreadReply { reply, account_id: id, account_name, url });
+                }
+                Err(error) => error,
+            };
+            self.engine.with_accounts(|accounts, now| {
+                accounts.release_chat(&id, false);
+                match error.kind {
+                    ErrorKind::RateLimit => {
+                        accounts.chat_limit(&id, now);
+                    }
+                    ErrorKind::Auth => accounts.mark_auth_error(&id, &error.message),
+                    ErrorKind::Flagged => accounts.mark_flagged(&id, &error.message, now),
+                    _ => {}
+                }
+            });
+            if pinned.is_none() && matches!(error.kind, ErrorKind::RateLimit | ErrorKind::Auth | ErrorKind::Flagged | ErrorKind::Session | ErrorKind::Network | ErrorKind::Aborted) {
                 last = Some(error);
             } else {
                 return Err(to_app_error(&error));
