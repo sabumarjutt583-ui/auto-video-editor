@@ -121,6 +121,16 @@ Everything is plain data committed under `src/lib/graphics/assets/`; none of the
 - **Installer size added (phase 4):** the packed icon sets and index about 0.45 MB, flags 1.56 MB (WebP does not compress further), country table 0.03 MB; maps (0.26 MB) and cities (0.1 MB) are only linked once phase 5 draws maps. About 2.1 MB in the installer now, about 2.5 MB with maps. The unpacked `dist` grows by 3.7 MB.
 - **Tests.** `library/library.test.ts` (every icon of both sets loads and has valid path data; unknown names fail validation and are repaired away; icon search; every spec country code has a row and a flag file; all flags are 480x360 WebP; every package is in THIRD_PARTY_LICENSES.md), `geo/geo.test.ts` (both map resolutions decode, test countries have sensible shapes, rings are closed, `unwrapRing`, projections, views fit their box, cities in en/ur/ja/ru, a Karachi-Tokyo route and a Tokyo-Los Angeles route split at the date line). Golden images (browser harness): 10 map/flag pictures (`geo_*`, `flags_*`) and 5 new icon pictures, plus `every_bundled_flag_decodes_and_draws` (all 250 flags draw in Chromium).
 
+## 5f. Advanced layers (phase 5)
+
+All 16 layer types now draw (src/lib/graphics/render/draw/): counter, barChart, lineChart, pieChart (also donut), timeline, map, lowerThird, quoteCard, list, progressBar, particles, kineticText, flag (+ the phase-2 text, richText, shape, icon, image, statCallout).
+- Colours and fonts come from the theme (brand kit in phase 6); charts use `theme.palette` (12 colours). Everything is a pure function of the frame number: particles use a seeded PRNG (mulberry32 from the layer id), no Math.random, Date or network.
+- Numbers: `format.ts` formats plain / grouped (1,200,000) / compact (3.5M, 45%, "-$3.5M"; 999999 shows as 1M). Digits are Western digits in every language; locale-specific digit shapes (Arabic-Indic, Devanagari) are not used. Not `Intl`, so the same text is drawn on every computer.
+- Map: `camera` (up to 8 keys: t, zoom 0.5-8, panX/panY -2..2, log-zoom blend) moves the view; countries fade in, routes draw on one after the other, labels are moved down a little when they would overlap (measured text width).
+- Right-to-left text (Urdu, Arabic) mirrors lower thirds, lists and kinetic text. Kinetic text times each word from the layer duration.
+- Limits: charts take at most the values allowed in limits.ts; a chart with no positive pie values draws nothing; a missing flag or map data is reported as a note, not an error.
+- Tests: render/layers.test.ts (all types draw, determinism, formatting, camera, notes) and about 70 golden pictures (enter / hold / exit). The worker == page test is exact for most cases; for the map and the flag (clipped shapes) a page canvas and an OffscreenCanvas anti-alias the edge pixels a little differently (at most ~10 % of the pixels, edges only), while the worker equals an OffscreenCanvas on the page exactly.
+
 ## 6. Phase checklist (commit per phase)
 
 | Phase | Result | Commit message |
@@ -130,7 +140,7 @@ Everything is plain data committed under `src/lib/graphics/assets/`; none of the
 | 2 (done) | renderer core (text, richText, shape, icon, image), timing engine, preview panel | Motion graphics phase 2: renderer core |
 | 3 (done) | transparent export + composite + alpha tests | Motion graphics phase 3: transparent export and composite |
 | 4 (done) | icons, flags, maps | Motion graphics phase 4: icons, flags and maps |
-| 5 | advanced layers | Motion graphics phase 5: advanced layers |
+| 5 (done) | advanced layers | Motion graphics phase 5: advanced layers |
 | 6 | brand kit | Motion graphics phase 6: brand kit |
 | 7 | AI graphics director | Motion graphics phase 7: AI graphics director |
 | 8 | placement | Motion graphics phase 8: smart placement |

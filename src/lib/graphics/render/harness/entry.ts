@@ -3,8 +3,8 @@
  * Rust test in src-tauri/src/graphics/golden_tests.rs). It draws with exactly the code the app uses.
  */
 import { loadCities } from "../../geo/cities.ts";
-import { loadMapData } from "../../geo/mapData.ts";
-import { FLAG_CODES, flagKey, loadFlagBitmaps } from "../../library/flags.ts";
+import { loadMapData, mapDataOfSpec } from "../../geo/mapData.ts";
+import { FLAG_CODES, flagCodesOf, flagKey, loadFlagBitmaps } from "../../library/flags.ts";
 import { ensureIcons, iconsOfSpec, iconShape } from "../../library/icons.ts";
 import type { GeoAssets } from "./geoCases.ts";
 import type { Canvas2D, RenderContext } from "../context.ts";
@@ -50,6 +50,7 @@ function context(width: number, height: number): RenderContext {
     image: (src) => (src === "test.png" ? picture : undefined),
     icon: iconShape,
     flag: (code) => assets?.flags.get(code.toUpperCase()),
+    map: (resolution) => (resolution === "110m" ? assets?.map110 : assets?.map50),
     createScratch: () => {
       const canvas = document.createElement("canvas");
       canvas.width = width;
@@ -173,7 +174,7 @@ const api = {
    * Draws every frame of a case in a real Web Worker (OffscreenCanvas, the code of the export) and on this page, and compares
    * the bytes. They must be identical: one renderer for preview and export.
    */
-  async exportViaWorker(index: number, workerUrl: string, fontBaseUrl: string): Promise<{ frames: number; identical: number; maxDiff: number; bytes: number }> {
+  async exportViaWorker(index: number, workerUrl: string, fontBaseUrl: string): Promise<{ frames: number; identical: number; maxDiff: number; maxPremultiplied: number; maxPixels: number; bytes: number }> {
     const item = GOLDEN_CASES[index];
     if (!item) throw new Error(`no case ${index}`);
     const { width, height } = GOLDEN_SIZE;
@@ -181,6 +182,7 @@ const api = {
     for (const [family, file, weight] of FONT_FILES.slice(0, 2)) {
       fonts.push({ family, weight, data: await (await fetch(`${fontBaseUrl}${file}`)).arrayBuffer() });
     }
+    const flags = await loadFlagBitmaps(flagCodesOf(item.spec));
     const worker = new Worker(workerUrl);
     const waiting = new Map<number, (b: ArrayBuffer) => void>();
     const ready = new Promise<void>((resolve, reject) => {
@@ -192,7 +194,7 @@ const api = {
       };
       worker.onerror = (e) => reject(new Error(e.message));
     });
-    worker.postMessage({ type: "init", spec: item.spec, width, height, fonts, images: {}, icons: await iconsOfSpec(item.spec) });
+    worker.postMessage({ type: "init", spec: item.spec, width, height, fonts, images: flags, icons: await iconsOfSpec(item.spec), maps: await mapDataOfSpec(item.spec) });
     await ready;
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -203,6 +205,8 @@ const api = {
     const total = Math.round(item.spec.duration * 30);
     let identical = 0;
     let maxDiff = 0;
+    let maxPremultiplied = 0;
+    let maxPixels = 0;
     let bytes = 0;
     for (let n = 0; n < total; n++) {
       const fromWorker = new Promise<ArrayBuffer>((resolve) => waiting.set(n, resolve));
@@ -214,10 +218,22 @@ const api = {
       let diff = 0;
       for (let i = 0; i < a.length; i++) diff = Math.max(diff, Math.abs((a[i] ?? 0) - (b[i] ?? 0)));
       maxDiff = Math.max(maxDiff, diff);
+      // Nearly transparent pixels round differently on a page canvas and an OffscreenCanvas; the premultiplied colour is the honest measure.
+      if (diff !== 0) {
+        let pixels = 0;
+        for (let i = 0; i < a.length; i += 4) if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3]) pixels++;
+        maxPixels = Math.max(maxPixels, pixels);
+        for (let i = 0; i < a.length; i += 4) {
+          const aa = (a[i + 3] ?? 0) / 255;
+          const ba = (b[i + 3] ?? 0) / 255;
+          maxPremultiplied = Math.max(maxPremultiplied, Math.abs(aa * 255 - ba * 255));
+          for (let c = 0; c < 3; c++) maxPremultiplied = Math.max(maxPremultiplied, Math.abs((a[i + c] ?? 0) * aa - (b[i + c] ?? 0) * ba));
+        }
+      }
       if (diff === 0) identical++;
     }
     worker.terminate();
-    return { frames: total, identical, maxDiff, bytes };
+    return { frames: total, identical, maxDiff, maxPremultiplied, maxPixels, bytes };
   },
   /** Frame `n` of a case as raw RGBA bytes (straight alpha, as the export sends them), base64 text. */
   rawFrame(index: number, n: number): string {

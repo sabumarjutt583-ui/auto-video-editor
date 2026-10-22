@@ -125,6 +125,17 @@ pub struct MapRoute {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CameraKey {
+    pub t: f64,
+    #[serde(default = "d_one")]
+    pub zoom: f64,
+    #[serde(default, rename = "panX")]
+    pub pan_x: f64,
+    #[serde(default, rename = "panY")]
+    pub pan_y: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ListItem {
     pub text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -147,6 +158,7 @@ fn d_world() -> String { "world".into() }
 fn d_natural_earth() -> String { "naturalEarth".into() }
 fn d_bullets() -> String { "bullets".into() }
 fn d_true() -> bool { true }
+fn d_one() -> f64 { 1.0 }
 fn d_dust() -> String { "dust".into() }
 fn d_count() -> u32 { 60 }
 fn d_pop() -> String { "pop".into() }
@@ -267,6 +279,8 @@ pub enum Layer {
         pins: Vec<MapPin>,
         #[serde(default)]
         routes: Vec<MapRoute>,
+        #[serde(default)]
+        camera: Vec<CameraKey>,
     },
     LowerThird {
         #[serde(flatten)]

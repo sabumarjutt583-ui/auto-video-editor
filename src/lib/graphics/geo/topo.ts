@@ -108,3 +108,38 @@ export function unwrapRing(ring: Ring): Ring {
   }
   return out;
 }
+
+/** A good place for a country's name: the middle of its largest piece (area-weighted centre of the outline), as [lon, lat]. */
+export function labelPoint(shape: Shape): [number, number] {
+  let best: Ring | null = null;
+  let bestSpan = -1;
+  for (const polygon of shape.polygons) {
+    const outer = polygon[0];
+    if (!outer || outer.length < 6) continue;
+    const ring = unwrapRing(outer);
+    let lonMin = Infinity, lonMax = -Infinity, latMin = Infinity, latMax = -Infinity;
+    for (let i = 0; i < ring.length; i += 2) {
+      lonMin = Math.min(lonMin, ring[i] as number);
+      lonMax = Math.max(lonMax, ring[i] as number);
+      latMin = Math.min(latMin, ring[i + 1] as number);
+      latMax = Math.max(latMax, ring[i + 1] as number);
+    }
+    const span = (lonMax - lonMin) * (latMax - latMin);
+    if (span > bestSpan) {
+      bestSpan = span;
+      best = ring;
+    }
+  }
+  if (!best) return [0, 0];
+  let area = 0, cx = 0, cy = 0;
+  for (let i = 0; i + 3 < best.length; i += 2) {
+    const x0 = best[i] as number, y0 = best[i + 1] as number, x1 = best[i + 2] as number, y1 = best[i + 3] as number;
+    const cross = x0 * y1 - x1 * y0;
+    area += cross;
+    cx += (x0 + x1) * cross;
+    cy += (y0 + y1) * cross;
+  }
+  if (Math.abs(area) < 1e-9) return [best[0] as number, best[1] as number];
+  const lon = cx / (3 * area);
+  return [lon > 180 ? lon - 360 : lon < -180 ? lon + 360 : lon, cy / (3 * area)];
+}

@@ -159,6 +159,11 @@ const mapLayer = refine(
     countries: arr(obj({ code: countryCode, label: optText(30) }), { min: 0, max: LIMITS.maxCountries, def: true }),
     pins: arr(obj({ name: text(30), lat: latitude, lon: longitude }), { min: 0, max: LIMITS.maxPins, def: true }),
     routes: arr(obj({ from: point, to: point }), { min: 0, max: LIMITS.maxRoutes, def: true }),
+    /** Camera moves: at second `t` the view has this zoom (1 = the whole region) and pan (in box widths/heights). Smooth in between. */
+    camera: arr(
+      obj({ t: num({ min: 0, max: LIMITS.maxDuration }), zoom: num({ min: 0.5, max: 8, def: 1 }), panX: num({ min: -2, max: 2, def: 0 }), panY: num({ min: -2, max: 2, def: 0 }) }),
+      { min: 0, max: LIMITS.maxCameraKeys, def: true },
+    ),
   }),
   (layer, path, ctx) =>
     layer.countries.length + layer.pins.length + layer.routes.length > 0 ? layer : fail(ctx, path, "a map needs at least one country, pin or route"),

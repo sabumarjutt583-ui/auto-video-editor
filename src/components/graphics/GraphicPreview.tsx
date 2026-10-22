@@ -1,6 +1,7 @@
 import { Pause, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { mapDataOfSpec, type MapData, type MapResolution } from "../../lib/graphics/geo/mapData";
 import { flagCodesOf, loadFlagBitmaps } from "../../lib/graphics/library/flags";
 import { ensureIcons, iconRefsOf } from "../../lib/graphics/library/icons";
 import { loadGraphicFonts, previewContext, previewSize } from "../../lib/graphics/render/browser";
@@ -26,6 +27,7 @@ export function GraphicPreview({ spec, aspect, backgroundUrl }: GraphicPreviewPr
   const [notes, setNotes] = useState<RenderNote[]>([]);
   const images = useMemo(() => new Map<string, CanvasImageSource>(), []);
   const [resources, setResources] = useState(0);
+  const maps = useRef<Partial<Record<MapResolution, MapData>>>({});
 
   useEffect(() => {
     let alive = true;
@@ -44,6 +46,7 @@ export function GraphicPreview({ spec, aspect, backgroundUrl }: GraphicPreviewPr
       await ensureIcons(iconRefsOf(spec));
       const flags = await loadFlagBitmaps(flagCodesOf(spec));
       for (const [key, bitmap] of Object.entries(flags)) images.set(key, bitmap);
+      maps.current = await mapDataOfSpec(spec);
       if (alive) setResources((n) => n + 1);
     })();
     return () => { alive = false; };
@@ -68,7 +71,7 @@ export function GraphicPreview({ spec, aspect, backgroundUrl }: GraphicPreviewPr
     const element = canvas.current;
     const ctx = element?.getContext("2d");
     if (!element || !ctx || !fontsReady) return;
-    const report = renderFrame(spec, frame, ctx, previewContext(size.width, size.height, images));
+    const report = renderFrame(spec, frame, ctx, previewContext(size.width, size.height, images, maps.current));
     setNotes((old) => (old.length === report.notes.length && old.every((n, i) => n.message === report.notes[i]?.message) ? old : report.notes));
   }, [spec, frame, size, images, fontsReady, resources]);
 

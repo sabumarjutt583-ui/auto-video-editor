@@ -8,6 +8,7 @@ export const LIMITS = {
   maxListItems: 8,
   maxParticles: 300,
   maxKeyframes: 24,
+  maxCameraKeys: 8,
   maxTimelineEvents: 8,
   maxPins: 12,
   maxRoutes: 6,

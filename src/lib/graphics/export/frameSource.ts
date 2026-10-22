@@ -3,6 +3,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { fontsDir } from "../../captions/api.ts";
 import { flagCodesOf, loadFlagBitmaps } from "../library/flags.ts";
 import { ensureIcons, iconRefsOf, iconsOfSpec } from "../library/icons.ts";
+import { mapDataOfSpec } from "../geo/mapData.ts";
 import { loadGraphicFonts, previewContext } from "../render/browser.ts";
 import { renderFrame } from "../render/renderFrame.ts";
 import type { GraphicSpec } from "../spec/schema.ts";
@@ -76,7 +77,7 @@ async function workerSource(spec: GraphicSpec, width: number, height: number, im
   };
   worker.onerror = (event) => failAll(new Error(event.message || "The drawing worker failed."));
   const started = new Promise<void>((resolve, reject) => { ready = { resolve, reject }; });
-  const init: ToWorker = { type: "init", spec, width, height, fonts: await workerFonts(spec), images, icons: await iconsOfSpec(spec) };
+  const init: ToWorker = { type: "init", spec, width, height, fonts: await workerFonts(spec), images, icons: await iconsOfSpec(spec), maps: await mapDataOfSpec(spec) };
   worker.postMessage(init, Object.values(images));
   await started;
   return {
@@ -99,7 +100,7 @@ async function mainSource(spec: GraphicSpec, width: number, height: number, imag
   canvas.height = height;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("This computer cannot draw the graphic.");
-  const rc = previewContext(width, height, new Map(Object.entries(images)));
+  const rc = previewContext(width, height, new Map(Object.entries(images)), await mapDataOfSpec(spec));
   return {
     frame: async (n) => {
       renderFrame(spec, n, ctx, rc);

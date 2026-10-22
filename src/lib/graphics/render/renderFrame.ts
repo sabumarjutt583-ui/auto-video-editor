@@ -1,12 +1,23 @@
 import type { GraphicSpec, Layer } from "../spec/schema.ts";
 import { poseOf } from "./anim.ts";
 import type { Area, Canvas2D, FrameReport, RenderContext, RenderNote } from "./context.ts";
+import { drawLowerThird, drawQuoteCard } from "./draw/cards.ts";
+import { drawChart } from "./draw/chart.ts";
+import type { DrawEnv } from "./draw/common.ts";
+import { drawCounter } from "./draw/counter.ts";
+import { drawFlag } from "./draw/flag.ts";
 import { drawIcon } from "./draw/icon.ts";
+import { drawKinetic } from "./draw/kinetic.ts";
+import { drawList } from "./draw/list.ts";
+import { drawMap } from "./draw/map.ts";
+import { drawParticles } from "./draw/particles.ts";
+import { drawProgress } from "./draw/progress.ts";
+import { drawTimeline } from "./draw/timeline.ts";
 import { drawImage } from "./draw/image.ts";
 import { drawShape } from "./draw/shape.ts";
 import { drawTextLike } from "./draw/text.ts";
 import type { Pose } from "./anim.ts";
-import { FPS, layerTiming } from "./timing.ts";
+import { FPS, layerTiming, type LayerTiming } from "./timing.ts";
 
 export interface RenderOptions {
   /** Sub-frames blended into one frame (1 = off). "High quality" uses 4 to 8. */
@@ -19,7 +30,8 @@ function areaOf(layer: Layer, rc: RenderContext): Area {
   return { x: layer.box.x * rc.width, y: layer.box.y * rc.height, w: layer.box.w * rc.width, h: layer.box.h * rc.height };
 }
 
-function drawLayer(ctx: Canvas2D, layer: Layer, area: Area, pose: Pose, rc: RenderContext, note: (n: RenderNote) => void): boolean {
+function drawLayer(ctx: Canvas2D, layer: Layer, area: Area, pose: Pose, timing: LayerTiming, rc: RenderContext, note: (n: RenderNote) => void): boolean {
+  const env: DrawEnv = { rc, note, timing, pose };
   switch (layer.type) {
     case "text":
     case "richText":
@@ -34,9 +46,39 @@ function drawLayer(ctx: Canvas2D, layer: Layer, area: Area, pose: Pose, rc: Rend
     case "image":
       drawImage(ctx, layer, area, rc, note);
       return true;
-    default:
-      note({ layerId: layer.id, kind: "not-drawn", message: `The layer type "${layer.type}" is not drawn yet.` });
-      return false;
+    case "counter":
+      drawCounter(ctx, layer, area, env);
+      return true;
+    case "chart":
+      drawChart(ctx, layer, area, env);
+      return true;
+    case "timeline":
+      drawTimeline(ctx, layer, area, env);
+      return true;
+    case "map":
+      drawMap(ctx, layer, area, env);
+      return true;
+    case "lowerThird":
+      drawLowerThird(ctx, layer, area, env);
+      return true;
+    case "quoteCard":
+      drawQuoteCard(ctx, layer, area, env);
+      return true;
+    case "list":
+      drawList(ctx, layer, area, env);
+      return true;
+    case "progressBar":
+      drawProgress(ctx, layer, area, env);
+      return true;
+    case "particles":
+      drawParticles(ctx, layer, area, env);
+      return true;
+    case "kineticText":
+      drawKinetic(ctx, layer, area, env);
+      return true;
+    case "flag":
+      drawFlag(ctx, layer, area, env);
+      return true;
   }
 }
 
@@ -68,7 +110,7 @@ function draw(spec: GraphicSpec, frame: number, ctx: Canvas2D, rc: RenderContext
       ctx.rect(area.x + pose.clipFrom * area.w, -rc.height, (pose.clipTo - pose.clipFrom) * area.w, rc.height * 3);
       ctx.clip();
     }
-    const drawn = drawLayer(ctx, layer, area, pose, rc, note);
+    const drawn = drawLayer(ctx, layer, area, pose, timing, rc, note);
     ctx.restore();
     if (drawn) report.drawn.push(layer.id);
   }

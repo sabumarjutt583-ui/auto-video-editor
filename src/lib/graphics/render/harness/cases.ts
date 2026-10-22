@@ -77,6 +77,60 @@ const MOVING = { id: "c", type: "shape", box: { x: 0.3, y: 0.3, w: 0.4, h: 0.4 }
 add("motion_blur_off", [MOVING], 2);
 add("motion_blur_on", [MOVING], 2, { motionBlurSamples: 6, shutter: 1 });
 
+// ---- Phase 5 layers: every type at three moments of a 3-second graphic: entering (0.5 s), holding (2.0 s) and leaving (2.77 s). ----
+const FULL = { x: 0.06, y: 0.08, w: 0.88, h: 0.84 };
+const MOMENTS = [["enter", 15], ["hold", 60], ["exit", 83]] as const;
+const timed = (layer: Record<string, unknown>): Record<string, unknown> => ({ enter: { preset: "fade", duration: 0.3, easing: "linear" }, exit: { preset: "fade", duration: 0.6, easing: "linear" }, ...layer });
+const three = (name: string, layer: Record<string, unknown>, moments: readonly (typeof MOMENTS)[number][] = MOMENTS): void => {
+  for (const [moment, frame] of moments) add(`${name}_${moment}`, [timed(layer)], frame, undefined, 3);
+};
+const HOLD = [MOMENTS[1]] as const;
+
+three("counter_grouped", { id: "c", type: "counter", box: { x: 0.1, y: 0.15, w: 0.8, h: 0.7 }, from: 0, to: 1200000, format: "grouped", size: 0.22, label: "Total views" });
+three("counter_money", { id: "c", type: "counter", box: { x: 0.1, y: 0.15, w: 0.8, h: 0.7 }, from: 0, to: 3500000, format: "compact", decimals: 1, prefix: "$", size: 0.22, label: "Revenue", color: "accent" }, HOLD);
+three("counter_percent", { id: "c", type: "counter", box: { x: 0.1, y: 0.15, w: 0.8, h: 0.7 }, from: 100, to: 45, suffix: "%", size: 0.25 }, HOLD);
+
+const ROWS4 = [{ label: "2021", value: 120 }, { label: "2022", value: 180 }, { label: "2023", value: 260 }, { label: "2024", value: 340 }];
+three("chart_bar", { id: "c", type: "chart", box: FULL, kind: "bar", title: "Yearly users", unit: "K", rows: ROWS4, highlight: 3 });
+add("chart_bar_horizontal_hold", [timed({ id: "c", type: "chart", box: FULL, kind: "bar", title: "Top countries", rows: ["India", "China", "United States", "Indonesia", "Pakistan", "Nigeria", "Brazil", "Bangladesh"].map((label, i) => ({ label, value: 1400 - i * 150 })) })], 60, undefined, 3);
+add("chart_bar_negative_hold", [timed({ id: "c", type: "chart", box: FULL, kind: "bar", unit: "%", rows: [{ label: "Q1", value: 12 }, { label: "Q2", value: -8 }, { label: "Q3", value: 5 }, { label: "Q4", value: -3 }] })], 60, undefined, 3);
+three("chart_line", { id: "c", type: "chart", box: FULL, kind: "line", title: "Subscribers", rows: [{ label: "Jan", value: 10 }, { label: "Feb", value: 14 }, { label: "Mar", value: 13 }, { label: "Apr", value: 22 }, { label: "May", value: 31 }, { label: "Jun", value: 45 }] });
+three("chart_pie", { id: "c", type: "chart", box: FULL, kind: "pie", rows: [{ label: "Mobile", value: 55 }, { label: "Desktop", value: 30 }, { label: "Tablet", value: 15 }], highlight: 0 });
+three("chart_donut", { id: "c", type: "chart", box: FULL, kind: "donut", title: "Traffic", rows: [{ label: "Search", value: 50 }, { label: "Social", value: 30 }, { label: "Direct", value: 20 }] });
+
+const EVENTS = [{ label: "Company founded", date: "1998" }, { label: "First product", date: "2001" }, { label: "Goes public", date: "2010" }, { label: "Global launch", date: "2020" }];
+three("timeline_horizontal", { id: "t", type: "timeline", box: FULL, orientation: "horizontal", events: EVENTS });
+add("timeline_vertical_hold", [timed({ id: "t", type: "timeline", box: FULL, orientation: "vertical", events: EVENTS })], 60, undefined, 3);
+
+const MAP = { id: "m", type: "map", box: FULL, region: "world", projection: "naturalEarth", countries: [{ code: "PK", label: "Pakistan" }, { code: "JP", label: "Japan" }], pins: [{ name: "Karachi", lat: 24.87, lon: 66.99 }], routes: [{ from: { lat: 24.87, lon: 66.99 }, to: { lat: 35.69, lon: 139.75 } }], camera: [{ t: 0, zoom: 1 }, { t: 2.5, zoom: 1.5, panX: -0.15, panY: 0.05 }] };
+three("map_world", MAP);
+add("map_europe_hold", [timed({ id: "m", type: "map", box: FULL, region: "europe", projection: "mercator", countries: [{ code: "DE", label: "Germany" }, { code: "FR" }, { code: "IT" }], pins: [{ name: "Paris", lat: 48.86, lon: 2.35 }], routes: [] })], 60, undefined, 3);
+add("map_globe_hold", [timed({ id: "m", type: "map", box: FULL, region: "asia", projection: "orthographic", countries: [{ code: "IN" }, { code: "CN" }], pins: [], routes: [{ from: { lat: 28.61, lon: 77.21 }, to: { lat: 39.9, lon: 116.4 } }] })], 60, undefined, 3);
+
+three("lower_third", { id: "l", type: "lowerThird", box: { x: 0.08, y: 0.62, w: 0.62, h: 0.26 }, title: "Dr. Amina Khan", subtitle: "Climate scientist", icon: { set: "lucide", name: "users" } });
+three("quote_card", { id: "q", type: "quoteCard", box: { x: 0.1, y: 0.12, w: 0.8, h: 0.76 }, quote: "The best way to predict the future is to create it.", author: "Peter Drucker" });
+three("list_bullets", { id: "l", type: "list", box: { x: 0.12, y: 0.12, w: 0.76, h: 0.76 }, style: "bullets", items: [{ text: "Faster rendering" }, { text: "Smarter captions" }, { text: "One-click export" }] });
+add("list_numbered_hold", [timed({ id: "l", type: "list", box: { x: 0.12, y: 0.12, w: 0.76, h: 0.76 }, style: "numbered", items: [{ text: "Record the voice" }, { text: "Add the pictures" }, { text: "Render the video" }, { text: "Upload" }] })], 60, undefined, 3);
+add("list_checks_icons_hold", [timed({ id: "l", type: "list", box: { x: 0.12, y: 0.12, w: 0.76, h: 0.76 }, style: "checks", items: [{ text: "Done" }, { text: "Trending", icon: { set: "lucide", name: "trending-up" } }, { text: "Hot", icon: { set: "tabler", name: "flame" } }] })], 60, undefined, 3);
+three("progress_bar", { id: "p", type: "progressBar", box: { x: 0.1, y: 0.35, w: 0.8, h: 0.3 }, from: 0.2, to: 0.72, label: "Upload progress" });
+
+for (const kind of ["confetti", "sparks", "dust", "snow", "bubbles"]) {
+  if (kind === "confetti") three("particles_confetti", { id: "pa", type: "particles", box: { x: 0, y: 0, w: 1, h: 1 }, kind, count: 70 });
+  else add(`particles_${kind}_hold`, [timed({ id: "pa", type: "particles", box: { x: 0, y: 0, w: 1, h: 1 }, kind, count: 70 })], 60, undefined, 3);
+}
+three("kinetic_pop", { id: "k", type: "kineticText", box: { x: 0.08, y: 0.2, w: 0.84, h: 0.6 }, words: ["Fast", "Smart", "and", "Simple"], style: "pop", size: 0.16 });
+add("kinetic_slide_hold", [timed({ id: "k", type: "kineticText", box: { x: 0.08, y: 0.2, w: 0.84, h: 0.6 }, words: ["Fast", "Smart", "and", "Simple"], style: "slide", size: 0.16 })], 60, undefined, 3);
+add("kinetic_highlight_enter", [timed({ id: "k", type: "kineticText", box: { x: 0.08, y: 0.2, w: 0.84, h: 0.6 }, words: ["Fast", "Smart", "and", "Simple"], style: "highlight", size: 0.16 })], 22, undefined, 3);
+three("flag_rect", { id: "f", type: "flag", box: { x: 0.25, y: 0.1, w: 0.5, h: 0.8 }, country: "PK", label: "Pakistan" });
+add("flag_circle_hold", [timed({ id: "f", type: "flag", box: { x: 0.3, y: 0.1, w: 0.4, h: 0.8 }, country: "JP", shape: "circle", label: "Japan" })], 60, undefined, 3);
+
+// Writing systems inside the new layers (right-to-left layouts mirror).
+add("labels_korean_chart_hold", [timed({ id: "c", type: "chart", box: FULL, kind: "bar", title: "연간 사용자", rows: [{ label: "서울", value: 90 }, { label: "부산", value: 60 }, { label: "대구", value: 35 }] })], 60, undefined, 3);
+add("labels_urdu_list_hold", [timed({ id: "l", type: "list", box: { x: 0.12, y: 0.12, w: 0.76, h: 0.76 }, style: "checks", items: [{ text: "تیز رفتار" }, { text: "آسان استعمال" }, { text: "مفت" }] })], 60, undefined, 3);
+add("labels_urdu_lower_third_hold", [timed({ id: "l", type: "lowerThird", box: { x: 0.2, y: 0.62, w: 0.72, h: 0.26 }, title: "ڈاکٹر امینہ خان", subtitle: "ماہر ماحولیات", icon: { set: "lucide", name: "users" } })], 60, undefined, 3);
+add("labels_japanese_quote_hold", [timed({ id: "q", type: "quoteCard", box: { x: 0.1, y: 0.12, w: 0.8, h: 0.76 }, quote: "千里の道も一歩から始まる。", author: "老子" })], 60, undefined, 3);
+add("labels_devanagari_counter_hold", [timed({ id: "c", type: "counter", box: { x: 0.1, y: 0.15, w: 0.8, h: 0.7 }, from: 0, to: 25000, size: 0.22, label: "कुल दर्शक" })], 60, undefined, 3);
+
 // Maps and flags are drawn by helpers (their layers come in phase 5); the spec is a placeholder.
 for (const item of GEO_CASES) cases.push({ name: item.name, spec: make(item.name, [text("map")]), frame: 0, custom: item.draw });
 

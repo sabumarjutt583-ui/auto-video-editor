@@ -44,3 +44,32 @@ export function loadMapData(resolution: MapResolution): Promise<MapData> {
 export function resolutionFor(region: string): MapResolution {
   return region === "world" ? "110m" : "50m";
 }
+
+/** Outlines a spec needs (`map` layers): 110m for a world map, 50m for a region or when a highlighted country is too small for 110m. */
+export async function mapDataOfSpec(spec: unknown): Promise<Partial<Record<MapResolution, MapData>>> {
+  const layers: Array<{ region: string; codes: string[] }> = [];
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item);
+    } else if (value && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      if (record.type === "map") {
+        const countries = Array.isArray(record.countries) ? (record.countries as Array<{ code?: unknown }>) : [];
+        layers.push({ region: typeof record.region === "string" ? record.region : "world", codes: countries.map((c) => String(c.code ?? "").toUpperCase()) });
+      }
+      for (const child of Object.values(record)) walk(child);
+    }
+  };
+  walk(spec);
+  const out: Partial<Record<MapResolution, MapData>> = {};
+  if (layers.length === 0) return out;
+  const need = new Set<MapResolution>();
+  for (const layer of layers) need.add(resolutionFor(layer.region));
+  if (need.has("110m")) {
+    const light = await loadMapData("110m");
+    out["110m"] = light;
+    if (layers.some((l) => l.region === "world" && l.codes.some((code) => !light.countries.some((c) => c.a2 === code)))) need.add("50m");
+  }
+  if (need.has("50m")) out["50m"] = await loadMapData("50m");
+  return out;
+}

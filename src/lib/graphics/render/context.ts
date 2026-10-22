@@ -1,3 +1,4 @@
+import type { MapData, MapResolution } from "../geo/mapData.ts";
 import type { Theme } from "./theme.ts";
 
 export type Canvas2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -28,6 +29,8 @@ export interface RenderContext {
   icon: (set: string, name: string) => IconShape | undefined;
   /** A flag picture by upper-case ISO 3166-1 alpha-2 code (loaded before drawing; undefined while missing). */
   flag?: (code: string) => CanvasImageSource | undefined;
+  /** Country outlines of a resolution (loaded before drawing; undefined while missing). */
+  map?: (resolution: MapResolution) => MapData | undefined;
   /** Makes a second canvas of the same size (needed for motion blur only). */
   createScratch?: () => Scratch;
 }
@@ -35,7 +38,7 @@ export interface RenderContext {
 /** A thing that went wrong or was changed while drawing a frame (text cut, picture missing ...). */
 export interface RenderNote {
   layerId: string;
-  kind: "truncated" | "shrunk" | "missing-image" | "missing-icon" | "not-drawn";
+  kind: "truncated" | "shrunk" | "missing-image" | "missing-icon" | "missing-flag" | "missing-map" | "not-drawn";
   message: string;
 }
 

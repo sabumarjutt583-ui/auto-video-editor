@@ -45,3 +45,6 @@ export function breaksEverywhere(code: number): boolean {
   const script = scriptOfChar(code);
   return script === "korean" ? false : script === "japanese" || script === "chinese" || (code >= 0x3000 && code <= 0x303f) || (code >= 0xff00 && code <= 0xffef);
 }
+
+/** True when the text is written right to left (Urdu, Arabic ...), so cards and lists mirror their layout. */
+export const isRtlText = (...texts: string[]): boolean => isRtl(detectScript(texts.join(" ")));

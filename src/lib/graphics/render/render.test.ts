@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { recorder } from "./recorder.ts";
 
 import { poseOf } from "./anim.ts";
 import { ease } from "./easing.ts";
@@ -160,27 +161,6 @@ test("fit: ellipsis fits the width", () => {
   assert.ok(lineText(cut).endsWith("…"));
 });
 
-// A canvas that only records what is called on it: enough to test order, timing and determinism without a browser.
-function recorder(): { ctx: import("./context.ts").Canvas2D; log: string[] } {
-  const log: string[] = [];
-  const state: Record<string, unknown> = {};
-  const ctx = new Proxy(state, {
-    get(target, key: string) {
-      if (key in target) return target[key];
-      return (...args: unknown[]) => {
-        log.push(`${key}(${args.map((a) => (typeof a === "number" ? Math.round(a * 1000) / 1000 : typeof a === "object" ? "obj" : String(a))).join(",")})`);
-        return key === "measureText" ? { width: 10 } : undefined;
-      };
-    },
-    set(target, key: string, value: unknown) {
-      log.push(`${key}=${String(value)}`);
-      target[key] = value;
-      return true;
-    },
-  }) as unknown as import("./context.ts").Canvas2D;
-  return { ctx, log };
-}
-
 const rc = { width: 320, height: 180, theme: DEFAULT_THEME, image: () => undefined, icon: () => undefined };
 
 test("renderFrame: same input gives the same drawing calls; layers outside their time are not drawn", async () => {
@@ -201,7 +181,7 @@ test("renderFrame: same input gives the same drawing calls; layers outside their
   assert.deepEqual(renderFrame(s, 100, recorder().ctx, rc).drawn, []);
 });
 
-test("renderFrame: layers are drawn in list order, and unfinished layer types are reported", async () => {
+test("renderFrame: layers are drawn in list order, a counter among them", async () => {
   const s = spec([
     { id: "back", type: "shape", box },
     { id: "num", type: "counter", box, to: 5 },
@@ -209,8 +189,8 @@ test("renderFrame: layers are drawn in list order, and unfinished layer types ar
   ]);
   const { renderFrame } = await import("./renderFrame.ts");
   const report = renderFrame(s, 0, recorder().ctx, rc);
-  assert.deepEqual(report.drawn, ["back", "front"]);
-  assert.deepEqual(report.notes.map((n) => `${n.layerId}:${n.kind}`), ["num:not-drawn"]);
+  assert.deepEqual(report.drawn, ["back", "num", "front"]);
+  assert.deepEqual(report.notes, []);
 });
 
 test("renderFrame: a missing icon or picture is reported, not thrown", async () => {

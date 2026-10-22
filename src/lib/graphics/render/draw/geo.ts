@@ -84,8 +84,13 @@ export function drawCountries(ctx: Canvas2D, countries: readonly (Shape & { a2: 
       const color = lit[country.a2];
       if ((color !== undefined) !== pass) continue;
       traceShape(ctx, country, view);
-      ctx.fillStyle = color ?? colors.land;
+      ctx.fillStyle = colors.land;
       ctx.fill("evenodd");
+      if (color !== undefined) {
+        // The highlight goes over the plain land, so a fading highlight blends with it.
+        ctx.fillStyle = color;
+        ctx.fill("evenodd");
+      }
       if (colors.borderWidth > 0) ctx.stroke();
     }
   }

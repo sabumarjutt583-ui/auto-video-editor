@@ -1,6 +1,7 @@
 import { FONTS } from "../../captions/fonts.ts";
 import { loadFont } from "../../captions/loadFonts.ts";
 import type { RenderContext } from "./context.ts";
+import type { MapData, MapResolution } from "../geo/mapData.ts";
 import { iconShape } from "../library/icons.ts";
 import { DEFAULT_THEME } from "./theme.ts";
 
@@ -15,7 +16,7 @@ export async function loadGraphicFonts(): Promise<boolean> {
  * A render context for a visible canvas (the live preview). Pictures are looked up in `images` by the layer `src`; flags are
  * in the same map under `flag:XX`. Icons come from the loaded sets (call `ensureIcons` first).
  */
-export function previewContext(width: number, height: number, images: ReadonlyMap<string, CanvasImageSource>): RenderContext {
+export function previewContext(width: number, height: number, images: ReadonlyMap<string, CanvasImageSource>, maps: Partial<Record<MapResolution, MapData>> = {}): RenderContext {
   return {
     width,
     height,
@@ -23,6 +24,7 @@ export function previewContext(width: number, height: number, images: ReadonlyMa
     image: (src) => images.get(src),
     icon: iconShape,
     flag: (code) => images.get(`flag:${code.toUpperCase()}`),
+    map: (resolution) => maps[resolution],
   };
 }
 

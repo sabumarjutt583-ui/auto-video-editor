@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 // Draws graphic frames off the main thread with an OffscreenCanvas. The drawing code is the same `renderFrame` the preview uses.
+import type { MapData, MapResolution } from "../geo/mapData.ts";
 import type { IconShape, RenderContext } from "../render/context.ts";
 import { renderFrame } from "../render/renderFrame.ts";
 import { DEFAULT_THEME } from "../render/theme.ts";
@@ -12,7 +13,7 @@ export interface WorkerFont {
 }
 
 export type ToWorker =
-  | { type: "init"; spec: GraphicSpec; width: number; height: number; fonts: WorkerFont[]; images: Record<string, ImageBitmap>; icons: Record<string, IconShape> }
+  | { type: "init"; spec: GraphicSpec; width: number; height: number; fonts: WorkerFont[]; images: Record<string, ImageBitmap>; icons: Record<string, IconShape>; maps: Partial<Record<MapResolution, MapData>> }
   | { type: "frame"; n: number };
 
 export type FromWorker =
@@ -45,11 +46,13 @@ self.onmessage = async (event: MessageEvent<ToWorker>) => {
       ctx = context;
       const images = message.images;
       const icons = message.icons;
+      const maps = message.maps;
       rc = {
         width: message.width, height: message.height, theme: DEFAULT_THEME,
         image: (src) => images[src],
         icon: (set, name) => icons[`${set}:${name}`],
         flag: (code) => images[`flag:${code.toUpperCase()}`],
+        map: (resolution) => maps[resolution],
       };
       post({ type: "ready" });
     } else if (spec && ctx && rc) {
