@@ -1,5 +1,7 @@
 import { repairSpec } from "../../spec/index.ts";
 import type { GraphicSpec } from "../../spec/schema.ts";
+import { GEO_CASES, type GeoAssets } from "./geoCases.ts";
+import type { Canvas2D } from "../context.ts";
 import type { RenderOptions } from "../renderFrame.ts";
 
 export interface GoldenCase {
@@ -7,6 +9,8 @@ export interface GoldenCase {
   spec: GraphicSpec;
   frame: number;
   options?: RenderOptions;
+  /** Draws the picture itself instead of `renderFrame` (maps and flags, whose layers come in phase 5). */
+  custom?: (ctx: Canvas2D, width: number, height: number, assets: GeoAssets) => void;
 }
 
 export const GOLDEN_SIZE = { width: 320, height: 180 };
@@ -47,6 +51,10 @@ add("shape_line", [{ id: "s", type: "shape", box: { x: 0.1, y: 0.45, w: 0.8, h: 
 for (const name of ["check", "star", "arrow-right", "users", "flame"]) {
   add(`icon_${name}`, [{ id: "i", type: "icon", box: { x: 0.3, y: 0.15, w: 0.4, h: 0.7 }, icon: { set: "lucide", name }, color: "accent" }], 30);
 }
+// The bundled sets: Lucide (outline, one with solid dots), Tabler outline and Tabler solid.
+for (const [set, name] of [["lucide", "trending-up"], ["lucide", "brain-circuit"], ["tabler", "flame"], ["tabler", "star-filled"], ["tabler", "world"]] as const) {
+  add(`icon_${set}_${name}`, [{ id: "i", type: "icon", box: { x: 0.3, y: 0.15, w: 0.4, h: 0.7 }, icon: { set, name }, color: "accent" }], 30);
+}
 add("image_cover_rounded", [{ id: "p", type: "image", box: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 }, src: "test.png", fit: "cover", radius: 0.2 }], 30);
 add("image_contain", [{ id: "p", type: "image", box: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 }, src: "test.png", fit: "contain" }], 30);
 
@@ -68,5 +76,8 @@ for (const preset of ["fade", "slideUp", "slideDown", "slideLeft", "slideRight",
 const MOVING = { id: "c", type: "shape", box: { x: 0.3, y: 0.3, w: 0.4, h: 0.4 }, shape: "roundRect", fill: "accent", enter: { preset: "slideLeft", duration: 0.15, easing: "linear" } };
 add("motion_blur_off", [MOVING], 2);
 add("motion_blur_on", [MOVING], 2, { motionBlurSamples: 6, shutter: 1 });
+
+// Maps and flags are drawn by helpers (their layers come in phase 5); the spec is a placeholder.
+for (const item of GEO_CASES) cases.push({ name: item.name, spec: make(item.name, [text("map")]), frame: 0, custom: item.draw });
 
 export const GOLDEN_CASES: readonly GoldenCase[] = cases;

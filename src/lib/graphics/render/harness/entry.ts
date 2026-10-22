@@ -2,8 +2,13 @@
  * Browser entry for the golden-image tests (bundled to one script by scripts/graphics-harness.mjs and driven by the
  * Rust test in src-tauri/src/graphics/golden_tests.rs). It draws with exactly the code the app uses.
  */
-import { builtinIcon } from "../icons.ts";
+import { loadCities } from "../../geo/cities.ts";
+import { loadMapData } from "../../geo/mapData.ts";
+import { FLAG_CODES, flagKey, loadFlagBitmaps } from "../../library/flags.ts";
+import { ensureIcons, iconsOfSpec, iconShape } from "../../library/icons.ts";
+import type { GeoAssets } from "./geoCases.ts";
 import type { Canvas2D, RenderContext } from "../context.ts";
+import { drawFlagPicture } from "../draw/geo.ts";
 import { renderFrame } from "../renderFrame.ts";
 import { DEFAULT_THEME } from "../theme.ts";
 import { GOLDEN_CASES, GOLDEN_SIZE } from "./cases.ts";
@@ -34,6 +39,8 @@ function testPicture(): HTMLCanvasElement {
   return canvas;
 }
 
+let assets: GeoAssets | null = null;
+
 function context(width: number, height: number): RenderContext {
   const picture = testPicture();
   return {
@@ -41,7 +48,8 @@ function context(width: number, height: number): RenderContext {
     height,
     theme: DEFAULT_THEME,
     image: (src) => (src === "test.png" ? picture : undefined),
-    icon: builtinIcon,
+    icon: iconShape,
+    flag: (code) => assets?.flags.get(code.toUpperCase()),
     createScratch: () => {
       const canvas = document.createElement("canvas");
       canvas.width = width;
@@ -61,6 +69,11 @@ function drawCase(index: number): { canvas: HTMLCanvasElement; ctx: CanvasRender
   canvas.height = GOLDEN_SIZE.height;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("no 2d context");
+  if (item.custom) {
+    if (!assets) throw new Error("call loadAssets() first");
+    item.custom(ctx as Canvas2D, canvas.width, canvas.height, assets);
+    return { canvas, ctx, notes: [] };
+  }
   const report = renderFrame(item.spec, item.frame, ctx as Canvas2D, context(canvas.width, canvas.height), item.options);
   return { canvas, ctx, notes: report.notes.map((n) => `${n.layerId}:${n.kind}`) };
 }
@@ -91,6 +104,37 @@ const api = {
     }
     await document.fonts.ready;
     return loaded;
+  },
+  /** Loads the icon sets, every flag, both map resolutions and the cities (the harness bundle has them inlined). */
+  async loadAssets(): Promise<{ flags: number; countries110: number; countries50: number; cities: number }> {
+    await ensureIcons([{ set: "lucide", name: "" }, { set: "tabler", name: "" }]);
+    const flagBitmaps = await loadFlagBitmaps(FLAG_CODES);
+    const flags = new Map<string, ImageBitmap>();
+    for (const code of FLAG_CODES) {
+      const bitmap = flagBitmaps[flagKey(code)];
+      if (bitmap) flags.set(code, bitmap);
+    }
+    const [map110, map50, cities] = await Promise.all([loadMapData("110m"), loadMapData("50m"), loadCities()]);
+    assets = { map110, map50, cities, flags };
+    return { flags: flags.size, countries110: map110.countries.length, countries50: map50.countries.length, cities: cities.length };
+  },
+  /** Draws every flag on its own canvas and reports the codes whose picture is empty or does not fill its 4:3 box. */
+  flagProblems(): string[] {
+    if (!assets) throw new Error("call loadAssets() first");
+    const problems: string[] = [];
+    for (const [code, bitmap] of assets.flags) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 120;
+      canvas.height = 90;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("no 2d context");
+      drawFlagPicture(ctx, bitmap, { x: 0, y: 0, w: 120, h: 90 }, "rect");
+      const data = ctx.getImageData(0, 0, 120, 90).data;
+      let painted = 0;
+      for (let i = 3; i < data.length; i += 4) if ((data[i] ?? 0) > 200) painted++;
+      if (painted < 120 * 90 * 0.3) problems.push(`${code}: only ${painted} pixels painted`);
+    }
+    return problems;
   },
   cases(): { name: string }[] {
     return GOLDEN_CASES.map((c) => ({ name: c.name }));
@@ -148,7 +192,7 @@ const api = {
       };
       worker.onerror = (e) => reject(new Error(e.message));
     });
-    worker.postMessage({ type: "init", spec: item.spec, width, height, fonts, images: {} });
+    worker.postMessage({ type: "init", spec: item.spec, width, height, fonts, images: {}, icons: await iconsOfSpec(item.spec) });
     await ready;
     const canvas = document.createElement("canvas");
     canvas.width = width;

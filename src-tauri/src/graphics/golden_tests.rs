@@ -49,6 +49,10 @@ async fn open() -> Option<(Session, PathBuf)> {
     let fonts = format!("{}/", file_url(&root().join("resources").join("fonts")));
     let loaded = session.eval(&format!("window.__graphics.loadFonts({fonts:?})")).await.expect("fonts load");
     assert_eq!(loaded, 12, "all bundled fonts load");
+    let assets = session.eval("window.__graphics.loadAssets()").await.expect("icons, flags, maps and cities load");
+    assert!(assets["flags"].as_u64().unwrap_or(0) >= 240, "flags: {assets}");
+    assert!(assets["countries110"].as_u64().unwrap_or(0) >= 170 && assets["countries50"].as_u64().unwrap_or(0) >= 230, "maps: {assets}");
+    assert!(assets["cities"].as_u64().unwrap_or(0) >= 1000, "cities: {assets}");
     Some((session, work))
 }
 
@@ -93,6 +97,15 @@ async fn every_case_matches_its_golden_image() {
         let _ = std::fs::rename(&actual_dir, &keep);
         panic!("{} golden image problems (new pictures in {}):\n{}", problems.len(), keep.display(), problems.join("\n"));
     }
+    let _ = std::fs::remove_dir_all(&work);
+}
+
+#[tokio::test]
+async fn every_bundled_flag_decodes_and_draws() {
+    let Some((session, work)) = open().await else { return };
+    let problems = session.eval("window.__graphics.flagProblems()").await.expect("flag check");
+    assert_eq!(problems.as_array().map(|a| a.len()), Some(0), "flags that do not draw: {problems}");
+    session.stop().await;
     let _ = std::fs::remove_dir_all(&work);
 }
 

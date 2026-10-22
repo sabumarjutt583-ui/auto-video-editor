@@ -19,6 +19,8 @@ await build({
   configFile: false,
   logLevel: "warn",
   build: {
+    // Icons, flags and map data are inlined into the one script.
+    assetsInlineLimit: 1e9,
     lib: { entry: "src/lib/graphics/render/harness/entry.ts", formats: ["iife"], name: "GraphicsHarness", fileName: () => "harness.js" },
     outDir: "src-tauri/target/graphics-harness",
     emptyOutDir: false,

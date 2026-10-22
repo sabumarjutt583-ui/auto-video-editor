@@ -135,3 +135,7 @@ Manual checks (the screen itself was not run in the sandbox, and no real Gemini/
 ### Motion graphics run, phase 3 (2026-10-22, Linux sandbox)
 
 `cargo test` 429 / `--features admin` 445 passed, no warnings; `npm run test:ts` 310 passed; `tsc` clean; `npm run build` ok (the drawing worker is a 13 kB asset). The automatic checklist above passes. The by-hand acceptance parts (section 3) were not repeated: they need the real app window. To check by hand after phase 3: Auto Editor > Motion > "Graphic preview (new engine)" > pick "Big number" > "Add to S01" > render: the graphic appears at the start of the scene, below the captions. Needs one try on Windows (WebView2) and macOS (WKWebView), because the raw IPC call and the Web Worker only exist inside the real webview.
+
+### Motion graphics, phase 4 (2026-10-22, Linux sandbox)
+
+`npm run test:ts` 328 passed (icons, countries, flags, maps, projections, cities, routes); `cargo test` 430 passed incl. 16 map/flag/icon golden pictures and "every bundled flag draws" in Chromium; `tsc`, `npm run build`, `cargo build` (also `--features admin`) clean. Check by hand: Auto Editor > Motion > "Graphic preview (new engine)" > an icon sample shows a Lucide icon. Maps and flags have no layer yet (phase 5).

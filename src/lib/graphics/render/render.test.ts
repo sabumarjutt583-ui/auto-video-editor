@@ -215,7 +215,7 @@ test("renderFrame: layers are drawn in list order, and unfinished layer types ar
 
 test("renderFrame: a missing icon or picture is reported, not thrown", async () => {
   const s = spec([
-    { id: "i", type: "icon", box, icon: { set: "lucide", name: "nope" } },
+    { id: "i", type: "icon", box, icon: { set: "lucide", name: "check" } },
     { id: "p", type: "image", box, src: "media/none.png" },
   ]);
   const { renderFrame } = await import("./renderFrame.ts");

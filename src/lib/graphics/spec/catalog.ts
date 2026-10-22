@@ -1,4 +1,6 @@
-/** What names exist: icons and countries. Phase 4 replaces the icon check with the bundled icon index. */
+import { hasIcon } from "../library/icons.ts";
+
+/** What names exist: icons (the bundled index) and countries. */
 export interface Catalog {
   hasIcon: (set: string, name: string) => boolean;
   /** `code` is an upper-case ISO 3166-1 alpha-2 code. */
@@ -17,10 +19,8 @@ export const COUNTRY_CODES: readonly string[] = (
 ).split(" ");
 
 const COUNTRY_SET = new Set(COUNTRY_CODES);
-const ICON_SETS = ["lucide", "tabler"];
 
-/** Until the icon index exists (phase 4) any well-formed icon name of a known set is accepted. */
 export const defaultCatalog: Catalog = {
-  hasIcon: (set, name) => ICON_SETS.includes(set) && /^[a-z0-9][a-z0-9-]{0,63}$/.test(name),
+  hasIcon,
   hasCountry: (code) => COUNTRY_SET.has(code),
 };

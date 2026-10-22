@@ -1,11 +1,11 @@
 import type { Layer } from "../../spec/schema.ts";
-import type { Area, Canvas2D, RenderContext, RenderNote } from "../context.ts";
+import type { Area, Canvas2D, IconShape, RenderContext, RenderNote } from "../context.ts";
 import { resolveColor } from "../theme.ts";
 
 type IconLayer = Extract<Layer, { type: "icon" }>;
 
 /** Draws SVG path data as an icon, as large as fits in the box, centred. */
-export function drawIconShape(ctx: Canvas2D, shape: { paths: string[]; viewBox: number; filled: boolean; strokeWidth?: number }, area: Area, color: string): void {
+export function drawIconShape(ctx: Canvas2D, shape: IconShape, area: Area, color: string): void {
   const side = Math.min(area.w, area.h);
   const scale = side / shape.viewBox;
   ctx.save();
@@ -23,6 +23,10 @@ export function drawIconShape(ctx: Canvas2D, shape: { paths: string[]; viewBox: 
     const path = new Path2D(d);
     if (shape.filled) ctx.fill(path);
     else ctx.stroke(path);
+  }
+  if (shape.fillPaths && !shape.filled) {
+    ctx.fillStyle = color;
+    for (const d of shape.fillPaths) ctx.fill(new Path2D(d));
   }
   ctx.restore();
 }

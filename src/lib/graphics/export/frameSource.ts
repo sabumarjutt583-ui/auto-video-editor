@@ -1,6 +1,8 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 import { fontsDir } from "../../captions/api.ts";
+import { flagCodesOf, loadFlagBitmaps } from "../library/flags.ts";
+import { ensureIcons, iconRefsOf, iconsOfSpec } from "../library/icons.ts";
 import { loadGraphicFonts, previewContext } from "../render/browser.ts";
 import { renderFrame } from "../render/renderFrame.ts";
 import type { GraphicSpec } from "../spec/schema.ts";
@@ -37,7 +39,7 @@ async function workerFonts(spec: GraphicSpec): Promise<WorkerFont[]> {
 
 /** The pictures a graphic uses, loaded from the project folder. A picture that cannot be read is left out (the renderer notes it). */
 export async function loadImages(spec: GraphicSpec, projectDir: string): Promise<Record<string, ImageBitmap>> {
-  const out: Record<string, ImageBitmap> = {};
+  const out: Record<string, ImageBitmap> = await loadFlagBitmaps(flagCodesOf(spec));
   const separator = projectDir.includes("\\") ? "\\" : "/";
   for (const layer of spec.layers) {
     if (layer.type !== "image" || layer.src in out) continue;
@@ -74,7 +76,7 @@ async function workerSource(spec: GraphicSpec, width: number, height: number, im
   };
   worker.onerror = (event) => failAll(new Error(event.message || "The drawing worker failed."));
   const started = new Promise<void>((resolve, reject) => { ready = { resolve, reject }; });
-  const init: ToWorker = { type: "init", spec, width, height, fonts: await workerFonts(spec), images };
+  const init: ToWorker = { type: "init", spec, width, height, fonts: await workerFonts(spec), images, icons: await iconsOfSpec(spec) };
   worker.postMessage(init, Object.values(images));
   await started;
   return {
@@ -91,6 +93,7 @@ async function workerSource(spec: GraphicSpec, width: number, height: number, im
 /** The same drawing on the main thread, for a webview without Worker or OffscreenCanvas support. */
 async function mainSource(spec: GraphicSpec, width: number, height: number, images: Record<string, ImageBitmap>): Promise<FrameSource> {
   await loadGraphicFonts();
+  await ensureIcons(iconRefsOf(spec));
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;

@@ -5,6 +5,8 @@ export type Canvas2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContex
 /** An icon as SVG path data in a square `viewBox` (Lucide and Tabler icons are converted to this in phase 4). */
 export interface IconShape {
   paths: string[];
+  /** Small shapes of an outline icon that are drawn solid (dots). */
+  fillPaths?: string[];
   viewBox: number;
   /** True for solid icons, false for outline icons (drawn with a round stroke). */
   filled: boolean;
@@ -24,6 +26,8 @@ export interface RenderContext {
   /** A loaded picture by the `src` of an image layer. */
   image: (src: string) => CanvasImageSource | undefined;
   icon: (set: string, name: string) => IconShape | undefined;
+  /** A flag picture by upper-case ISO 3166-1 alpha-2 code (loaded before drawing; undefined while missing). */
+  flag?: (code: string) => CanvasImageSource | undefined;
   /** Makes a second canvas of the same size (needed for motion blur only). */
   createScratch?: () => Scratch;
 }

@@ -100,6 +100,27 @@ One renderer for preview and export (R5). Cache key = hash(spec + rendererVersio
 - **Tests:** export (90 frames, exact duration 00:00:03.00, bit-exact alpha round trip, 9:16 and 1:1, cancel cleanup, wrong/missing frame), composite (frames 45..74 exactly, 120 frames total, no halo over black/white with synthetic soft edges and with real renderer text, colour match, captions above graphics), worker output byte-identical to the page's (3 graphics x 60 frames), real renderer frames to clip bit-exact. The 5-second smoke test of the installer FFmpeg now includes a graphic clip.
 - Not covered by automatic tests: the real Tauri raw-IPC call and the Worker inside the Tauri webviews (Windows WebView2, macOS WKWebView): both need a person to press "Add to scene" once on each system.
 
+## 5e. Bundled assets: icons, flags, maps (phase 4)
+
+Everything is plain data committed under `src/lib/graphics/assets/`; none of the source packages is a dependency of the app (`npm pack` into a temp folder, converted by `scripts/build-graphic-assets.mjs` and `scripts/build-flags.mjs`, licences in `THIRD_PARTY_LICENSES.md`). Nothing is read from the internet; no Google Maps, no map tiles.
+
+| Data | Source (licence) | File(s) | Size (packed) |
+|---|---|---|---|
+| Icons, default set | Lucide 1.61 (ISC) - 1,903 icons | `icons/lucide.json` (loaded on first use) | 84 kB |
+| Icons, second set | Tabler 3.49 (MIT) - 5,184 outline + 1,054 solid (`<name>-filled`) | `icons/tabler.json` (loaded on first use) | 323 kB |
+| Icon index | names of both sets (validation, always loaded), keywords (search, loaded on first search) | `icons/names.json`, `icons/tags.json` | 31 kB + 132 kB |
+| Flags | flag-icons 7.6 (MIT) - 250 flags, one 480x360 lossless WebP each (`flags/<code>.webp`) | made by headless Chromium + ffmpeg | 1.56 MB |
+| Countries | i18n-iso-countries (MIT): alpha-2/3, ISO numeric, names in en ur ko ja ru hi zh ar fa; Kosovo (XK) added by hand | `countries.json` | 72 kB raw |
+| Country outlines | world-atlas 2.0 (ISC) from Natural Earth (public domain), TopoJSON 110m and 50m (`land` dropped) | `maps/countries-{110m,50m}.json` | 30 + 228 kB |
+| Cities | Natural Earth populated places 1:50m (public domain): 1,248 rows with name, country, lat, lon, population, capital, names in ur ko ja ru hi zh ar fa | `cities.json` | ~100 kB |
+
+- **Icons.** `library/icons.ts`: `hasIcon` (the check every spec goes through: `defaultCatalog.hasIcon`, so an unknown icon fails strict validation and `repairSpec` drops the layer), `ensureIcons`/`iconShape` (sync lookup after the set is loaded), `iconsOfSpec` (plain data for the export worker, which cannot import the sets), `searchIcons(query, limit)` (deterministic keyword score, Lucide first; the director in phase 7 offers the AI the top 30). `IconShape.fillPaths` carries the small solid dots of outline icons. The old 6 hand-drawn placeholder icons are gone.
+- **Flags.** Rasters, not vectors: flag SVGs use clip paths, gradients and `<use>`, and a picture keeps preview and export identical. `library/flags.ts` (Vite `import.meta.glob`), key `flag:XX` in the picture map of the render context (`RenderContext.flag`). `draw/geo.ts` `drawFlagPicture(rect | circle)`.
+- **Maps.** `geo/topo.ts` (TopoJSON decoder + `unwrapRing`, which makes outlines that cross the date line continuous; a ring around a pole is closed along the pole), `geo/mapData.ts` (`loadMapData("110m" | "50m")`, ids mapped to alpha-2; 110m for the world view, 50m for regions), `geo/projections.ts` (equirectangular, Mercator (clamped at 85.05 deg), Natural Earth I, orthographic globe; `makeView(kind, bounds, box, camera)` fits a region into a box, camera zoom/pan on top; `REGION_BOUNDS` for the 8 regions of the spec), `geo/cities.ts` (`findCity(name, cc?)` in any of the languages, accents and case ignored), `geo/route.ts` (great-circle route, split where it crosses the date line or goes behind the globe, `trimPolylines` for the draw-on). **No d3-geo**: the projections are about 100 lines of pure code, so no new dependency and no floating point differences between machines. `draw/geo.ts`: `drawCountries` (highlight colours, three shifted copies on a flat map), `drawRoutePieces`, `drawPin`.
+- **Spec fields they serve** (drawn in phase 5): `flag` layer (`country`), `map` layer (`region`, `projection`, `countries`, `pins`, `routes`), `icon` fields of `icon`, `lowerThird`, `list`.
+- **Installer size added (phase 4):** the packed icon sets and index about 0.45 MB, flags 1.56 MB (WebP does not compress further), country table 0.03 MB; maps (0.26 MB) and cities (0.1 MB) are only linked once phase 5 draws maps. About 2.1 MB in the installer now, about 2.5 MB with maps. The unpacked `dist` grows by 3.7 MB.
+- **Tests.** `library/library.test.ts` (every icon of both sets loads and has valid path data; unknown names fail validation and are repaired away; icon search; every spec country code has a row and a flag file; all flags are 480x360 WebP; every package is in THIRD_PARTY_LICENSES.md), `geo/geo.test.ts` (both map resolutions decode, test countries have sensible shapes, rings are closed, `unwrapRing`, projections, views fit their box, cities in en/ur/ja/ru, a Karachi-Tokyo route and a Tokyo-Los Angeles route split at the date line). Golden images (browser harness): 10 map/flag pictures (`geo_*`, `flags_*`) and 5 new icon pictures, plus `every_bundled_flag_decodes_and_draws` (all 250 flags draw in Chromium).
+
 ## 6. Phase checklist (commit per phase)
 
 | Phase | Result | Commit message |
@@ -108,7 +129,7 @@ One renderer for preview and export (R5). Cache key = hash(spec + rendererVersio
 | 1 (done) | GraphicSpec schema, validator, repairSpec, Rust structs | Motion graphics phase 1: GraphicSpec schema and validation |
 | 2 (done) | renderer core (text, richText, shape, icon, image), timing engine, preview panel | Motion graphics phase 2: renderer core |
 | 3 (done) | transparent export + composite + alpha tests | Motion graphics phase 3: transparent export and composite |
-| 4 | icons, flags, maps | Motion graphics phase 4: icons, flags and maps |
+| 4 (done) | icons, flags, maps | Motion graphics phase 4: icons, flags and maps |
 | 5 | advanced layers | Motion graphics phase 5: advanced layers |
 | 6 | brand kit | Motion graphics phase 6: brand kit |
 | 7 | AI graphics director | Motion graphics phase 7: AI graphics director |

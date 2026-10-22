@@ -1,6 +1,8 @@
 import { Pause, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { flagCodesOf, loadFlagBitmaps } from "../../lib/graphics/library/flags";
+import { ensureIcons, iconRefsOf } from "../../lib/graphics/library/icons";
 import { loadGraphicFonts, previewContext, previewSize } from "../../lib/graphics/render/browser";
 import { FPS, frameCount, renderFrame, type RenderNote } from "../../lib/graphics/render";
 import type { GraphicSpec } from "../../lib/graphics/spec";
@@ -23,6 +25,7 @@ export function GraphicPreview({ spec, aspect, backgroundUrl }: GraphicPreviewPr
   const [fontsReady, setFontsReady] = useState(false);
   const [notes, setNotes] = useState<RenderNote[]>([]);
   const images = useMemo(() => new Map<string, CanvasImageSource>(), []);
+  const [resources, setResources] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -33,6 +36,18 @@ export function GraphicPreview({ spec, aspect, backgroundUrl }: GraphicPreviewPr
   useEffect(() => {
     setFrame(0);
   }, [spec]);
+
+  // Icon sets and flags are loaded the first time a graphic needs them; the picture is drawn again when they are there.
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      await ensureIcons(iconRefsOf(spec));
+      const flags = await loadFlagBitmaps(flagCodesOf(spec));
+      for (const [key, bitmap] of Object.entries(flags)) images.set(key, bitmap);
+      if (alive) setResources((n) => n + 1);
+    })();
+    return () => { alive = false; };
+  }, [spec, images]);
 
   // The clock: the frame follows real time (30 fps) while playing; a late browser skips frames instead of slowing down.
   useEffect(() => {
@@ -55,7 +70,7 @@ export function GraphicPreview({ spec, aspect, backgroundUrl }: GraphicPreviewPr
     if (!element || !ctx || !fontsReady) return;
     const report = renderFrame(spec, frame, ctx, previewContext(size.width, size.height, images));
     setNotes((old) => (old.length === report.notes.length && old.every((n, i) => n.message === report.notes[i]?.message) ? old : report.notes));
-  }, [spec, frame, size, images, fontsReady]);
+  }, [spec, frame, size, images, fontsReady, resources]);
 
   const seconds = (frame / FPS).toFixed(2);
   return (
