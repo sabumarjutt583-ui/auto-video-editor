@@ -112,7 +112,7 @@ pub fn classify_card_error(patterns: &[ErrorPattern], text: &str, signed_out: bo
 pub fn classify_browser_error(raw: &str, prefix: &str) -> GenError {
     let lower = raw.to_lowercase();
     let first_line = raw.lines().next().unwrap_or("").trim();
-    if ["target closed", "has been closed", "session closed", "connection closed", "crashed", "no target", "websocket", "not running", "broken pipe", "connection reset"].iter().any(|p| lower.contains(p)) {
+    if ["target closed", "has been closed", "session closed", "connection closed", "crashed", "no target", "websocket", "not running", "broken pipe", "connection reset", "session with given id not found", "no session with given id", "-32001"].iter().any(|p| lower.contains(p)) {
         return GenError::new(ErrorKind::Session, "The browser was closed or crashed.");
     }
     if ["err_internet_disconnected", "err_name_not_resolved", "err_connection", "err_network", "err_timed_out", "err_address_unreachable", "err_proxy", "err_tunnel"].iter().any(|p| lower.contains(p)) {
@@ -136,6 +136,13 @@ pub fn clip(text: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_lost_page_is_a_session_problem() {
+        assert_eq!(classify_browser_error("browser error -32001: Session with given id not found.", "Reading the chat page").kind, ErrorKind::Session);
+        assert_eq!(classify_browser_error("Target closed", "x").kind, ErrorKind::Session);
+        assert_eq!(classify_browser_error("something else", "x").kind, ErrorKind::NoImage);
+    }
 
     fn patterns() -> Vec<ErrorPattern> {
         let p = |words: &[&str], kind, message: &str| ErrorPattern { contains: words.iter().map(|w| (*w).to_string()).collect(), kind, message: message.to_string() };

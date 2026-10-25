@@ -266,3 +266,39 @@ test("quick prompts without timing use P ids, and a single row copy has no extra
 test("the empty-line setting stays between 1 and 3", () => {
   assert.deepEqual([0, 1, 2, 3, 9, Number.NaN].map(clampEmptyLines), [1, 1, 2, 3, 3, 2]);
 });
+
+test("batch size and parallel requests: smaller batches, up to 3 at a time, every scene filled once", async () => {
+  const scenes = Array.from({ length: 25 }, (_, i) => scene(i + 1));
+  let running = 0;
+  let most = 0;
+  const call = async (_system: string, prompt: string): Promise<string> => {
+    running += 1;
+    most = Math.max(most, running);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    running -= 1;
+    const ids = [...prompt.matchAll(/^(S\d+[a-z]?) \|/gm)].map((m) => m[1]);
+    return JSON.stringify(ids.map((id) => ({ id, scene: `Shot for ${id}`, motion: "Slow push-in" })));
+  };
+  const progress: string[] = [];
+  const result = await generatePrompts({ scenes, targetIds: new Set(scenes.map((s) => s.id)), context: context(), call, batchSize: 5, parallel: 3, staggerMs: 0, onBatch: (n, t) => progress.push(`${n}/${t}`) });
+  assert.equal(result.failed, null);
+  assert.equal(progress.length, 5);
+  assert.ok(most >= 2 && most <= 3, `at most 3 at a time, saw ${most}`);
+  assert.ok(result.scenes.every((s) => s.prompt.trim() !== ""));
+  const one = await generatePrompts({ scenes, targetIds: new Set(scenes.map((s) => s.id)), context: context(), call, batchSize: 5 });
+  assert.equal(one.failed, null);
+  assert.equal(most >= 1, true);
+});
+
+test("with parallel requests a failing batch stops new ones and keeps the finished ones", async () => {
+  const scenes = Array.from({ length: 20 }, (_, i) => scene(i + 1));
+  const call = async (_system: string, prompt: string): Promise<string> => {
+    const ids = [...prompt.matchAll(/^(S\d+[a-z]?) \|/gm)].map((m) => m[1]);
+    if (ids.includes("S06")) throw new Error("network down");
+    return JSON.stringify(ids.map((id) => ({ id, scene: `Shot for ${id}`, motion: "" })));
+  };
+  const result = await generatePrompts({ scenes, targetIds: new Set(scenes.map((s) => s.id)), context: context(), call, batchSize: 5, parallel: 2, staggerMs: 0 });
+  assert.equal(result.failed?.batch, 2);
+  assert.ok(result.scenes.slice(0, 5).every((s) => s.prompt.trim() !== ""));
+  assert.ok(result.scenes.slice(5, 10).every((s) => s.prompt.trim() === ""));
+});

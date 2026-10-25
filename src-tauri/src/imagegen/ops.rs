@@ -130,7 +130,7 @@ impl ImageGen {
         if !settings.consent_given(config.major().unwrap_or(1)) {
             return Err(AppError::new("Please read and accept the Google account notice first (Settings, Image Generator).", "consent not accepted"));
         }
-        let timeout = Duration::from_secs(u64::from(settings.timeout_sec).max(120));
+        let timeout = Duration::from_secs(u64::from(settings.timeout_sec).max(chat::MIN_ANSWER_WAIT_SECS));
         let attempts = self.engine.read_accounts(|accounts| accounts.file.accounts.len()).max(1);
         let mut last: Option<GenError> = None;
         for _ in 0..attempts {
@@ -182,7 +182,7 @@ impl ImageGen {
         if !settings.consent_given(config.major().unwrap_or(1)) {
             return Err(AppError::new("Please read and accept the Google account notice first (Settings, Image Generator).", "consent not accepted"));
         }
-        let timeout = Duration::from_secs(u64::from(settings.timeout_sec).max(120));
+        let timeout = Duration::from_secs(u64::from(settings.timeout_sec).max(chat::MIN_ANSWER_WAIT_SECS));
         let pinned = account.zip(url);
         let attempts = if pinned.is_some() { 1 } else { self.engine.read_accounts(|a| a.file.accounts.len()).max(1) };
         let mut last: Option<GenError> = None;

@@ -9,7 +9,8 @@ import { generateText } from "../../lib/ai";
 import { writeTextFile } from "../../lib/files";
 import { clampEmptyLines, copyBlock, copyLines, toCsv, toJson } from "../../lib/prompts/export";
 import { generatePrompts, reassemble, type PromptContext } from "../../lib/prompts/generate";
-import { runChatPrompts } from "../../lib/prompts/chat/runner";
+import { randomPauseMs, runChatPrompts } from "../../lib/prompts/chat/runner";
+import { logFrontendError } from "../../lib/appUpdate/api";
 import { loadThread, saveThread } from "../../lib/prompts/chat/threadStore";
 import { webChatTransport } from "../../lib/prompts/chat/tauriTransport";
 import { needsMotion } from "../../lib/prompts/assemble";
@@ -93,7 +94,9 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
               context,
               transport: webChatTransport(jobId),
               tag: project.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "P",
-              batchSize: Math.min(25, Math.max(5, appSettings?.chatBatchSize ?? 20)),
+              batchSize: Math.min(25, Math.max(5, appSettings?.chatBatchSize ?? 10)),
+              pauseBetween: () => randomPauseMs(appSettings?.chatPauseMinSec ?? 4, appSettings?.chatPauseMaxSec ?? 12),
+              onLog: (line) => void logFrontendError(line, "/prompt-generator (chat run)").catch(() => undefined),
               thread: loadThread(project.id),
               onThread: (thread) => saveThread(project.id, thread),
               onBatch: ({ batch: number, total, account }) => setBatch({ number, total, account }),
@@ -106,6 +109,8 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
             targetIds,
             context,
             resendOnError: !appSettings?.textViaChat,
+            batchSize: Math.min(20, Math.max(5, appSettings?.apiBatchSize ?? 10)),
+            parallel: Math.min(3, Math.max(1, appSettings?.apiParallel ?? 2)),
             call: async (system, prompt) => (await generateText(prompt, system, true, jobId)).text,
             onBatch: (number, total) => setBatch({ number, total }),
             onScenes: (next) => update({ scenes: withoutDeleted(next, useProjectStore.getState().project?.scenes ?? next, deletedRef.current) }),
@@ -123,7 +128,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
         setBatch(null);
       }
     },
-    [context, scenes, update, appSettings?.textViaChat, appSettings?.chatBatchSize, project.id],
+    [context, scenes, update, appSettings?.textViaChat, appSettings?.chatBatchSize, appSettings?.chatPauseMinSec, appSettings?.chatPauseMaxSec, appSettings?.apiBatchSize, appSettings?.apiParallel, project.id],
   );
 
   const generateMissing = () => void run(new Set(scenes.filter((s) => s.prompt.trim() === "" && !s.edited).map((s) => s.id)));
@@ -208,7 +213,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
       <OptionsCard project={project} style={style} onSettings={setSettings} onAspect={setAspect} />
 
       {!quick && <EngineSwitch />}
-      {manual && <ManualPanel scenes={scenes} context={context} tag={project.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "P"} batchSize={Math.min(25, Math.max(5, appSettings?.chatBatchSize ?? 20))} onScenes={(next) => update({ scenes: next })} deleted={deletedRef.current} />}
+      {manual && <ManualPanel scenes={scenes} context={context} tag={project.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "P"} batchSize={Math.min(25, Math.max(5, appSettings?.chatBatchSize ?? 10))} onScenes={(next) => update({ scenes: next })} deleted={deletedRef.current} />}
 
       <div className={manual ? "hidden" : "flex flex-wrap items-center gap-2"}>
         <Button variant="primary" icon={Sparkles} disabled={busy || !context || missing === 0} onClick={generateMissing}>

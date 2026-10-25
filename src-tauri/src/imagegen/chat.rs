@@ -21,6 +21,9 @@ use crate::logging;
 
 const LOG: &str = "webchat";
 
+/// A chat answer is waited for at least this long (long batches take 3 minutes and more; the wait never interrupts Gemini).
+pub const MIN_ANSWER_WAIT_SECS: u64 = 900;
+
 /// The longest prompt the chat box is given (the page refuses very long text).
 pub const MAX_PROMPT_CHARS: usize = 30_000;
 

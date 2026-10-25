@@ -149,8 +149,39 @@ impl FreeWorker {
         }
     }
 
+    /// The browser of this account as it is right now (None when none is open).
+    async fn current_session(&self) -> Option<Arc<Session>> {
+        self.inner.ready.lock().await.as_ref().map(|r| r.session.clone())
+    }
+
+    /// A browser that lost its tab ("Session with given id not found") or died is closed, so the next call opens a fresh one.
+    /// Only the browser the failed call used is closed, never a newer one another call has opened since.
+    async fn forget_if_lost<T>(&self, before: Option<Arc<Session>>, result: &Result<T, GenError>) {
+        let Err(error) = result else { return };
+        if error.kind != ErrorKind::Session {
+            return;
+        }
+        let same = match (&before, self.current_session().await) {
+            (Some(old), Some(now)) => Arc::ptr_eq(old, &now),
+            (None, Some(_)) => true,
+            _ => false,
+        };
+        if same {
+            crate::logging::warn("webchat", &format!("browser: the page was lost ({}); the browser is closed and opened again on the next try", error.message));
+            let _open = self.inner.open_lock.lock().await;
+            self.drop_session().await;
+        }
+    }
+
     /// Makes one picture. `parallel` is how many the tool may make at the same time.
     pub async fn generate(&self, prompt: &str, aspect: &str, parallel: u32, timeout: Duration) -> Picture {
+        let before = self.current_session().await;
+        let result = self.generate_once(prompt, aspect, parallel, timeout).await;
+        self.forget_if_lost(before, &result).await;
+        result
+    }
+
+    async fn generate_once(&self, prompt: &str, aspect: &str, parallel: u32, timeout: Duration) -> Picture {
         let (session, frame, _) = self.ready().await?;
         let config = self.config();
         let receiver = {
@@ -188,7 +219,9 @@ impl FreeWorker {
     /// A question in a stored thread (or a new one). Returns the answer and the thread's address.
     pub async fn chat_thread(&self, prompt: &str, timeout: Duration, progress: chat::Progress<'_>, opts: &chat::ThreadOpts) -> Result<(ChatReply, String), GenError> {
         self.inner.chat_busy.fetch_add(1, Ordering::SeqCst);
+        let before = self.current_session().await;
         let result = self.thread_inner(prompt, timeout, progress, opts).await;
+        self.forget_if_lost(before, &result).await;
         self.inner.chat_busy.fetch_sub(1, Ordering::SeqCst);
         self.touch();
         result
@@ -209,7 +242,9 @@ impl FreeWorker {
 
     pub async fn chat_with(&self, prompt: &str, images: &[std::path::PathBuf], timeout: Duration, progress: chat::Progress<'_>) -> Result<ChatReply, GenError> {
         self.inner.chat_busy.fetch_add(1, Ordering::SeqCst);
+        let before = self.current_session().await;
         let result = self.chat_inner(prompt, images, timeout, progress).await;
+        self.forget_if_lost(before, &result).await;
         self.inner.chat_busy.fetch_sub(1, Ordering::SeqCst);
         self.touch();
         result
@@ -232,7 +267,9 @@ impl FreeWorker {
     /// Makes one video in a fresh chat of this account's browser (one chat question or video at a time).
     pub async fn video_with(&self, prompt: &str, image: Option<&std::path::Path>, timeout: Duration, progress: chat::Progress<'_>) -> Result<Vec<u8>, GenError> {
         self.inner.chat_busy.fetch_add(1, Ordering::SeqCst);
+        let before = self.current_session().await;
         let result = self.video_inner(prompt, image, timeout, progress).await;
+        self.forget_if_lost(before, &result).await;
         self.inner.chat_busy.fetch_sub(1, Ordering::SeqCst);
         self.touch();
         result
@@ -241,7 +278,9 @@ impl FreeWorker {
     /// Makes one video in Google Flow (one project per account; one chat question or video at a time).
     pub async fn flow_with(&self, prompt: &str, image: Option<&std::path::Path>, timeout: Duration, progress: chat::Progress<'_>) -> Result<Vec<u8>, GenError> {
         self.inner.chat_busy.fetch_add(1, Ordering::SeqCst);
+        let before = self.current_session().await;
         let result = self.flow_inner(prompt, image, timeout, progress).await;
+        self.forget_if_lost(before, &result).await;
         self.inner.chat_busy.fetch_sub(1, Ordering::SeqCst);
         self.touch();
         result

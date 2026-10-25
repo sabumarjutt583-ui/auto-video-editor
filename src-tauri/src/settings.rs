@@ -56,6 +56,13 @@ pub struct Settings {
     pub text_manual: bool,
     /// Scenes per message in the web chat (5 to 25).
     pub chat_batch_size: u8,
+    /// Scenes per request with the Gemini API key (5 to 20).
+    pub api_batch_size: u8,
+    /// Requests sent at the same time with the Gemini API key (1 to 3).
+    pub api_parallel: u8,
+    /// Polite pause before the next web chat message, a random time between these two numbers of seconds (0 to 120; 0 and 0 = no pause).
+    pub chat_pause_min_sec: u8,
+    pub chat_pause_max_sec: u8,
     /// Empty lines after every prompt in Copy all and Export TXT (1 to 3).
     pub export_empty_lines: u8,
     /// Write the id (S01_000.0-005.1 or P01) before every prompt in Copy all and Export TXT.
@@ -109,7 +116,11 @@ impl Default for Settings {
             openai_model: DEFAULT_OPENAI_MODEL.to_string(),
             text_via_chat: false,
             text_manual: false,
-            chat_batch_size: 20,
+            chat_batch_size: 10,
+            api_batch_size: 10,
+            api_parallel: 2,
+            chat_pause_min_sec: 4,
+            chat_pause_max_sec: 12,
             export_empty_lines: 2,
             export_include_ids: true,
             export_folder: String::new(),
@@ -197,7 +208,13 @@ impl Settings {
             return Err(invalid("The brand kit id is not valid."));
         }
 
+        let (pause_min, pause_max) = (self.chat_pause_min_sec.min(120), self.chat_pause_max_sec.min(120));
         Ok(Self {
+            chat_batch_size: self.chat_batch_size.clamp(5, 25),
+            api_batch_size: self.api_batch_size.clamp(5, 20),
+            api_parallel: self.api_parallel.clamp(1, 3),
+            chat_pause_min_sec: pause_min.min(pause_max),
+            chat_pause_max_sec: pause_min.max(pause_max),
             brand_kit_id,
             style_favorites,
             recent_styles,

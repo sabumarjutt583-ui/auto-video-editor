@@ -169,3 +169,11 @@ resources/fonts/: Noto Sans, Noto Sans CJK, Noto Sans Devanagari, Noto Sans Arab
 - Errors the person SEES (`ErrorNotice`) are also logged once as `[ui] on <page>: <message> | <details>` (`logFrontendError(text, area)`, dedupe in src/lib/errorLog.ts + test); unexpected window errors stay `[window]`.
 - "Export logs" adds the newest 5 web chat failure reports (`webchat-fail-*.txt`, keys hidden, cut at 2000 chars; the .jpg screenshots stay in the logs folder).
 - API timeout text no longer names a fixed number of seconds (calls have 60 s or 150 s limits).
+
+## Slow or lost chats, polite pace, faster API prompts
+- Chat waits at least 15 min (`chat::MIN_ANSWER_WAIT_SECS`, used by `chat_ask_progress` and `chat_thread`); the wait never interrupts Gemini.
+- `runChatPrompts` asks the SAME batch (same batch id, same thread) again by itself after `ResponseTimeout / NoResponse / Session / Network / Timeout / PageChanged`: waits 20 s, 45 s, 90 s (`transientWaitsMs`), then stops and keeps finished batches. The Rust side looks for `BATCH_ID: <id>` in the thread first, so a message that is already there is not sent again. Auth / RateLimit / Flagged are not retried.
+- Polite pause between batches: settings `chatPauseMinSec/chatPauseMaxSec` (default 4 to 12 s, `randomPauseMs`), UI in TextEngineCard. It lowers the message rate; it is NOT a promise against limits and not detection evasion.
+- A lost page ("Session with given id not found", -32001) is a `Session` error now (errors.rs), and `Worker::forget_if_lost` closes only the browser that call used, so the next try opens a fresh one (chat, thread, video, Flow, pictures).
+- API path: `generatePrompts({batchSize, parallel, staggerMs})`; settings `apiBatchSize` (default 10, 5-20) and `apiParallel` (default 2, 1-3). A failing batch stops new ones and keeps the finished ones. `chatBatchSize` default is now 10 (a saved value stays). Settings values are clamped in `Settings::validated`.
+- Still open: Gemini upload button selector (needs a screenshot of the real page; fix `chat.selectors.attach/uploadItem` in config.json); chat batches are not run on several accounts at once.

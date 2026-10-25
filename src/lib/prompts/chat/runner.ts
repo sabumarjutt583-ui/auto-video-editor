@@ -46,6 +46,10 @@ export interface ChatRunArgs {
   threadBatches?: number;
   /** Wait before the single retry after a soft failure (ms). */
   softWaitMs?: number;
+  /** Waits (ms) before each automatic retry of the SAME batch after a slow or lost chat. Default 20 s, 45 s, 90 s: three retries. */
+  transientWaitsMs?: readonly number[];
+  /** Polite pause (ms) before the next batch is sent. Default none. */
+  pauseBetween?: () => number;
   sleep?: (ms: number) => Promise<void>;
   thread?: ThreadRef | null;
   onThread?: (thread: ThreadRef | null) => void;
@@ -62,6 +66,18 @@ export interface ChatRunResult {
 const detailsOf = (error: unknown) => toAppError(error).details;
 const has = (error: unknown, word: string) => detailsOf(error).includes(word);
 export const isSoft = (error: unknown) => has(error, "SoftFailure");
+
+/** Problems that pass: Gemini was slow, did not start, the tab or browser was lost, the connection dropped. The same batch is asked again in the same thread. */
+const TRANSIENT = ["ResponseTimeout", "NoResponse", "Session", "Network", "Timeout", "PageChanged"] as const;
+export const isTransient = (error: unknown) => TRANSIENT.some((kind) => has(error, kind));
+export const DEFAULT_TRANSIENT_WAITS_MS: readonly number[] = [20_000, 45_000, 90_000];
+
+/** A pause between `minSeconds` and `maxSeconds` (milliseconds); `random` returns 0 to 1. */
+export function randomPauseMs(minSeconds: number, maxSeconds: number, random: () => number = Math.random): number {
+  const low = Math.max(0, Math.min(minSeconds, maxSeconds));
+  const high = Math.max(0, Math.max(minSeconds, maxSeconds));
+  return Math.round((low + (high - low) * random()) * 1000);
+}
 
 /** Writes a verified full prompt into a scene. */
 export function applyFullPrompt(scene: Scene, prompt: string, motion: string, fixes: string[], context: PromptContext): Scene {
@@ -155,11 +171,21 @@ export async function runChatPrompts(args: ChatRunArgs): Promise<ChatRunResult> 
 
     let answerText = "";
     let softTries = 0;
+    let transientTries = 0;
+    const transientWaits = args.transientWaitsMs ?? DEFAULT_TRANSIENT_WAITS_MS;
     for (;;) {
       try {
         answerText = await ask(buildBatchMessage(batchId, context, group, before), batchId);
         break;
       } catch (error) {
+        if (isTransient(error) && transientTries < transientWaits.length) {
+          // Not a failure yet: wait, then ask for the SAME batch in the SAME thread. The chat looks for the batch id first, so a message that is already there is not sent again.
+          const wait = transientWaits[transientTries] ?? 30_000;
+          transientTries += 1;
+          log(`batch ${b + 1}: ${toAppError(error).message} Trying again in ${Math.round(wait / 1000)} s (${transientTries} of ${transientWaits.length})`);
+          await sleep(wait);
+          continue;
+        }
         if (isSoft(error) && softTries === 0) {
           softTries += 1;
           log("soft failure: waiting, then ONE new thread");
@@ -200,6 +226,11 @@ export async function runChatPrompts(args: ChatRunArgs): Promise<ChatRunResult> 
     args.onScenes?.(scenes);
 
     if (thread) setThread({ ...(thread as ThreadRef), batches: (thread as ThreadRef).batches + 1 });
+    const pause = b < groups.length - 1 ? (args.pauseBetween?.() ?? 0) : 0;
+    if (pause > 0) {
+      log(`pause of ${Math.round(pause / 1000)} s before the next batch`);
+      await sleep(pause);
+    }
     if (fixedRows / Math.max(1, ids.length) > 0.3) {
       log(`${fixedRows} of ${ids.length} rows needed fixes: next batch starts a new thread`);
       setThread(null);

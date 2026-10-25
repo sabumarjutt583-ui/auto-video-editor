@@ -4,7 +4,7 @@ import type { StyleProfile } from "../../types/style.ts";
 import { isCancelled } from "../errors.ts";
 import { assemblePrompt, finishMotion, needsMotion } from "./assemble.ts";
 import { planBatches, storySoFar } from "./batches.ts";
-import { buildBatchPrompt, buildSystemInstruction, parseBatch, type BatchScene, type Described } from "./gemini.ts";
+import { BATCH_SIZE, buildBatchPrompt, buildSystemInstruction, parseBatch, type BatchScene, type Described } from "./gemini.ts";
 
 export interface PromptContext {
   style: StyleProfile;
@@ -60,6 +60,12 @@ export interface GenerateArgs {
   call: (system: string, prompt: string) => Promise<string>;
   /** false = a call that threw is not repeated (web chat). Default true. */
   resendOnError?: boolean;
+  /** Scenes per request (default 20). */
+  batchSize?: number;
+  /** Requests at the same time (1 to 3, default 1). */
+  parallel?: number;
+  /** Wait between the starts of the first parallel requests (ms, default 800). */
+  staggerMs?: number;
   /** Called before each batch with (batch number from 1, total). */
   onBatch?: (number: number, total: number) => void;
   /** Called after every batch with all scenes, so finished batches can be saved. */
@@ -72,12 +78,18 @@ export interface GenerateResult {
   failed: { batch: number; error: unknown } | null;
 }
 
-/** Layers 1 to 3: writes prompts in batches of 20, one batch after another. */
+/** Most batches asked at the same time (a Gemini key has a limit of requests per minute). */
+export const MAX_PARALLEL_BATCHES = 3;
+/** Default wait between the starts of the first batches when several run at once (ms). */
+const STAGGER_MS = 800;
+
+/** Layers 1 to 3: writes prompts in batches (default 20 scenes), `parallel` batches at a time (default 1). */
 export async function generatePrompts(args: GenerateArgs): Promise<GenerateResult> {
   const { targetIds, context, call } = args;
   let scenes = [...args.scenes];
   const targets = scenes.filter((scene) => targetIds.has(scene.id));
-  const batches = planBatches(targets);
+  const batches = planBatches(targets, args.batchSize ?? BATCH_SIZE);
+  const parallel = Math.max(1, Math.min(MAX_PARALLEL_BATCHES, Math.floor(args.parallel ?? 1)));
   const system = buildSystemInstruction({
     style: context.style,
     characters: context.characters,
@@ -86,17 +98,22 @@ export async function generatePrompts(args: GenerateArgs): Promise<GenerateResul
     outputType: context.settings.outputType,
     aspect: context.aspect,
   });
+  // The "story so far" only uses the narration, which never changes, so every batch can be prepared from the start list.
+  const original = args.scenes;
+  let nextBatch = 0;
+  let stopped = false;
+  let failed: GenerateResult["failed"] = null;
 
-  for (let b = 0; b < batches.length; b += 1) {
+  async function describeBatch(b: number): Promise<void> {
     const batch = batches[b] ?? [];
     args.onBatch?.(b + 1, batches.length);
-    const firstIndex = scenes.findIndex((scene) => scene.id === batch[0]?.id);
-    const prompt = buildBatchPrompt(batch.map((scene) => castOf(scene, context)), storySoFar(scenes.slice(0, Math.max(0, firstIndex))), context.settings.outputType);
+    const firstIndex = original.findIndex((scene) => scene.id === batch[0]?.id);
+    const prompt = buildBatchPrompt(batch.map((scene) => castOf(scene, context)), storySoFar(original.slice(0, Math.max(0, firstIndex))), context.settings.outputType);
     const ids = batch.map((scene) => scene.id);
 
     let described: Described[] | null = null;
     let lastError: unknown = new Error("The AI answer was not in the expected format.");
-    for (let attempt = 0; attempt <= BATCH_RETRIES && !described; attempt += 1) {
+    for (let attempt = 0; attempt <= BATCH_RETRIES && !described && !stopped; attempt += 1) {
       try {
         described = parseBatch(await call(system, prompt), ids);
         if (!described) lastError = new Error("The AI answer was not in the expected format (JSON list with the exact scene ids).");
@@ -107,8 +124,12 @@ export async function generatePrompts(args: GenerateArgs): Promise<GenerateResul
         if (args.resendOnError === false) break;
       }
     }
-    if (!described) return { scenes, failed: { batch: b + 1, error: lastError } };
-
+    if (stopped) return;
+    if (!described) {
+      stopped = true;
+      if (failed === null || b + 1 < failed.batch) failed = { batch: b + 1, error: lastError };
+      return;
+    }
     const byId = new Map(described.map((item) => [item.id, item]));
     scenes = scenes.map((scene) => {
       const item = byId.get(scene.id);
@@ -116,5 +137,21 @@ export async function generatePrompts(args: GenerateArgs): Promise<GenerateResul
     });
     args.onScenes?.(scenes);
   }
-  return { scenes, failed: null };
+
+  async function worker(slot: number): Promise<void> {
+    if (slot > 0) await new Promise<void>((resolve) => setTimeout(resolve, (args.staggerMs ?? STAGGER_MS) * slot));
+    while (!stopped && nextBatch < batches.length) {
+      const b = nextBatch;
+      nextBatch += 1;
+      try {
+        await describeBatch(b);
+      } catch (error) {
+        stopped = true;
+        throw error;
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(parallel, Math.max(1, batches.length)) }, (_, slot) => worker(slot)));
+  return { scenes, failed };
 }

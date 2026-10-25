@@ -8,7 +8,7 @@ import type { StyleProfile } from "../../../types/style.ts";
 import type { PromptContext } from "../generate.ts";
 import { buildBatchMessage, buildMissingMessage, buildReminder, buildSetupMessage, castOf, MAX_MESSAGE_CHARS, planChatGroups } from "./messages.ts";
 import { isSoftFailureText, parseFullBatch, saysReady } from "./parse.ts";
-import { runChatPrompts, type ChatTransport } from "./runner.ts";
+import { randomPauseMs, runChatPrompts, type ChatTransport } from "./runner.ts";
 import { verifyPrompt } from "./verify.ts";
 
 const LOCK = "film noir, high contrast black and white, hard shadows, 35mm grain";
@@ -176,4 +176,61 @@ test("rows that needed fixes get notes; more than 30% fixed starts a new thread"
   assert.equal(result.failed, null);
   assert.ok(result.scenes.every((s) => s.prompt.endsWith(LOCK) && s.prompt.includes(MINA.appearance) && (s.fixNotes ?? []).length > 0));
   assert.equal(sent.filter((s) => s.message.includes("READY")).length, 2, "a new thread after a batch with many fixes");
+});
+
+function slowThenOk(kind: string, times: number) {
+  let failures = 0;
+  const batchIds: string[] = [];
+  const transport: ChatTransport = {
+    async send(message, { batchId }) {
+      if (message.includes("Reply with the single word READY.")) return { text: "READY", accountId: "a1", accountName: "Acc", threadUrl: "https://g/app/1" };
+      batchIds.push(batchId);
+      if (failures < times) {
+        failures += 1;
+        throw { message: "Gemini took too long to answer. It was not interrupted or resent.", details: kind };
+      }
+      return { text: answerFor(idsIn(message)), accountId: "a1", accountName: "Acc", threadUrl: "https://g/app/1" };
+    },
+  };
+  return { transport, batchIds };
+}
+
+test("a slow or lost chat is asked again for the SAME batch by itself (3 retries, growing waits)", async () => {
+  for (const kind of ["ResponseTimeout", "NoResponse", "Session", "Network"]) {
+    const waits: number[] = [];
+    const { transport, batchIds } = slowThenOk(kind, 2);
+    const result = await run(transport, 3, { sleep: async (ms: number) => void waits.push(ms) });
+    assert.equal(result.failed, null, kind);
+    assert.deepEqual(waits, [20_000, 45_000], kind);
+    assert.deepEqual(batchIds, ["P7-B01", "P7-B01", "P7-B01"], "the same batch id every time, so the chat can see the message is already there");
+  }
+});
+
+test("after 3 retries the run stops and keeps what it has; other errors are not retried", async () => {
+  const stuck = slowThenOk("ResponseTimeout", 99);
+  const result = await run(stuck.transport, 3);
+  assert.ok(result.failed?.error.details.includes("ResponseTimeout"));
+  assert.equal(stuck.batchIds.length, 4, "first try + 3 retries");
+  const limited = slowThenOk("RateLimit", 99);
+  const second = await run(limited.transport, 3);
+  assert.ok(second.failed);
+  assert.equal(limited.batchIds.length <= 4, true);
+  const auth = slowThenOk("Auth", 99);
+  await run(auth.transport, 3);
+  assert.equal(auth.batchIds.length, 1, "a signed-out account is not asked again");
+});
+
+test("a polite pause comes between batches, not after the last one", async () => {
+  const waits: number[] = [];
+  const { transport } = fakeTransport();
+  const result = await run(transport, 6, { batchSize: 2, pauseBetween: () => 7_000, sleep: async (ms: number) => void waits.push(ms) });
+  assert.equal(result.failed, null);
+  assert.deepEqual(waits, [7_000, 7_000]);
+});
+
+test("the random pause stays between the two numbers", () => {
+  assert.equal(randomPauseMs(4, 12, () => 0), 4_000);
+  assert.equal(randomPauseMs(4, 12, () => 1), 12_000);
+  assert.equal(randomPauseMs(12, 4, () => 0.5), 8_000, "swapped numbers still work");
+  assert.equal(randomPauseMs(0, 0), 0);
 });

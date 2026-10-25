@@ -15,6 +15,13 @@ export interface AppSettings {
   textManual?: boolean;
   /** Scenes per message in the web chat (5 to 25). */
   chatBatchSize: number;
+  /** Scenes per request with the Gemini API key (5 to 20). */
+  apiBatchSize: number;
+  /** Requests at the same time with the Gemini API key (1 to 3). */
+  apiParallel: number;
+  /** Polite pause before the next web chat message: a random time between these seconds (0 to 120). */
+  chatPauseMinSec: number;
+  chatPauseMaxSec: number;
   /** Empty lines after every prompt in Copy all and Export TXT (1 to 3). */
   exportEmptyLines: number;
   /** Write the id before every prompt in Copy all and Export TXT. */
