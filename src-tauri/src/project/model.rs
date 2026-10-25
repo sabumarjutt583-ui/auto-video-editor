@@ -235,6 +235,16 @@ impl ProjectSettings {
     }
 }
 
+/// A voice-over part that is not the one being worked on. `snapshot` holds the part's own fields
+/// (voice, timing, scenes, editor...) exactly as the app stores them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct VoicePart {
+    pub id: String,
+    pub name: String,
+    pub snapshot: serde_json::Value,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Project {
@@ -285,6 +295,12 @@ pub struct Project {
     /// Everything the Auto Editor adds (imported media, per-scene overrides, captions, audio mix).
     /// The shape is owned by src/types/editor.ts; it is kept as JSON here so nothing is lost on save.
     pub editor: serde_json::Value,
+    /// Id of the part being worked on ("" = the only part, called "Part 1").
+    pub active_part_id: String,
+    /// Name of the part being worked on ("" = "Part 1").
+    pub part_name: String,
+    /// The other parts of a voice-over that comes in several parts.
+    pub parts: Vec<VoicePart>,
 }
 
 impl Default for Project {
@@ -322,6 +338,9 @@ impl Default for Project {
             media_map: BTreeMap::new(),
             rendered_at: None,
             editor: serde_json::Value::Null,
+            active_part_id: String::new(),
+            part_name: String::new(),
+            parts: Vec::new(),
         }
     }
 }

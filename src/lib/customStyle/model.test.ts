@@ -34,18 +34,18 @@ function goodStyle(): StyleProfile {
 
 const answer = (style: StyleProfile, raw = "{}"): AnalyzeAnswer => ({ style, raw });
 
-test("only png, jpg and webp are taken, and only up to 4 pictures in all", () => {
-  const split = splitPictures(["a.PNG", "b.txt", "c.jpg", "d.webp", "e.jpeg", "f.png"], 1);
-  assert.deepEqual(split.accepted, ["a.PNG", "c.jpg", "d.webp"]);
+test("only png, jpg and webp are taken, and only up to 20 pictures in all", () => {
+  const split = splitPictures(["a.PNG", "b.txt", "c.jpg", "d.webp", "e.jpeg", "f.png"], 18);
+  assert.deepEqual(split.accepted, ["a.PNG", "c.jpg"]);
   assert.deepEqual(split.notPictures, ["b.txt"]);
-  assert.deepEqual(split.tooMany, ["e.jpeg", "f.png"]);
+  assert.deepEqual(split.tooMany, ["d.webp", "e.jpeg", "f.png"]);
   assert.deepEqual(splitPictures(["C:\\x\\a.webp"], 0).accepted, ["C:\\x\\a.webp"]);
-  assert.deepEqual(splitPictures(["a.png"], 4).accepted, []);
+  assert.deepEqual(splitPictures(["a.png"], 20).accepted, []);
 });
 
 test("Analyze needs a name and 3 pictures", () => {
   assert.match(analyzeBlocker("", 3) ?? "", /name/);
-  assert.match(analyzeBlocker("Soft", 2) ?? "", /3 or 4/);
+  assert.match(analyzeBlocker("Soft", 2) ?? "", /3 to 20/);
   assert.equal(analyzeBlocker("Soft", 3), null);
   assert.equal(analyzeBlocker("Soft", 4), null);
   assert.match(analyzeBlocker("Pixar look", 3) ?? "", /brand/);

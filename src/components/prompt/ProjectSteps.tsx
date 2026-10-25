@@ -10,6 +10,8 @@ import { StyleSection } from "../styles";
 import { TimingStep } from "../timing";
 import { VoiceStep } from "../voice";
 import { Button } from "../ui";
+import { activeId } from "../../lib/parts";
+import { PartsBar } from "./PartsBar";
 import { StepTabs } from "./StepTabs";
 
 interface ProjectStepsProps {
@@ -39,17 +41,18 @@ export function ProjectSteps({ project, quick = false, initialStep = "voice" }: 
           <Button onClick={() => setStep("voice")}>Add a voice</Button>
         </div>
       )}
+      {!quick && <PartsBar project={project} />}
       <StepTabs current={step} access={access} onSelect={setStep} />
-      {step === "voice" && <VoiceStep key={project.id} project={project} />}
-      {step === "timing" && <TimingStep key={project.id} project={project} />}
-      {step === "scenes" && <ScenesStep key={project.id} project={project} />}
+      {step === "voice" && <VoiceStep key={`${project.id}-${activeId(project)}`} project={project} />}
+      {step === "timing" && <TimingStep key={`${project.id}-${activeId(project)}`} project={project} />}
+      {step === "scenes" && <ScenesStep key={`${project.id}-${activeId(project)}`} project={project} />}
       {step === "style" && (
         <>
           <StyleSection key={`style-${project.id}`} project={project} />
           <BibleSection key={`bible-${project.id}`} project={project} />
         </>
       )}
-      {step === "prompts" && <PromptsStep key={project.id} project={project} quick={quick} />}
+      {step === "prompts" && <PromptsStep key={`${project.id}-${activeId(project)}`} project={project} quick={quick} />}
     </div>
   );
 }

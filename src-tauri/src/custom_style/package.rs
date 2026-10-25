@@ -138,6 +138,12 @@ mod tests {
         write_stored(&entries.iter().map(|(n, d)| ZipEntry { name: (*n).into(), data: d.to_vec() }).collect::<Vec<_>>())
     }
 
+    fn too_many_zip(profile: &[u8]) -> Vec<u8> {
+        let mut entries = vec![ZipEntry { name: "style.json".into(), data: profile.to_vec() }];
+        entries.extend((0..=MAX_IMAGES).map(|i| ZipEntry { name: format!("images/p{i}.jpg"), data: b"1".to_vec() }));
+        write_stored(&entries)
+    }
+
     #[test]
     fn damaged_or_foreign_files_are_refused_with_a_friendly_message() {
         let profile = br#"{"id":"custom_a","name":"A","category":"C"}"#;
@@ -146,7 +152,7 @@ mod tests {
             ("no profile", zip(&[("meta.json", b"{}")])),
             ("bad profile", zip(&[("style.json", b"{oops")])),
             ("unsafe name", zip(&[("style.json", profile), ("../evil.jpg", b"x")])),
-            ("too many pictures", zip(&[("style.json", profile), ("images/a.jpg", b"1"), ("images/b.jpg", b"1"), ("images/c.jpg", b"1"), ("images/d.jpg", b"1"), ("images/e.jpg", b"1")])),
+            ("too many pictures", too_many_zip(profile)),
             ("empty picture", zip(&[("style.json", profile), ("images/a.jpg", b"")])),
         ] {
             let error = read(&data).unwrap_err();

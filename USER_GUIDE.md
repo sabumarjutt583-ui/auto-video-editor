@@ -150,7 +150,7 @@ At the bottom, **Check for library update** downloads new sounds and styles if t
 Open the **Style Gallery**, go to **My Styles** and press **Create style** (or use **Create custom style** next to the style picker).
 
 1. Type a **name** and choose a **category** (My Styles is the default).
-2. Add **3 or 4 pictures** that share one look: drop them on the window or click the dashed card. PNG, JPG or WebP, up to 10 MB each. Remove one with the X.
+2. Add **3 to 20 pictures** (the web chat looks at up to 10 of them, spread over the set) that share one look: drop them on the window or click the dashed card. PNG, JPG or WebP, up to 10 MB each. Remove one with the X.
 3. Write a few words about the look, the mood or what to keep (**Description**, recommended).
 4. Choose what studies the pictures: **Gemini** or **OpenAI** (they need a key in Settings) or the **Gemini web chat** (your Google accounts, no key).
 5. Press **Analyze with AI**. The AI describes only the look the pictures have in common, not what is in them. If its first answer breaks a writing rule, it is asked once more automatically.
@@ -203,3 +203,7 @@ New styles and sound effects are delivered separately (see **Settings > Library 
 **Can I use the app without the internet?** Yes, for everything except Groq timing, Gemini and updates.
 
 **My language is not in the list.** Choose the closest one; the timing and captions work with any language that Whisper understands, and your own SRT file works for every language.
+
+
+## Voice-over in several parts
+If your voice-over comes in parts, use the **Voice-over parts** bar at the top of the Prompt Generator. Click **Add next part** to start a new part (called Part 2, Part 3 ...), then upload its voice and continue with timing, scenes and prompts. Click **Rename** to give the open part a name. Click a part name to go back to it; nothing is lost. Style, cast and settings are shared by all parts. Remove a part with the bin icon next to its name.

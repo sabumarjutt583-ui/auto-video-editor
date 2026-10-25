@@ -70,6 +70,71 @@ pub async fn import_voice(app: AppHandle, project_id: String, source_path: Strin
     Ok(VoiceImport { original_path: relative, duration: info.duration, sample_rate: info.sample_rate, channels: info.channels, codec: info.codec })
 }
 
+/// Moves the voice files of the open part into `audio/parts/<stash>/` and, when `restore` is given, brings that
+/// part's files back into `audio/`. Paths stored in the project never change (they always point into `audio/`).
+#[tauri::command]
+pub async fn swap_voice_files(app: AppHandle, project_id: String, stash: String, restore: Option<String>) -> Result<(), AppError> {
+    let project_dir = project_folder(&app, &project_id)?;
+    run_blocking(move || swap_files(&audio_folder(&project_dir), &stash, restore.as_deref())).await
+}
+
+fn part_folder_name(name: &str) -> Result<&str, AppError> {
+    if name.is_empty() || name.len() > 40 || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        return Err(AppError::new("That part could not be used.", format!("Bad part id: {name}")));
+    }
+    Ok(name)
+}
+
+fn is_voice_file(name: &str) -> bool {
+    name.starts_with(&format!("{ORIGINAL_STEM}.")) || name == PROCESSED_FILE
+}
+
+fn move_voice_files(from: &Path, to: &Path) -> Result<(), AppError> {
+    let Ok(entries) = std::fs::read_dir(from) else { return Ok(()) };
+    std::fs::create_dir_all(to).map_err(|e| AppError::new("The audio folder could not be created.", e.to_string()))?;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if entry.path().is_file() && is_voice_file(&name) {
+            std::fs::rename(entry.path(), to.join(&name)).map_err(|e| AppError::new("The voice files of the part could not be moved.", format!("{e} ({name})")))?;
+        }
+    }
+    Ok(())
+}
+
+fn swap_files(audio: &Path, stash: &str, restore: Option<&str>) -> Result<(), AppError> {
+    let stash_dir = audio.join("parts").join(part_folder_name(stash)?);
+    move_voice_files(audio, &stash_dir)?;
+    if let Some(restore) = restore {
+        let from = audio.join("parts").join(part_folder_name(restore)?);
+        move_voice_files(&from, audio)?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod swap_tests {
+    use super::*;
+
+    #[test]
+    fn voice_files_are_stashed_and_restored() {
+        let dir = std::env::temp_dir().join(format!("av-swap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("original.mp3"), b"one").unwrap();
+        std::fs::write(dir.join("processed.wav"), b"one-p").unwrap();
+        std::fs::write(dir.join("other.txt"), b"keep").unwrap();
+        swap_files(&dir, "p1", None).unwrap();
+        assert!(!dir.join("original.mp3").exists() && dir.join("other.txt").exists());
+        assert!(dir.join("parts/p1/processed.wav").is_file());
+        std::fs::write(dir.join("original.wav"), b"two").unwrap();
+        swap_files(&dir, "p2", Some("p1")).unwrap();
+        assert_eq!(std::fs::read(dir.join("original.mp3")).unwrap(), b"one");
+        assert_eq!(std::fs::read(dir.join("parts/p2/original.wav")).unwrap(), b"two");
+        assert!(swap_files(&dir, "../x", None).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
 /// Peaks for drawing the waveform of a project audio file.
 #[tauri::command]
 pub async fn get_waveform(app: AppHandle, project_id: String, path: String) -> Result<Waveform, AppError> {

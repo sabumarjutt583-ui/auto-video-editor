@@ -20,7 +20,7 @@ interface AnalyzeFormProps {
   onCancel: () => void;
 }
 
-/** Step 1: the name, the 3 or 4 reference pictures, a few words about the look, and what should study them. */
+/** Step 1: the name, the 3 to 20 reference pictures, a few words about the look, and what should study them. */
 export function AnalyzeForm({ creator, onManual, onCancel }: AnalyzeFormProps) {
   const ids = { name: useId(), category: useId(), description: useId(), engine: useId() };
   const job = useJobStore(selectJob([ANALYSIS_JOB]));
@@ -42,7 +42,7 @@ export function AnalyzeForm({ creator, onManual, onCancel }: AnalyzeFormProps) {
         void creator.analyze();
       }}
     >
-      <p className="text-sm text-muted">Give 3 or 4 pictures that share one look. The AI studies the look they have in common (not what is in them) and writes the style for you.</p>
+      <p className="text-sm text-muted">Give 3 or more pictures (up to 20) that share one look. The AI studies the look they have in common (not what is in them) and writes the style for you.</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Style name" htmlFor={ids.name}>
           <TextInput id={ids.name} value={creator.name} autoFocus maxLength={80} disabled={creator.busy} onChange={(e) => creator.setName(e.target.value)} placeholder="For example: Soft morning film" />

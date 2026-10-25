@@ -26,7 +26,7 @@ pub const FIELDS: [&str; 13] = [
 
 /// The standing instructions (they follow docs/STYLE_GUIDE.md).
 pub const SYSTEM: &str = "You are a visual style analyst for a tool that writes image and video prompts. \
-You are shown 3 or 4 reference pictures that share ONE look. Write a style profile that describes ONLY the visual look the pictures have in common: \
+You are shown several (3 or more) reference pictures that share ONE look. Write a style profile that describes ONLY the visual look the pictures have in common: \
 the medium, the light, the colors, the camera, the composition, the textures, how people are drawn and the mood. \
 Do NOT describe the subjects, objects, places, people or story of the pictures. Never use brand, studio, artist, film, game or character names, and no names of real people. \
 Write in English, in plain concrete words a picture generator understands. No vague praise (\"beautiful\", \"stunning\").\n\n\

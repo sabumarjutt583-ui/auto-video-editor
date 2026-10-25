@@ -165,6 +165,19 @@ export interface Project {
   renderedAt: string | null;
   /** What the Auto Editor adds. May be null or partly filled in older projects: read it with `readEditor`. */
   editor: Partial<EditorData> | null;
+  /** Id of the part being worked on ("" = the only part, "Part 1"). */
+  activePartId: string;
+  /** Name of the part being worked on ("" = "Part 1"). */
+  partName: string;
+  /** The other parts of a voice-over in several parts (their own voice, timing, scenes and editor). */
+  parts: VoicePart[];
+}
+
+/** A voice-over part that is not open right now. `snapshot` holds its own project fields. */
+export interface VoicePart {
+  id: string;
+  name: string;
+  snapshot: Record<string, unknown>;
 }
 
 /** Fields the app edits. The rest are controlled by the system. */

@@ -4,7 +4,7 @@ import { BANNED_NAMES, bannedHits, completeProblems } from "../styleChecks.ts";
 import { blankStyle, MY_STYLES } from "../styleModel.ts";
 
 export const MIN_IMAGES = 3;
-export const MAX_IMAGES = 4;
+export const MAX_IMAGES = 20;
 export const PICTURE_EXTENSIONS = ["png", "jpg", "jpeg", "webp"] as const;
 export const SAMPLE_PROMPTS = 3;
 
@@ -23,7 +23,7 @@ export interface PictureSplit {
   accepted: string[];
   /** Files that are not PNG, JPG or WebP. */
   notPictures: string[];
-  /** Pictures left out because the limit of 4 is reached. */
+  /** Pictures left out because the limit is reached. */
   tooMany: string[];
 }
 
@@ -40,7 +40,7 @@ export function analyzeBlocker(name: string, imageCount: number): string | null 
   if (name.trim() === "") return "Please give the style a name.";
   const banned = nameProblems(name);
   if (banned.length > 0) return banned[0] ?? null;
-  if (imageCount < MIN_IMAGES) return `Please add ${MIN_IMAGES} or ${MAX_IMAGES} reference pictures (${imageCount} so far).`;
+  if (imageCount < MIN_IMAGES) return `Please add ${MIN_IMAGES} to ${MAX_IMAGES} reference pictures (${imageCount} so far).`;
   return null;
 }
 

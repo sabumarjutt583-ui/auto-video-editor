@@ -6,6 +6,11 @@ export function importVoice(projectId: string, sourcePath: string): Promise<Voic
   return invoke<VoiceImport>("import_voice", { projectId, sourcePath });
 }
 
+/** Puts the voice files of the open part aside and (optionally) brings another part's files back. */
+export function swapVoiceFiles(projectId: string, stash: string, restore: string | null): Promise<void> {
+  return invoke<void>("swap_voice_files", { projectId, stash, restore });
+}
+
 export function getWaveform(projectId: string, path: string): Promise<Waveform> {
   return invoke<Waveform>("get_waveform", { projectId, path });
 }

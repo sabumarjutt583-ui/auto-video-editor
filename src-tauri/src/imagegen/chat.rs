@@ -279,7 +279,7 @@ async fn diagnose_kind(session: &Session, tab: &Tab, engine: &EngineConfig, kind
 }
 
 /// The most pictures one question may carry.
-pub const MAX_IMAGES: usize = 4;
+pub const MAX_IMAGES: usize = 10;
 
 /// Asks one question in a fresh chat and returns the finished answer. The pictures (files on this computer) are uploaded into the message first,
 /// through the page's own upload button.

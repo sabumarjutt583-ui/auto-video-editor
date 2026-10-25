@@ -97,7 +97,7 @@ pub async fn analyze_style(
 ) -> Result<AnalyzeAnswer, AppError> {
     let job = jobs.begin(&job_id, "style-analysis", event_sink(app.clone()))?;
     if !(MIN_IMAGES..=MAX_IMAGES).contains(&request.images.len()) {
-        return Err(AppError::new(format!("Please add {MIN_IMAGES} or {MAX_IMAGES} reference pictures."), format!("{} pictures", request.images.len())));
+        return Err(AppError::new(format!("Please add {MIN_IMAGES} to {MAX_IMAGES} reference pictures."), format!("{} pictures", request.images.len())));
     }
     let paths = trusted(&app, &request.images)?;
     let question = analyze::build_question(&request.name, &request.description, paths.len(), &request.problems, request.previous.as_deref());
@@ -107,9 +107,11 @@ pub async fn analyze_style(
         Engine::Chat => {
             job.progress("Asking Gemini in the web chat (this can take a minute)", 20.0);
             let prompt = chat_question(Some(analyze::SYSTEM), &format!("{question}\nThe reference pictures are attached to this message."), true);
+            // The web chat takes a limited number of files per message: pick pictures spread over the whole set.
+            let chosen = spread(&paths, crate::imagegen::chat::MAX_IMAGES);
             let reply = tokio::select! {
                 () = job.cancelled() => return Err(AppError::cancelled()),
-                reply = ig.chat_ask_images(&prompt, &paths) => reply?,
+                reply = ig.chat_ask_images(&prompt, &chosen) => reply?,
             };
             json_from_reply(&reply).unwrap_or(reply.text)
         }
@@ -239,5 +241,25 @@ mod tests {
         assert!(custom_id("custom_a").is_ok());
         assert!(custom_id("noir").is_err());
         assert!(custom_id("custom_../x").is_err());
+    }
+}
+
+/// At most `max` items, evenly spread over the list (all of them when it is short enough).
+fn spread<T: Clone>(items: &[T], max: usize) -> Vec<T> {
+    if items.len() <= max || max == 0 {
+        return items.to_vec();
+    }
+    (0..max).map(|i| items[i * items.len() / max].clone()).collect()
+}
+
+#[cfg(test)]
+mod spread_tests {
+    use super::spread;
+
+    #[test]
+    fn short_lists_stay_and_long_lists_are_spread() {
+        assert_eq!(spread(&[1, 2, 3], 10), vec![1, 2, 3]);
+        let long: Vec<usize> = (0..20).collect();
+        assert_eq!(spread(&long, 10), vec![0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
     }
 }

@@ -12,7 +12,7 @@ use tokio::time::timeout;
 use crate::commands::error::AppError;
 
 pub const MIN_IMAGES: usize = 3;
-pub const MAX_IMAGES: usize = 4;
+pub const MAX_IMAGES: usize = 20;
 pub const MAX_BYTES: u64 = 10 * 1024 * 1024;
 pub const MAX_SIDE: u32 = 1024;
 const TIMEOUT: Duration = Duration::from_secs(60);
@@ -254,7 +254,7 @@ mod tests {
         assert!(load(&dir, "custom_a").is_none());
         assert!(load(&dir, "custom_b").is_some());
         assert!(store(&dir, "custom_c", &[], &Meta::default()).is_err());
-        assert!(store(&dir, "custom_c", &vec![sources[0].clone(); 5], &Meta::default()).is_err());
+        assert!(store(&dir, "custom_c", &vec![sources[0].clone(); MAX_IMAGES + 1], &Meta::default()).is_err());
         let _ = fs::remove_dir_all(dir);
     }
 

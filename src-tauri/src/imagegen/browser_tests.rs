@@ -238,7 +238,7 @@ async fn pictures_are_uploaded_through_the_pages_own_upload_and_reach_the_questi
     assert_eq!(reply.text, "Echo with 2 files: describe them", "{reply:?}");
     let missing = worker.chat("x", &[dir.join("nope.jpg")], Duration::from_secs(5)).await.expect_err("missing file");
     assert_eq!(missing.kind, ErrorKind::BadRequest);
-    let too_many: Vec<std::path::PathBuf> = (0..5).map(|_| first.clone()).collect();
+    let too_many: Vec<std::path::PathBuf> = (0..=super::chat::MAX_IMAGES).map(|_| first.clone()).collect();
     assert_eq!(worker.chat("x", &too_many, Duration::from_secs(5)).await.expect_err("too many").kind, ErrorKind::BadRequest);
     worker.close().await;
     let _ = std::fs::remove_dir_all(dir);
