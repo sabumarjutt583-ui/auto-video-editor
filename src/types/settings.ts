@@ -59,4 +59,8 @@ export interface AppSettings {
   brandKitId: string;
   /** Graphics saved as presets (any JSON; `readPresets` checks them). */
   graphicPresets: unknown[];
+  /** Channel profiles for "Make video" (any JSON; `readProfiles` checks them). */
+  channelProfiles: unknown[];
+  /** The channel profile chosen on the Make video page (empty = none yet). */
+  channelProfileId: string;
 }

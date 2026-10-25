@@ -221,3 +221,12 @@ Not done here (no Windows PC, no real Google account, no desktop window): the re
 5. Switch the model to 2.5 Flash and make a short voice. A wrong key shows the "key was not accepted" message.
 6. Check whether the style note ("in a calm, warm storyteller voice") is only heard as a style and never read aloud. If it is read aloud, change `spoken_text` in src-tauri/src/tts/mod.rs.
 7. Urdu / Nepali: try a short text and write down whether the model reads it well.
+
+## Make Video (by hand, needs Gemini + Groq keys and a signed-in Google account)
+1. Make Video > Create the first profile. Fill the profile (language, a picture style, scene length 5 s). Check Copy, Export, Import (a new id), Delete.
+2. Short script (3-4 sentences), press Make video. Every row should go pending > running > done. Listen to the result.
+3. Tick "Ask me before: Pictures", run again with a new script: the run stops at Pictures, Stop here ends it, then Continue where it stopped goes on. Finished rows must say "Already done".
+4. Press Cancel while the voice or the pictures are being made: the run ends as Cancelled, finished work is kept.
+5. Wrong Gemini key: the Voice row shows an error with Details; after fixing the key, Continue where it stopped must not redo finished rows.
+6. Own voice file instead of a script: the voice step must skip Gemini. Music files in the profile: the Audio step copies them into the project.
+7. Not testable without the real pages: the pictures step (Google accounts) and the web-chat prompts.

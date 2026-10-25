@@ -101,6 +101,10 @@ pub struct Settings {
     pub brand_kit_id: String,
     /// Graphics the person saved as presets (JSON objects; the frontend checks them when it reads them).
     pub graphic_presets: Vec<serde_json::Value>,
+    /// Channel profiles for "Make video" (JSON objects; the frontend repairs them when it reads them).
+    pub channel_profiles: Vec<serde_json::Value>,
+    /// The channel profile that is chosen on the Make video page (empty = none yet).
+    pub channel_profile_id: String,
 }
 
 /// Most brand kits a person can keep, and the size of one kit as JSON text.
@@ -109,6 +113,9 @@ const MAX_BRAND_KIT_BYTES: usize = 20_000;
 /// Most graphic presets, and the size of one preset as JSON text.
 const MAX_GRAPHIC_PRESETS: usize = 100;
 const MAX_GRAPHIC_PRESET_BYTES: usize = 30_000;
+/// Most channel profiles, and the size of one profile as JSON text.
+const MAX_CHANNEL_PROFILES: usize = 100;
+const MAX_CHANNEL_PROFILE_BYTES: usize = 40_000;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -146,6 +153,8 @@ impl Default for Settings {
             brand_kits: Vec::new(),
             brand_kit_id: "clean_documentary".to_string(),
             graphic_presets: Vec::new(),
+            channel_profiles: Vec::new(),
+            channel_profile_id: String::new(),
         }
     }
 }
@@ -210,6 +219,13 @@ impl Settings {
         if self.graphic_presets.len() > MAX_GRAPHIC_PRESETS || self.graphic_presets.iter().any(|p| !p.is_object() || p.to_string().len() > MAX_GRAPHIC_PRESET_BYTES) {
             return Err(invalid("A graphic preset is not valid or there are too many of them."));
         }
+        if self.channel_profiles.len() > MAX_CHANNEL_PROFILES || self.channel_profiles.iter().any(|p| !p.is_object() || p.to_string().len() > MAX_CHANNEL_PROFILE_BYTES) {
+            return Err(invalid("A channel profile is not valid or there are too many of them."));
+        }
+        let channel_profile_id = self.channel_profile_id.trim().to_string();
+        if channel_profile_id.len() > 60 || channel_profile_id.contains(char::is_control) {
+            return Err(invalid("The channel profile id is not valid."));
+        }
         let brand_kit_id = self.brand_kit_id.trim().to_string();
         if brand_kit_id.is_empty() || brand_kit_id.len() > 60 || brand_kit_id.contains(char::is_control) {
             return Err(invalid("The brand kit id is not valid."));
@@ -229,6 +245,7 @@ impl Settings {
             chat_pause_min_sec: pause_min.min(pause_max),
             chat_pause_max_sec: pause_min.max(pause_max),
             brand_kit_id,
+            channel_profile_id,
             style_favorites,
             recent_styles,
             library_update_url,
@@ -356,6 +373,30 @@ mod tests {
         let mut big = settings;
         big.graphic_presets = vec![serde_json::json!({"name": "x".repeat(30_001)})];
         assert!(big.validated().is_err());
+    }
+
+    #[test]
+    fn channel_profiles_are_kept_and_checked_for_size_and_shape() {
+        let mut settings = Settings::default();
+        assert!(settings.channel_profiles.is_empty() && settings.channel_profile_id.is_empty());
+        settings.channel_profiles = vec![serde_json::json!({"id": "korean-senior", "name": "Korean Senior", "language": "ko"})];
+        settings.channel_profile_id = "korean-senior".to_string();
+        let ok = settings.clone().validated().unwrap();
+        assert_eq!((ok.channel_profiles.len(), ok.channel_profile_id.as_str()), (1, "korean-senior"));
+        let old: Settings = serde_json::from_str("{\"geminiModel\": \"gemini-3.8-flash\"}").unwrap();
+        assert!(old.channel_profiles.is_empty(), "files from before profiles still load");
+        let mut bad = settings.clone();
+        bad.channel_profiles = vec![serde_json::json!("text")];
+        assert!(bad.validated().is_err());
+        let mut many = settings.clone();
+        many.channel_profiles = (0..101).map(|i| serde_json::json!({"id": format!("p{i}")})).collect();
+        assert!(many.validated().is_err());
+        let mut big = settings.clone();
+        big.channel_profiles = vec![serde_json::json!({"name": "x".repeat(40_001)})];
+        assert!(big.validated().is_err());
+        let mut long_id = settings;
+        long_id.channel_profile_id = "x".repeat(61);
+        assert!(long_id.validated().is_err());
     }
 
     #[test]
