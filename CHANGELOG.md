@@ -5,6 +5,34 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-25
+
+### Changed
+- Voice-over in named parts, up to 20 style reference pictures
+- Web chat part 9: tests and docs
+- Web chat part 8: delete images
+- Web chat part 7: delete prompts
+- Web chat part 6: manual copy-paste mode
+- Web chat part 5: script text and minimum scene length
+- Web chat part 4: setup + batches with reminders + verified full prompts
+- Web chat part 3: reliable chat driver
+- Web chat part 2: hidden shared browser
+- Web chat part 1: diagnosis
+- Motion graphics phase 13: end-to-end tests and docs
+- Motion graphics phase 12: cache and parallel render
+- Motion graphics phase 11: graphic sound effects
+- Motion graphics phase 10: editing and presets
+- Motion graphics phase 9: quality checks
+- Motion graphics phase 8: smart placement
+- Motion graphics phase 7: AI graphics director
+- Motion graphics phase 6: brand kit
+- Motion graphics phase 5: advanced layers
+- Motion graphics phase 4: icons, flags and maps
+- Motion graphics phase 3: transparent export and composite
+- Motion graphics phase 2: renderer core
+- Motion graphics phase 1: GraphicSpec schema and validation
+- Motion graphics phase 0: audit and plan
+
 ## [0.4.0] - 2026-10-22
 
 ### Added
