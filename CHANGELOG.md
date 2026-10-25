@@ -5,6 +5,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-25
+
+### Changed
+- Make the voice-over inside the app with Gemini speech models (30 voices, model choice, listen first)
+- Videos with Google Flow next to Gemini Create video
+- Web chat waits longer and asks the same batch again by itself; polite pause between batches
+- Faster prompts with the Gemini API key: smaller batches, two at a time
+- Fix: a browser left open on an account profile is closed and started again
+- Images: one Google account at a time (setting)
+- Every error is written to the log, with the page it happened on
+
 ## [0.5.0] - 2026-10-25
 
 ### Changed
