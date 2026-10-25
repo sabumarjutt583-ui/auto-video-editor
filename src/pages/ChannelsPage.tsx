@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { ChannelCard } from "../components/channels/ChannelCard";
-import { Counters, VideoList, useChannelData } from "../components/channels";
+import { Counters, QueuePanel, VideoList, useChannelData } from "../components/channels";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { useConsent } from "../components/imagegen/useConsent";
 import { useProfiles } from "../components/pipeline";
@@ -13,6 +13,7 @@ import { toAppError } from "../lib/errors";
 import { countVideos, needAttention, recentlyFinished } from "../lib/pipeline/dashboard";
 import { defaultProfile, importProfile, newProfileId } from "../lib/pipeline/profile";
 import { NO_CHANNEL } from "../lib/pipeline/channels";
+import { useQueueStore } from "../store/queueStore";
 import { readTextFile } from "../lib/timing/api";
 import type { AppError } from "../types";
 
@@ -23,6 +24,7 @@ export function ChannelsPage() {
   const data = useChannelData();
   const { ensure, dialog } = useConsent();
   const [error, setError] = useState<AppError | null>(null);
+  const queued = useQueueStore((state) => state.items.length);
 
   const known = useMemo(() => new Set(profiles.profiles.map((p) => p.id)), [profiles.profiles]);
   const orphans = useMemo(() => data.projects.filter((p) => !known.has(p.channelId)), [data.projects, known]);
@@ -105,6 +107,13 @@ export function ChannelsPage() {
           </div>
         )}
       </section>
+
+      {queued > 0 && (
+        <section aria-label="Queue" className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold">Queue</h3>
+          <QueuePanel channelId={null} channelName={(cid) => profiles.profiles.find((p) => p.id === cid)?.name ?? "No channel"} ensureConsent={ensure} />
+        </section>
+      )}
 
       <section aria-label="Videos being made" className="flex flex-col gap-3">
         <h3 className="text-sm font-semibold">Being made or waiting</h3>

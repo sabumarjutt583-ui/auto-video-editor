@@ -239,3 +239,6 @@ In Prompt Generator, Voice step, use **Make the voice with Gemini**: paste the s
 Open **Channels** in the sidebar to see all your channels and every video: how many are being made, which wait for you and which are finished. Open a channel to make a new video, see each video's steps, play or show a finished video, or change the channel's settings.
 
 When you make a new project in **Projects**, choose the channel. The video starts with that channel's settings and shows up in that channel's dashboard.
+
+## Queue
+In a channel, open **Queue**, paste several scripts (a line with only `---` between them) and press **Start the queue**. The app makes the videos one after another with the channel's settings. It never waits for you to press Continue. Videos that fail are skipped and can be tried again.

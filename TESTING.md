@@ -236,3 +236,7 @@ Not done here (no Windows PC, no real Google account, no desktop window): the re
 2. Open a channel > New video > paste a script > Start: you land on Videos and see the step progress move.
 3. Go to another page and back: the run keeps going. Cancel works. A pause shows Continue / Stop here.
 4. A finished video: Play video, Show video, Project folder work. A stopped video: Continue where it stopped.
+
+## Smart clip fit and queue (by hand)
+1. Scene 5 s with a 3 s clip: Render with "Slow, then repeat" - clip slows a little then plays again; "Repeat" - no slowing; "Hold" - last picture stays. A 9 s clip is cut at the end.
+2. Channel > Queue: paste 3 scripts separated by `---`, Start the queue. Videos finish one after another; Stop halts after cancelling the current one; a failed video does not block the next; "Try failed again" continues it.

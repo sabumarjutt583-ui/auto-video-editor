@@ -2,7 +2,7 @@ import { Download, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { Counters, VideoList, useChannelData } from "../components/channels";
+import { Counters, QueuePanel, VideoList, useChannelData } from "../components/channels";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { useConsent } from "../components/imagegen/useConsent";
 import { ProfileBasics, ProfileEditing, ProfilePauses, ProfileVoiceLook, StartCard, useProfiles } from "../components/pipeline";
@@ -15,7 +15,7 @@ import { NO_CHANNEL } from "../lib/pipeline/channels";
 import { exportProfile, profileProblems } from "../lib/pipeline/profile";
 import type { AppError } from "../types";
 
-type Tab = "videos" | "new" | "settings";
+type Tab = "videos" | "new" | "queue" | "settings";
 
 /** One channel: its videos with progress, a form for a new video, and its profile. */
 export function ChannelPage() {
@@ -36,7 +36,7 @@ export function ChannelPage() {
   const known = new Set(profiles.profiles.map((p) => p.id));
   const videos = orphan ? data.projects.filter((p) => !known.has(p.channelId)) : videosOf(data.projects, id);
   const requested = params.get("tab");
-  const tab: Tab = orphan ? "videos" : requested === "new" || requested === "settings" ? requested : "videos";
+  const tab: Tab = orphan ? "videos" : requested === "new" || requested === "queue" || requested === "settings" ? requested : "videos";
   const setTab = (next: Tab) => setParams(next === "videos" ? {} : { tab: next }, { replace: true });
   const busy = data.run.running;
 
@@ -79,6 +79,7 @@ export function ChannelPage() {
     : [
         { value: "videos", label: "Videos" },
         { value: "new", label: "New video" },
+        { value: "queue", label: "Queue" },
         { value: "settings", label: "Settings" },
       ];
 
@@ -115,6 +116,8 @@ export function ChannelPage() {
           onStart={start}
         />
       )}
+
+      {tab === "queue" && profile && <QueuePanel channelId={profile.id} channelName={(cid) => profiles.profiles.find((p) => p.id === cid)?.name ?? "Video"} ensureConsent={ensure} />}
 
       {tab === "settings" && profile && (
         <>
