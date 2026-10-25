@@ -34,3 +34,16 @@ export function renderVideo(projectId: string, request: RenderRequest, jobId: st
 export function showInFolder(projectId: string, path: string): Promise<void> {
   return invoke<void>("show_in_folder", { projectId, path });
 }
+
+/** The newest finished video of a project, or null when it has none. */
+export function latestVideo(projectId: string): Promise<string | null> {
+  return invoke<string | null>("latest_video", { projectId });
+}
+
+export function playVideo(projectId: string, path: string): Promise<void> {
+  return invoke<void>("play_video", { projectId, path });
+}
+
+export function openProjectFolder(projectId: string): Promise<void> {
+  return invoke<void>("open_project_folder", { projectId });
+}

@@ -11,7 +11,7 @@ import {
 import type { ProjectSummary } from "../types/project.ts";
 
 function summary(id: string, name: string, updatedAt: string): ProjectSummary {
-  return { id, name, createdAt: updatedAt, updatedAt, voiceDuration: 0, sceneCount: 0, status: null };
+  return { id, name, createdAt: updatedAt, updatedAt, voiceDuration: 0, sceneCount: 0, status: null, channelId: "", voiceLocked: false, hasWords: false, bibleLocked: false, promptsWritten: 0, pictureScenes: 0, pictures: 0, audioMixed: false, rendered: false };
 }
 
 const projects = [

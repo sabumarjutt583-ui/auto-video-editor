@@ -230,3 +230,9 @@ Not done here (no Windows PC, no real Google account, no desktop window): the re
 5. Wrong Gemini key: the Voice row shows an error with Details; after fixing the key, Continue where it stopped must not redo finished rows.
 6. Own voice file instead of a script: the voice step must skip Gemini. Music files in the profile: the Audio step copies them into the project.
 7. Not testable without the real pages: the pictures step (Google accounts) and the web-chat prompts.
+
+## Channels dashboard (by hand)
+1. Sidebar shows one "Channels" item. Open it: counters and one card per channel; old projects appear under "No channel".
+2. Open a channel > New video > paste a script > Start: you land on Videos and see the step progress move.
+3. Go to another page and back: the run keeps going. Cancel works. A pause shows Continue / Stop here.
+4. A finished video: Play video, Show video, Project folder work. A stopped video: Continue where it stopped.

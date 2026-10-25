@@ -301,6 +301,8 @@ pub struct Project {
     pub part_name: String,
     /// The other parts of a voice-over that comes in several parts.
     pub parts: Vec<VoicePart>,
+    /// The channel profile this video was made for ("" = none). Used by the Channels dashboard.
+    pub channel_id: String,
 }
 
 impl Default for Project {
@@ -341,6 +343,7 @@ impl Default for Project {
             active_part_id: String::new(),
             part_name: String::new(),
             parts: Vec::new(),
+            channel_id: String::new(),
         }
     }
 }
@@ -394,6 +397,18 @@ pub struct ProjectSummary {
     pub voice_duration: f64,
     pub scene_count: usize,
     pub status: Option<ProjectStatus>,
+    /// The channel this video belongs to ("" = none).
+    pub channel_id: String,
+    /// What is finished so far, for the Channels dashboard (the steps of "Make video").
+    pub voice_locked: bool,
+    pub has_words: bool,
+    pub bible_locked: bool,
+    pub prompts_written: usize,
+    /// Image scenes that have a prompt, and how many of them already have a picture.
+    pub picture_scenes: usize,
+    pub pictures: usize,
+    pub audio_mixed: bool,
+    pub rendered: bool,
 }
 
 impl From<&Project> for ProjectSummary {
@@ -406,6 +421,20 @@ impl From<&Project> for ProjectSummary {
             voice_duration: project.voice_duration,
             scene_count: project.scenes.len(),
             status: derive_status(project),
+            channel_id: project.channel_id.clone(),
+            voice_locked: project.voice_locked && project.voice_path.is_some() && project.voice_duration > 0.0,
+            has_words: !project.words.is_empty(),
+            bible_locked: project.bible_locked,
+            prompts_written: project.scenes.iter().filter(|scene| !scene.prompt.trim().is_empty()).count(),
+            picture_scenes: project.scenes.iter().filter(|scene| scene.media_type == MediaType::Image && !scene.prompt.trim().is_empty()).count(),
+            pictures: project
+                .scenes
+                .iter()
+                .filter(|scene| scene.media_type == MediaType::Image && !scene.prompt.trim().is_empty())
+                .filter(|scene| project.media_map.get(&scene.id).is_some_and(|file| !file.is_empty()))
+                .count(),
+            audio_mixed: project.editor.pointer("/audio/mix").is_some_and(|mix| mix.is_object()),
+            rendered: project.rendered_at.is_some(),
         }
     }
 }
@@ -470,6 +499,32 @@ mod tests {
         let mut rendered = project_with_scenes(&["a"], &[true]);
         rendered.rendered_at = Some("2026-01-01T00:00:00.000Z".into());
         assert_eq!(derive_status(&rendered), Some(ProjectStatus::Rendered));
+    }
+
+    #[test]
+    fn summary_reports_the_channel_and_the_steps_that_are_finished() {
+        let mut project = project_with_scenes(&["a", "b", "c"], &[true, true, true]);
+        project.channel_id = "korean-senior".into();
+        project.words = vec![Word { text: "hi".into(), start: 0.0, end: 1.0 }];
+        project.voice_path = Some("audio/processed.wav".into());
+        project.voice_duration = 10.0;
+        project.voice_locked = true;
+        project.scenes[2].prompt = String::new();
+        project.media_map.insert(project.scenes[0].id.clone(), "media/a.png".into());
+        project.editor = serde_json::json!({ "audio": { "mix": { "path": "exports/audio_mix.wav" } } });
+        let summary = ProjectSummary::from(&project);
+        assert_eq!(summary.channel_id, "korean-senior");
+        assert!(summary.voice_locked && summary.has_words && summary.audio_mixed && !summary.rendered);
+        assert_eq!((summary.prompts_written, summary.picture_scenes, summary.pictures), (2, 2, 1));
+        let json = serde_json::to_value(&summary).unwrap();
+        assert_eq!(json["channelId"], "korean-senior");
+        assert_eq!(json["pictureScenes"], 2);
+    }
+
+    #[test]
+    fn an_old_project_without_a_channel_loads_with_none() {
+        let project: Project = serde_json::from_str("{\"id\": \"x\", \"name\": \"old\"}").unwrap();
+        assert_eq!(project.channel_id, "");
     }
 
     #[test]

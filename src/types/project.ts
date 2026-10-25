@@ -171,6 +171,8 @@ export interface Project {
   partName: string;
   /** The other parts of a voice-over in several parts (their own voice, timing, scenes and editor). */
   parts: VoicePart[];
+  /** The channel profile this video was made for ("" = none; older projects). */
+  channelId: string;
 }
 
 /** A voice-over part that is not open right now. `snapshot` holds its own project fields. */
@@ -195,6 +197,18 @@ export interface ProjectSummary {
   sceneCount: number;
   /** null while the project is still being set up. */
   status: ProjectStatus | null;
+  /** The channel this video belongs to ("" = none). */
+  channelId: string;
+  /** What is finished so far (the steps of "Make video"), for the Channels dashboard. */
+  voiceLocked: boolean;
+  hasWords: boolean;
+  bibleLocked: boolean;
+  promptsWritten: number;
+  /** Image scenes with a prompt, and how many of them already have a picture. */
+  pictureScenes: number;
+  pictures: number;
+  audioMixed: boolean;
+  rendered: boolean;
 }
 
 /** A project folder that could not be read (damaged file, newer app version, ...). */

@@ -7,7 +7,8 @@ import { DEFAULT_PATH } from "./lib/nav";
 import {
   AutoEditorPage,
   ImageGeneratorPage,
-  MakePage,
+  ChannelPage,
+  ChannelsPage,
   ProjectsPage,
   PromptGeneratorPage,
   SettingsPage,
@@ -84,7 +85,9 @@ export function App() {
         <Route element={<AppShell />}>
           <Route index element={<Navigate to={DEFAULT_PATH} replace />} />
           <Route path="/projects" element={<ProjectsPage />} />
-          <Route path="/make-video" element={<MakePage />} />
+          <Route path="/channels" element={<ChannelsPage />} />
+          <Route path="/channels/:id" element={<ChannelPage />} />
+          <Route path="/make-video" element={<Navigate to="/channels" replace />} />
           <Route path="/prompt-generator" element={<PromptGeneratorPage />} />
           <Route path="/image-generator" element={<ImageGeneratorPage />} />
           <Route path="/auto-editor" element={<AutoEditorPage />} />
