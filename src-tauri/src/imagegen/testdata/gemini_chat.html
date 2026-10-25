@@ -35,6 +35,16 @@
     document.getElementById('hint').innerText = window.videoMode ? 'Describe your video' : '';
     document.getElementById('menu').hidden = true;
   });
+  if (location.search.indexOf('newplus') >= 0) {
+    // The page was redesigned: other label, no test id, and the "+" sits in front of the text field.
+    var plusButton = document.getElementById('plus');
+    plusButton.setAttribute('aria-label', 'Add files and more');
+    plusButton.style.cssText = 'display:inline-block;width:32px;height:32px;vertical-align:middle';
+    document.getElementById('upl').removeAttribute('data-test-id');
+    var rich = document.querySelector('rich-textarea');
+    rich.style.cssText = 'display:inline-block;width:400px;vertical-align:middle';
+    rich.parentNode.insertBefore(plusButton, rich);
+  }
   if (location.search.indexOf('limited') >= 0) {
     document.getElementById('banner').innerText = "You\u2019re out of videos for now\nVideos will be available again on Oct 25 at 11:35 AM, or upgrade to keep going.";
   }

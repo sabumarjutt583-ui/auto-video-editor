@@ -184,3 +184,9 @@ resources/fonts/: Noto Sans, Noto Sans CJK, Noto Sans Devanagari, Noto Sans Arab
 - Settings `ttsModel` (default gemini-3.1-flash-tts-preview; also 2.5 flash / 2.5 pro), `ttsVoice` (default Kore), `ttsStyle`. Style is sent as `Say <style>:` in front of the text. Voice descriptors (Bright, Firm...) are Google's words; no gender is claimed.
 - TS: src/lib/tts/{api,estimate}.ts (+test: reading time and piece count).
 - Not testable here: the real API. Check by hand (TESTING.md "Voice from a script"): English and Korean, 1 piece and 5+ pieces, Cancel, a wrong key, a second run (pieces reused).
+
+## Gemini "+" button by place, voice sample as blob
+- `chat::click_plus(session, tab, selector, input_selector)` (imagegen/chat.rs): tries the saved selector (`chat.selectors.attach`, `video.toolsButton`); when the page was redesigned (the label changed), it finds the icon button at the left end of the message box (same row as the text field, a label with upload/attach/add/menu/more/tools wins) and writes a WARN `[webchat] the "+" button was found by its place`. Used by picture upload (`find_file_input`) and Create video (`enable_video_mode`). `chat::click_menu_text` picks a menu entry by its text (the upload entry falls back to "Upload files"). Test: `a_redesigned_page_still_gets_its_plus_menu_found_by_place` (fake page `?newplus=1`).
+- Two Gemini layouts exist (seen 25 Oct 2026): "Videos" in the left menu or under "More"; the "+" menu has Upload files, Add from Drive, More uploads, Create image, Create video, More tools. The app only uses the "+" menu.
+- Voice "Listen": the page's security rules (`media-src` in tauri.conf.json) allow `blob:` but not `data:`, so `ttsPreview` turns the WAV address into a Blob URL (`src/lib/tts/sample.ts`, + test).
+- Still open: Google Flow "New project" button not found (needs a screenshot of the real Flow page; fix `flow` block in config.json).

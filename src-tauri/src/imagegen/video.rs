@@ -100,7 +100,7 @@ async fn enable_video_mode(session: &Session, tab: &Tab, engine: &EngineConfig) 
         return Ok(());
     }
     for _ in 0..3 {
-        if !chat::click(session, tab, &cfg.tools_button).await? {
+        if !chat::click_plus(session, tab, &cfg.tools_button, &engine.chat.selectors.input).await? {
             return Err(chat::diagnose(session, tab, engine, "Gemini's \"+\" button was not found. The chat page may have changed.").await);
         }
         let deadline = tokio::time::Instant::now() + Duration::from_millis(engine.chat.timing.send_enable_ms.min(8_000));

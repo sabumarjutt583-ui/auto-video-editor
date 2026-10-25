@@ -335,6 +335,32 @@ pub(super) async fn click(session: &Session, tab: &Tab, selector: &str) -> Resul
     Ok(session.eval_in(&tab.frame, &expression).await.map_err(|e| from_cdp(&e, "Opening the upload menu"))? == Value::Bool(true))
 }
 
+/// Presses the "+" button of the message box. The saved selector is tried first; when the page has changed
+/// (its label is different now), the button is found by place instead: the icon button at the left end of the
+/// message box, in the same row as the text field. The way it was found is written to the log.
+pub(super) async fn click_plus(session: &Session, tab: &Tab, selector: &str, input_selector: &str) -> Result<bool, GenError> {
+    let expression = format!(
+        "(function (sel, inputSel) {{ var b = sel ? document.querySelector(sel) : null; if (b) {{ b.click(); return 'selector'; }} var input = document.querySelector(inputSel); if (!input) return ''; var ir = input.getBoundingClientRect(); var cy = ir.top + ir.height / 2; var best = null, bestScore = -1e9; var all = document.querySelectorAll('button, [role=\"button\"]'); for (var i = 0; i < all.length; i++) {{ var r = all[i].getBoundingClientRect(); if (r.width < 8 || r.height < 8 || all[i].disabled) continue; var mid = r.top + r.height / 2; if (Math.abs(mid - cy) > 70) continue; if (r.left < ir.left - 160 || r.left > ir.left + 120) continue; var label = ((all[i].getAttribute('aria-label') || '') + ' ' + (all[i].innerText || '')).toLowerCase(); var score = (/(upload|attach|add|plus|menu|more|tools)/.test(label) ? 1000 : 0) - r.left; if (score > bestScore) {{ best = all[i]; bestScore = score; }} }} if (!best) return ''; best.click(); return 'position'; }})({}, {})",
+        js(selector),
+        js(input_selector)
+    );
+    let value = session.eval_in(&tab.frame, &expression).await.map_err(|e| from_cdp(&e, "Opening the \"+\" menu"))?;
+    let how = value.as_str().unwrap_or_default();
+    if how == "position" {
+        logging::warn(LOG, "the \"+\" button was found by its place, not by the saved selector (the chat page has changed)");
+    }
+    Ok(!how.is_empty())
+}
+
+/// Clicks the first menu entry whose whole text matches the regex (menus are only on the page while they are open).
+pub(super) async fn click_menu_text(session: &Session, tab: &Tab, pattern: &str) -> Result<bool, GenError> {
+    let expression = format!(
+        "(function (p) {{ var re = new RegExp(p, 'i'); var all = document.querySelectorAll('button, [role=\"menuitem\"], [role=\"option\"], .mat-mdc-menu-item, .mdc-list-item'); for (var i = 0; i < all.length; i++) {{ var t = (all[i].innerText || all[i].textContent || '').trim(); if (re.test(t)) {{ all[i].click(); return true; }} }} return false; }})({})",
+        js(pattern)
+    );
+    Ok(session.eval_in(&tab.frame, &expression).await.map_err(|e| from_cdp(&e, "Choosing a menu entry"))? == Value::Bool(true))
+}
+
 /// Finds the page's file input. The page makes it only when the upload entry is used and then opens the system
 /// file window; that window is held back (the input is remembered instead) so the files can be handed over directly.
 async fn find_file_input(session: &Session, tab: &Tab, chat: &ChatConfig) -> Result<String, GenError> {
@@ -344,14 +370,14 @@ async fn find_file_input(session: &Session, tab: &Tab, chat: &ChatConfig) -> Res
     if let Some(id) = object_id(session, tab, &format!("document.querySelector({})", js(&s.file_input))).await? {
         return Ok(id);
     }
-    if !click(session, tab, &s.attach).await? {
+    if !click_plus(session, tab, &s.attach, &s.input).await? {
         return Err(GenError::new(ErrorKind::NoImage, "Gemini's upload button was not found. The chat page may have changed."));
     }
     let deadline = tokio::time::Instant::now() + Duration::from_millis(chat.timing.send_enable_ms);
     let mut item_clicked = false;
     loop {
         if !item_clicked {
-            item_clicked = click(session, tab, &s.upload_item).await?;
+            item_clicked = click(session, tab, &s.upload_item).await? || click_menu_text(session, tab, "^\\s*Upload files?\\s*$").await?;
         }
         if let Some(id) = object_id(session, tab, "window.__avPick || document.querySelector('input[type=file]')").await? {
             return Ok(id);

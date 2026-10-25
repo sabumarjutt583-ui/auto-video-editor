@@ -387,6 +387,15 @@ async fn a_picture_can_be_attached_to_be_animated() {
 }
 
 #[tokio::test]
+async fn a_redesigned_page_still_gets_its_plus_menu_found_by_place() {
+    let Some((worker, _server, dir)) = worker_with("video-new-plus", |engine| engine.chat.url.push_str("?newplus=1")).await else { return };
+    let bytes = worker.video_with("A fox in the snow", None, Duration::from_secs(60), None).await.expect("video through the found \"+\" button");
+    assert!(super::video::looks_like_video(&bytes), "{} bytes", bytes.len());
+    worker.close().await;
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test]
 async fn an_account_that_is_out_of_videos_reports_when_it_is_back_and_sends_nothing() {
     let Some((worker, server, dir)) = worker_with("video-limit-first", |engine| engine.chat.url.push_str("?limited=1")).await else { return };
     let sends_before = server.chat_sends.load(std::sync::atomic::Ordering::SeqCst);
