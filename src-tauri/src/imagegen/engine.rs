@@ -519,6 +519,7 @@ impl Engine {
         let parallel = state.settings.parallel.clamp(1, 8);
         let consent_ok = state.settings.consent_given(state.config.major().unwrap_or(1));
         let max_parallel = state.config.max_parallel;
+        let one_at_a_time = state.settings.one_account_at_a_time;
         let State { accounts, run, .. } = state;
         let run = run.as_mut()?;
         if !consent_ok || !run.running || run.storage_retry_at > now || run.queue.stats().generating as u32 >= parallel {
@@ -528,7 +529,8 @@ impl Engine {
         let busy_targets: HashSet<String> = run.queue.jobs.iter().filter_map(|j| j.target.clone()).collect();
         let taken = |name: &str| busy_targets.contains(name) || media.join(name).exists();
 
-        let account = accounts.claim_slot(now, parallel.min(max_parallel))?;
+        let limit = parallel.min(max_parallel);
+        let account = if one_at_a_time { accounts.claim_slot_one(now, limit)? } else { accounts.claim_slot(now, limit)? };
         match run.queue.claim_next(now, Some(&account), &taken) {
             Some(job) => Some((job, account)),
             None => {

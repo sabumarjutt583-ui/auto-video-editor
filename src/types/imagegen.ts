@@ -11,6 +11,8 @@ export interface Consent {
 export interface ImageGenSettings {
   /** Pictures made at the same time, 1 to 8. */
   parallel: number;
+  /** Pictures are made with one Google account at a time; the next one only takes over while the first rests. */
+  oneAccountAtATime: boolean;
   maxAttempts: number;
   timeoutSec: number;
   browserMode: BrowserMode;

@@ -160,3 +160,6 @@ resources/fonts/: Noto Sans, Noto Sans CJK, Noto Sans Devanagari, Noto Sans Arab
 
 ## Browser already open on a profile (fix)
 - A second Chrome on an open profile does not start: it hands over (an `about:blank` tab appears in the old window) and ends at once with exit code 0 on Windows (21 elsewhere). `Session::open` (imagegen/browser/session.rs) now treats that as a hand-over: `browser/stale.rs close_browsers_of(profile)` closes only processes whose command line has exactly `--user-data-dir=<profile>` (PowerShell on Windows, `pkill -f` elsewhere), then the browser is started once more. Test: `a_browser_of_the_profile_without_a_devtools_port_is_closed_and_the_browser_starts`.
+
+## One Google account at a time (images)
+- Setting `oneAccountAtATime` (Rust `ImageGenSettings.one_account_at_a_time`, default true; checkbox "One Google account at a time" in components/imagegen/EngineBar.tsx). `Accounts::claim_slot_one`: the FIRST usable account (list order) that is not resting/signing in gets every slot up to "Pictures at the same time"; the next account only works while the first cannot (usage limit, signed out, paused) and the first goes first again when it is back. Off = the old round-robin over all accounts (`claim_slot`). Applies to pictures only; chat questions and videos keep their own account rotation.

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { clock } from "../../lib/imagegen/format";
 import type { ImageGenSettings, ImageGenSnapshot } from "../../types/imagegen";
-import { Field, NumberField } from "../ui";
+import { Checkbox, Field, NumberField } from "../ui";
 
 interface EngineBarProps {
   snapshot: ImageGenSnapshot;
@@ -26,6 +26,9 @@ export function EngineBar({ snapshot, onChange }: EngineBarProps) {
             <NumberField id={parallelId} value={settings.parallel} min={1} max={8} onChange={(parallel) => onChange({ parallel })} />
           </div>
         </Field>
+        <div className="pb-2">
+          <Checkbox label="One Google account at a time" checked={settings.oneAccountAtATime} onChange={(e) => onChange({ oneAccountAtATime: e.target.checked })} />
+        </div>
         <p className="pb-2 text-sm text-muted">
           {ready} of {accounts.length} Google account{accounts.length === 1 ? "" : "s"} ready.{" "}
           <button type="button" onClick={() => navigate("/settings")} className="cursor-pointer font-medium text-accent-fg hover:underline">

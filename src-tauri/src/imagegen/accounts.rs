@@ -351,6 +351,20 @@ impl Accounts {
         None
     }
 
+    /// One account at a time: the first account (in the list order) that can work now gets every slot up to `limit`.
+    /// The next account is only used while the first one cannot work (usage limit, signed out, paused, signing in).
+    pub fn claim_slot_one(&mut self, now: u64, limit: u32) -> Option<String> {
+        let first = self.file.accounts.iter().find(|a| {
+            Self::can_take_work(a) && self.runtime.get(&a.id).map_or(true, |r| r.phase.is_none() && r.cooldown_until <= now)
+        })?;
+        let id = first.id.clone();
+        if !self.has_capacity(&id, now, limit) {
+            return None;
+        }
+        self.rt(&id).active += 1;
+        Some(id)
+    }
+
     /// The account that should answer the next chat question: usable, not resting after a chat limit,
     /// and with the fewest questions in flight (ties go round-robin).
     pub fn claim_chat(&mut self, now: u64) -> Option<String> {
@@ -742,6 +756,23 @@ mod tests {
         let order: Vec<String> = (0..4).filter_map(|_| accounts.claim_slot(10, 5)).collect();
         assert_eq!(order, [a.clone(), b.clone(), a.clone(), b.clone()]);
         assert_eq!((accounts.active(&a), accounts.active(&b)), (2, 2));
+    }
+
+    #[test]
+    fn one_account_at_a_time_uses_the_next_only_while_the_first_cannot_work() {
+        let mut accounts = Accounts::default();
+        let a = ready_account(&mut accounts, "A", "a@x.com");
+        let b = ready_account(&mut accounts, "B", "b@x.com");
+        assert_eq!(accounts.claim_slot_one(10, 2).as_deref(), Some(a.as_str()));
+        assert_eq!(accounts.claim_slot_one(10, 2).as_deref(), Some(a.as_str()));
+        assert_eq!(accounts.claim_slot_one(10, 2), None, "A is full: B is NOT started at the same time");
+        assert_eq!((accounts.active(&a), accounts.active(&b)), (2, 0));
+        accounts.release_slot(&a);
+        accounts.release_slot(&a);
+        accounts.limit_pause(&a, "Usage limit reached", 0, 10);
+        assert_eq!(accounts.claim_slot_one(11, 2).as_deref(), Some(b.as_str()), "A rests: B takes over");
+        accounts.release_slot(&b);
+        assert_eq!(accounts.claim_slot_one(10 + 3_600_000, 2).as_deref(), Some(a.as_str()), "A is back and goes first again");
     }
 
     #[test]

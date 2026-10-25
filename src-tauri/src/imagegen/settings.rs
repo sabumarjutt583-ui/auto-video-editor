@@ -26,6 +26,9 @@ pub struct Consent {
 pub struct ImageGenSettings {
     /// Pictures made at the same time, 1 to 8.
     pub parallel: u32,
+    /// True: pictures are made with ONE Google account at a time (the first one that can work); the next account is only
+    /// used while the first is resting (usage limit) or signed out. False: all accounts work at the same time.
+    pub one_account_at_a_time: bool,
     pub max_attempts: u32,
     pub timeout_sec: u32,
     pub browser_mode: BrowserMode,
@@ -40,6 +43,7 @@ impl Default for ImageGenSettings {
     fn default() -> Self {
         Self {
             parallel: 3,
+            one_account_at_a_time: true,
             max_attempts: 3,
             timeout_sec: 300,
             browser_mode: BrowserMode::Hidden,

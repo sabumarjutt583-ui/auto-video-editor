@@ -156,12 +156,22 @@ async fn every_scene_becomes_a_picture_named_by_its_timecode() {
 
 #[tokio::test]
 async fn two_accounts_share_the_work() {
-    let s = setup("two", Fake::new(|_| ok()), |_| {});
+    let s = setup("two", Fake::new(|_| ok()), |settings| settings.one_account_at_a_time = false);
     let (a, b) = (account(&s.engine, "A"), account(&s.engine, "B"));
     s.engine.start(&s.project, scenes(8), false, true).unwrap();
     wait_for(&s.engine, "all completed", |snap| snap.stats.completed == 8).await;
     let calls = s.fake.calls();
     assert!(calls.iter().any(|c| c.account.as_deref() == Some(a.as_str())) && calls.iter().any(|c| c.account.as_deref() == Some(b.as_str())));
+}
+
+#[tokio::test]
+async fn by_default_only_one_account_works_at_a_time() {
+    let s = setup("one-at-a-time", Fake::new(|_| ok()), |_| {});
+    let (a, _b) = (account(&s.engine, "A"), account(&s.engine, "B"));
+    s.engine.start(&s.project, scenes(8), false, true).unwrap();
+    wait_for(&s.engine, "all completed", |snap| snap.stats.completed == 8).await;
+    let calls = s.fake.calls();
+    assert!(calls.iter().all(|c| c.account.as_deref() == Some(a.as_str())), "the second account was not started: {calls:?}");
 }
 
 #[tokio::test]
