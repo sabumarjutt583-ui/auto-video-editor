@@ -147,6 +147,8 @@ pub struct ChatConfig {
     pub error_texts: Vec<String>,
     /// Generic error / refusal replies that mean "this chat is broken, start a new one".
     pub soft_failure_texts: Vec<String>,
+    /// The page where a person signs in (only used by the script writer's own chat page).
+    pub login_url: String,
 }
 
 impl Default for ChatConfig {
@@ -159,6 +161,36 @@ impl Default for ChatConfig {
             limit_texts: words(&["reached your limit", "usage limit", "limit for today", "try again tomorrow", "come back later", "reached the limit"]),
             error_texts: words(&["something went wrong", "i'm having trouble", "couldn't complete"]),
             soft_failure_texts: words(&["encountering an error", "having a hard time fulfilling", "something else instead", "can't help with that", "cannot help with that"]),
+            login_url: String::new(),
+        }
+    }
+}
+
+impl ChatConfig {
+    /// The defaults for the script writer's chat page (as remembered on 2026-10-25; fixed by a settings update when the page changes).
+    pub fn script_writer() -> Self {
+        let words = |list: &[&str]| list.iter().map(|w| (*w).to_string()).collect();
+        Self {
+            url: "https://claude.ai/new".into(),
+            login_url: "https://claude.ai/login".into(),
+            selectors: ChatSelectors {
+                input: "div.ProseMirror[contenteditable=\"true\"]".into(),
+                send: "button[aria-label=\"Send message\"]".into(),
+                response: "div[data-is-streaming]".into(),
+                response_text: ".font-claude-response".into(),
+                code_block: "pre".into(),
+                done: "button[data-testid=\"action-bar-copy\"]".into(),
+                stop: "button[aria-label=\"Stop response\"]".into(),
+                thinking: "div[data-is-streaming=\"true\"]".into(),
+                attach: String::new(),
+                upload_item: String::new(),
+                file_input: String::new(),
+                attachment: String::new(),
+            },
+            timing: ChatTiming::default(),
+            limit_texts: words(&["usage limit", "reached your limit", "hit your limit", "message limit", "limit reached", "out of messages", "resets at"]),
+            error_texts: words(&["something went wrong", "an error occurred", "couldn't complete"]),
+            soft_failure_texts: words(&[]),
         }
     }
 }
@@ -336,6 +368,9 @@ pub struct EngineConfig {
     pub human_checks: Vec<HumanCheck>,
     #[serde(default)]
     pub chat: ChatConfig,
+    /// The script writer's chat page (a Claude account the person signs in to).
+    #[serde(default = "ChatConfig::script_writer")]
+    pub script: ChatConfig,
     #[serde(default)]
     pub video: VideoConfig,
     #[serde(default)]

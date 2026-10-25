@@ -6,7 +6,10 @@ export interface QueueItem {
   id: string;
   channelId: string;
   name: string;
+  /** Empty when only a topic is given: the script writer writes it when the video's turn comes. */
   script: string;
+  /** What the video is about (used by the script writer when `script` is empty). */
+  topic: string;
   /** The person's own voice file, or null to make the voice from the script. */
   voiceFile: string | null;
   status: QueueStatus;
@@ -18,6 +21,7 @@ export interface QueueItem {
 
 export const MAX_QUEUE = 200;
 export const MAX_SCRIPT_CHARS = 200_000;
+export const MAX_TOPIC_CHARS = 2000;
 
 const STATUSES: readonly QueueStatus[] = ["waiting", "running", "done", "failed"];
 
@@ -37,13 +41,29 @@ export function parseScripts(text: string): { name: string; script: string }[] {
   return result;
 }
 
+/** One topic per line (empty lines are skipped; a leading "1." or "-" is removed). */
+export function parseTopics(text: string): string[] {
+  return text
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trim().replace(/^(?:\d+[.)]|[-*•])\s+/, "").slice(0, MAX_TOPIC_CHARS))
+    .filter((line) => line !== "");
+}
+
+/** New waiting items made from topics: the script is written when their turn comes. */
+export function addTopics(queue: readonly QueueItem[], channelId: string, topics: readonly string[], newId: () => string): QueueItem[] {
+  const room = Math.max(0, MAX_QUEUE - queue.length);
+  const added = topics.slice(0, room).map((topic): QueueItem => ({ id: newId(), channelId, name: topic.slice(0, 60), script: "", topic, voiceFile: null, status: "waiting", projectId: null, note: "" }));
+  return [...queue, ...added];
+}
+
 /** New waiting items for a channel. Empty names become "<fallback> 1", "<fallback> 2" ... counted from what is queued. */
 export function addScripts(queue: readonly QueueItem[], channelId: string, fallbackName: string, parsed: readonly { name: string; script: string }[], newId: () => string): QueueItem[] {
   const room = Math.max(0, MAX_QUEUE - queue.length);
   let counter = queue.filter((item) => item.channelId === channelId).length;
   const added = parsed.slice(0, room).map((entry): QueueItem => {
     counter += 1;
-    return { id: newId(), channelId, name: entry.name || `${fallbackName} ${counter}`, script: entry.script, voiceFile: null, status: "waiting", projectId: null, note: "" };
+    return { id: newId(), channelId, name: entry.name || `${fallbackName} ${counter}`, script: entry.script, topic: "", voiceFile: null, status: "waiting", projectId: null, note: "" };
   });
   return [...queue, ...added];
 }
@@ -92,6 +112,8 @@ export function readQueue(value: unknown): QueueItem[] {
     if (typeof raw !== "object" || raw === null) continue;
     const o = raw as Record<string, unknown>;
     if (typeof o.id !== "string" || o.id === "" || seen.has(o.id) || typeof o.script !== "string") continue;
+    const topic = typeof o.topic === "string" ? o.topic.slice(0, MAX_TOPIC_CHARS) : "";
+    if (o.script.trim() === "" && topic.trim() === "") continue;
     seen.add(o.id);
     const status = STATUSES.find((s) => s === o.status) ?? "waiting";
     result.push({
@@ -99,6 +121,7 @@ export function readQueue(value: unknown): QueueItem[] {
       channelId: typeof o.channelId === "string" ? o.channelId : "",
       name: typeof o.name === "string" ? o.name.slice(0, 80) : "",
       script: o.script.slice(0, MAX_SCRIPT_CHARS),
+      topic,
       voiceFile: typeof o.voiceFile === "string" && o.voiceFile !== "" ? o.voiceFile : null,
       status: status === "running" ? "waiting" : status,
       projectId: typeof o.projectId === "string" && o.projectId !== "" ? o.projectId : null,

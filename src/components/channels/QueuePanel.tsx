@@ -1,7 +1,7 @@
 import { Check, ListPlus, Loader2, Play, RotateCw, Square, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
-import { parseScripts, queueCounts, type QueueItem, type QueueStatus } from "../../lib/pipeline/queue";
+import { parseScripts, parseTopics, queueCounts, type QueueItem, type QueueStatus } from "../../lib/pipeline/queue";
 import { useQueueStore } from "../../store/queueStore";
 import { Button, Card, Field } from "../ui";
 import type { ConsentFn } from "./types";
@@ -13,13 +13,17 @@ interface Props {
   channelId: string | null;
   channelName: (id: string) => string;
   ensureConsent: ConsentFn;
+  /** The channel has a script writer: topics can be queued without a script. */
+  canWrite?: boolean;
 }
 
 /** Paste many scripts, and the app makes the videos one after another. */
-export function QueuePanel({ channelId, channelName, ensureConsent }: Props) {
-  const { items, running, add, remove, clearDone, retryFailed, run, stop } = useQueueStore();
+export function QueuePanel({ channelId, channelName, ensureConsent, canWrite = false }: Props) {
+  const { items, running, add, addTopics, remove, clearDone, retryFailed, run, stop } = useQueueStore();
   const [text, setText] = useState("");
+  const [topicText, setTopicText] = useState("");
   const parsed = parseScripts(text);
+  const topics = parseTopics(topicText);
   const shown = channelId === null ? items : items.filter((item) => item.channelId === channelId);
   const counts = queueCounts(items);
 
@@ -29,8 +33,33 @@ export function QueuePanel({ channelId, channelName, ensureConsent }: Props) {
     setText("");
   }
 
+  function addAllTopics() {
+    if (channelId === null || topics.length === 0) return;
+    addTopics(channelId, topics);
+    setTopicText("");
+  }
+
   return (
     <div className="flex flex-col gap-4">
+      {channelId !== null && canWrite && (
+        <Card title="Add topics to the queue" description="One topic per line. When a video's turn comes, the script writer writes its script from the channel's master prompt, then the video is made.">
+          <Field label="Topics" htmlFor="queue-topics" hint={topics.length > 0 ? `${topics.length} ${topics.length === 1 ? "topic" : "topics"} found.` : "Nothing found yet."}>
+            <textarea
+              id="queue-topics"
+              value={topicText}
+              rows={6}
+              onChange={(e) => setTopicText(e.target.value)}
+              placeholder={"A farmer's last harvest\nThe dog who waited at the station"}
+              className="w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
+            />
+          </Field>
+          <div>
+            <Button icon={ListPlus} disabled={topics.length === 0} onClick={addAllTopics}>
+              Add {topics.length > 0 ? topics.length : ""} to the queue
+            </Button>
+          </div>
+        </Card>
+      )}
       {channelId !== null && (
         <Card title="Add videos to the queue" description="Paste one script per video. Put a line with only --- between them. A first line starting with # is the video title.">
           <Field label="Scripts" htmlFor="queue-text" hint={parsed.length > 0 ? `${parsed.length} ${parsed.length === 1 ? "video" : "videos"} found.` : "Nothing found yet."}>
@@ -97,7 +126,7 @@ function Row({ item, position, channel, locked, onRemove }: { item: QueueItem; p
         <p className="truncate text-sm font-medium">{item.name}</p>
         <p className="truncate text-xs text-muted">
           {channel ? `${channel} · ` : ""}
-          {item.script.length.toLocaleString()} characters
+          {item.script ? `${item.script.length.toLocaleString()} characters` : "script will be written"}
         </p>
         {item.note && <p className="text-xs text-danger">{item.note}</p>}
       </div>

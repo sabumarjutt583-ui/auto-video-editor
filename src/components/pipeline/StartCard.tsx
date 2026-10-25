@@ -1,4 +1,4 @@
-import { FileAudio, Play, X } from "lucide-react";
+import { FileAudio, PenLine, Play, X } from "lucide-react";
 
 import { pickFile } from "../../lib/dialog";
 import { AUDIO_EXTENSIONS, fileName } from "../../lib/audioFiles";
@@ -14,10 +14,12 @@ interface Props {
   onScript: (value: string) => void;
   onVoiceFile: (value: string | null) => void;
   onStart: () => void;
+  /** The script writer: shown when the channel has one. */
+  writer?: { topic: string; writing: boolean; onTopic: (value: string) => void; onWrite: () => void };
 }
 
 /** The only things that change from video to video: its name and its script (or your own voice file). */
-export function StartCard({ name, script, voiceFile, disabled, problems, onName, onScript, onVoiceFile, onStart }: Props) {
+export function StartCard({ name, script, voiceFile, disabled, problems, onName, onScript, onVoiceFile, onStart, writer }: Props) {
   async function chooseVoice() {
     const path = await pickFile("Choose your voice-over", "Audio", AUDIO_EXTENSIONS);
     if (path) onVoiceFile(path);
@@ -27,6 +29,16 @@ export function StartCard({ name, script, voiceFile, disabled, problems, onName,
       <Field label="Video name" htmlFor="mv-name" hint="Empty = the channel name.">
         <TextInput id="mv-name" value={name} maxLength={80} disabled={disabled} onChange={(e) => onName(e.target.value)} />
       </Field>
+      {writer && (
+        <Field label="Topic" htmlFor="mv-topic" hint="What the video is about. Press 'Write the script' to read the script before the video is made, or leave the script empty and press Make video: the script is then written first.">
+          <div className="flex flex-wrap gap-2">
+            <TextInput id="mv-topic" value={writer.topic} maxLength={2000} disabled={disabled || writer.writing} onChange={(e) => writer.onTopic(e.target.value)} />
+            <Button icon={PenLine} loading={writer.writing} disabled={disabled || writer.writing || writer.topic.trim() === ""} onClick={writer.onWrite}>
+              Write the script
+            </Button>
+          </div>
+        </Field>
+      )}
       <Field label="Script" htmlFor="mv-script" hint={voiceFile ? "Optional with your own voice file: it makes the captions use your exact words." : "The exact words to be spoken. The app makes the voice from this."}>
         <textarea
           id="mv-script"

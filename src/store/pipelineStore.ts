@@ -7,6 +7,7 @@ import { runPipeline } from "../lib/pipeline/runner";
 import { STAGE_IDS, type StageId } from "../lib/pipeline/stages";
 import { initialView, reduceView, restart, withDetail, type RunView } from "../lib/pipeline/view";
 import { runStage } from "../lib/pipeline/impl";
+import { writeScript } from "../lib/script/write";
 import { applyChannelProfile } from "../lib/pipeline/impl/applyProfile";
 import { createProject } from "../lib/projects";
 import type { AppError } from "../types";
@@ -17,6 +18,8 @@ export interface MakeVideoInput {
   profile: ChannelProfile;
   name: string;
   script: string;
+  /** What the video is about. When the script is empty and the channel has a script writer, the script is written from this. */
+  topic?: string;
   /** The person's own voice file, or null to make the voice from the script. */
   voiceFile: string | null;
   /** Called before the pictures step; resolves false when the person refuses the notice. */
@@ -39,6 +42,8 @@ interface PipelineState {
   waiting: StageId | null;
   error: AppError | null;
   problems: string[];
+  /** The script writer is writing the script now. */
+  writing: boolean;
   finished: Finished | null;
   running: boolean;
   start: (input: MakeVideoInput) => Promise<void>;
@@ -115,16 +120,29 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
     waiting: null,
     error: null,
     problems: [],
+    writing: false,
     finished: null,
     running: false,
 
     start: async (input) => {
       if (get().running) return;
-      const found = profileProblems(input.profile, { script: input.script, voiceFile: input.voiceFile });
+      const found = profileProblems(input.profile, { script: input.script, voiceFile: input.voiceFile, topic: input.topic });
       set({ problems: found });
       if (found.length > 0) return;
-      set({ view: initialView(), error: null, finished: null });
+      set({ view: initialView(), error: null, finished: null, projectId: null, channelId: null });
       try {
+        if (input.script.trim() === "" && input.voiceFile === null) {
+          // The script is written first, so a failed writer leaves no empty project behind.
+          set({ writing: true });
+          try {
+            input = { ...input, script: await writeScript(input.profile, input.topic ?? "") };
+          } catch (caught) {
+            set({ error: toAppError(caught, "The script could not be written.") });
+            return;
+          } finally {
+            set({ writing: false });
+          }
+        }
         const created = await createProject(input.name.trim() || input.profile.name);
         await useProjectStore.getState().open(created.id);
         const project = useProjectStore.getState().project;

@@ -5,14 +5,15 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { Counters, QueuePanel, VideoList, useChannelData } from "../components/channels";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { useConsent } from "../components/imagegen/useConsent";
-import { ProfileBasics, ProfileEditing, ProfilePauses, ProfileVoiceLook, StartCard, useProfiles } from "../components/pipeline";
+import { ProfileBasics, ProfileEditing, ProfilePauses, ProfileScript, ProfileVoiceLook, StartCard, useProfiles } from "../components/pipeline";
 import { Button, SegmentedControl } from "../components/ui";
 import { pickSavePath } from "../lib/dialog";
 import { toAppError } from "../lib/errors";
 import { writeTextFile } from "../lib/files";
 import { countVideos, videosOf } from "../lib/pipeline/dashboard";
 import { NO_CHANNEL } from "../lib/pipeline/channels";
-import { exportProfile, profileProblems } from "../lib/pipeline/profile";
+import { canWriteScript, exportProfile, profileProblems } from "../lib/pipeline/profile";
+import { writeScript } from "../lib/script/write";
 import type { AppError } from "../types";
 
 type Tab = "videos" | "new" | "queue" | "settings";
@@ -27,6 +28,8 @@ export function ChannelPage() {
   const { ensure, dialog } = useConsent();
   const [name, setName] = useState("");
   const [script, setScript] = useState("");
+  const [topic, setTopic] = useState("");
+  const [writing, setWriting] = useState(false);
   const [voiceFile, setVoiceFile] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
@@ -65,12 +68,26 @@ export function ChannelPage() {
   function start() {
     if (!profile) return;
     // The run goes on in the store while the person watches the list, so it is not awaited here.
-    void data.run.start({ profile, name, script, voiceFile, ensureConsent: ensure });
-    if (profileProblems(profile, { script, voiceFile }).length === 0) {
+    void data.run.start({ profile, name: name || topic, script, topic, voiceFile, ensureConsent: ensure });
+    if (profileProblems(profile, { script, voiceFile, topic }).length === 0) {
       setName("");
+      setTopic("");
       setScript("");
       setVoiceFile(null);
       setTab("videos");
+    }
+  }
+
+  async function writeNow() {
+    if (!profile) return;
+    setError(null);
+    setWriting(true);
+    try {
+      setScript(await writeScript(profile, topic));
+    } catch (caught) {
+      setError(toAppError(caught, "The script could not be written."));
+    } finally {
+      setWriting(false);
     }
   }
 
@@ -94,6 +111,7 @@ export function ChannelPage() {
         {orphan && <p className="text-sm text-muted">Projects made before channels existed, or whose channel was deleted.</p>}
       </div>
       <Counters counts={countVideos(videos, data.active)} />
+      {data.run.writing && <p className="rounded-xl border border-accent/40 bg-accent-soft px-4 py-3 text-sm" role="status">The script writer is writing a script. This can take a minute or more…</p>}
       {options.length > 1 && <SegmentedControl<Tab> label="Channel sections" value={tab} onChange={setTab} options={options} />}
       {data.error && <ErrorNotice error={data.error} />}
       {data.run.error && <ErrorNotice error={data.run.error} />}
@@ -114,14 +132,16 @@ export function ChannelPage() {
           onScript={setScript}
           onVoiceFile={setVoiceFile}
           onStart={start}
+          writer={canWriteScript(profile) ? { topic, writing, onTopic: setTopic, onWrite: () => void writeNow() } : undefined}
         />
       )}
 
-      {tab === "queue" && profile && <QueuePanel channelId={profile.id} channelName={(cid) => profiles.profiles.find((p) => p.id === cid)?.name ?? "Video"} ensureConsent={ensure} />}
+      {tab === "queue" && profile && <QueuePanel canWrite={canWriteScript(profile)} channelId={profile.id} channelName={(cid) => profiles.profiles.find((p) => p.id === cid)?.name ?? "Video"} ensureConsent={ensure} />}
 
       {tab === "settings" && profile && (
         <>
           <ProfileBasics profile={profile} onChange={profiles.save} />
+          <ProfileScript profile={profile} onChange={profiles.save} />
           <ProfileVoiceLook profile={profile} onChange={profiles.save} />
           <ProfileEditing profile={profile} onChange={profiles.save} />
           <ProfilePauses profile={profile} onChange={profiles.save} />

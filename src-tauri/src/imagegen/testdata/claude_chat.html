@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Claude</title></head>
+<body>
+<script>if (location.search.indexOf('out=1') >= 0) { location.replace('/login'); }</script>
+<div id="log"></div>
+<div class="ProseMirror" contenteditable="true" role="textbox"></div>
+<button id="send" aria-label="Send message">Send</button>
+<script>
+  var input = document.querySelector('div.ProseMirror');
+  var log = document.getElementById('log');
+  document.getElementById('send').addEventListener('click', function () {
+    var question = input.innerText.trim();
+    if (!question) return;
+    input.innerText = '';
+    var box = document.createElement('div');
+    box.setAttribute('data-is-streaming', 'true');
+    var text = document.createElement('div');
+    text.className = 'font-claude-response';
+    box.appendChild(text);
+    log.appendChild(box);
+    var stop = document.createElement('button');
+    stop.setAttribute('aria-label', 'Stop response');
+    stop.textContent = 'Stop';
+    document.body.appendChild(stop);
+    var answer = 'Script for: ' + question + '\nSecond line of the script.';
+    var i = 0;
+    var timer = setInterval(function () {
+      i += 8;
+      text.innerText = answer.slice(0, i);
+      if (i >= answer.length) {
+        clearInterval(timer);
+        box.setAttribute('data-is-streaming', 'false');
+        stop.remove();
+      }
+    }, 150);
+  });
+</script>
+</body></html>

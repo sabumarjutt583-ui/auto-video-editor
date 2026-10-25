@@ -242,3 +242,6 @@ When you make a new project in **Projects**, choose the channel. The video start
 
 ## Queue
 In a channel, open **Queue**, paste several scripts (a line with only `---` between them) and press **Start the queue**. The app makes the videos one after another with the channel's settings. It never waits for you to press Continue. Videos that fail are skipped and can be tried again.
+
+## Script writer (optional)
+In **Settings > Script writer** connect your own Claude account (read the notice first). In a channel's **Settings > Script writing** choose Claude and write the channel's master prompt once. Then, for a new video, give only the topic: press **Write the script** to read it first, or just press Make video. In the **Queue** you can add many topics, one per line.

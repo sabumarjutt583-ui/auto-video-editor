@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { addScripts, clearDone, nextWaiting, parseScripts, queueCounts, readQueue, removeItem, retryFailed, setItem, type QueueItem } from "./queue.ts";
+import { addScripts, addTopics, parseTopics, clearDone, nextWaiting, parseScripts, queueCounts, readQueue, removeItem, retryFailed, setItem, type QueueItem } from "./queue.ts";
 
 let n = 0;
 const id = () => `q${++n}`;
@@ -53,4 +53,12 @@ test("a saved queue is repaired when read", () => {
   assert.equal(q[1]?.status, "waiting");
   assert.equal(q[1]?.voiceFile, null);
   assert.deepEqual(readQueue("x"), []);
+});
+
+test("topics: one per line, numbering removed, and the script stays empty until its turn", () => {
+  assert.deepEqual(parseTopics("1. The last harvest\n\n- A dog waits\n  Plain line  \n"), ["The last harvest", "A dog waits", "Plain line"]);
+  const q = addTopics([], "a", ["One", "Two"], id);
+  assert.deepEqual(q.map((i) => [i.name, i.script, i.topic, i.status]), [["One", "", "One", "waiting"], ["Two", "", "Two", "waiting"]]);
+  assert.equal(readQueue(q).length, 2);
+  assert.equal(readQueue([{ id: "z", script: "", topic: "" }]).length, 0);
 });

@@ -9,3 +9,4 @@ export { ImageGeneratorCard } from "./ImageGeneratorCard";
 export { ModelsCard } from "./ModelsCard";
 export { SaveIndicator } from "./SaveIndicator";
 export { SecretInput } from "./SecretInput";
+export { ScriptWriterCard } from "./ScriptWriterCard";

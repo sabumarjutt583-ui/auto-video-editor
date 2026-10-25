@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { readQueue, nextWaiting, setItem, addScripts, clearDone, removeItem, retryFailed, type QueueItem } from "../lib/pipeline/queue";
+import { readQueue, nextWaiting, setItem, addScripts, addTopics, clearDone, removeItem, retryFailed, type QueueItem } from "../lib/pipeline/queue";
 import { readProfiles, type ChannelProfile } from "../lib/pipeline/profile";
 import { NO_PAUSES } from "../lib/pipeline/stages";
 import { usePipelineStore } from "./pipelineStore";
@@ -28,6 +28,7 @@ interface QueueState {
   items: QueueItem[];
   running: boolean;
   add: (channelId: string, fallbackName: string, parsed: { name: string; script: string }[]) => void;
+  addTopics: (channelId: string, topics: string[]) => void;
   remove: (id: string) => void;
   clearDone: () => void;
   retryFailed: () => void;
@@ -56,6 +57,7 @@ export const useQueueStore = create<QueueState>((set, get) => {
     running: false,
 
     add: (channelId, fallbackName, parsed) => commit(addScripts(get().items, channelId, fallbackName, parsed, newId)),
+    addTopics: (channelId, topics) => commit(addTopics(get().items, channelId, topics, newId)),
     remove: (id) => commit(removeItem(get().items, id)),
     clearDone: () => commit(clearDone(get().items)),
     retryFailed: () => commit(retryFailed(get().items)),
@@ -78,12 +80,16 @@ export const useQueueStore = create<QueueState>((set, get) => {
           commit(setItem(get().items, item.id, { status: "running", note: "" }));
           const pipeline = usePipelineStore.getState();
           if (item.projectId) await pipeline.continueProject(item.projectId, profile, ensureConsent);
-          else await pipeline.start({ profile, name: item.name, script: item.script, voiceFile: item.voiceFile, ensureConsent });
+          else await pipeline.start({ profile, name: item.name, script: item.script, topic: item.topic, voiceFile: item.voiceFile, ensureConsent });
 
           const after = usePipelineStore.getState();
           const projectId = after.projectId ?? item.projectId;
           if (after.finished !== null) {
             commit(setItem(get().items, item.id, { status: "done", projectId, note: "" }));
+          } else if (!projectId && (after.error?.details === "RateLimit" || after.error?.details === "Auth")) {
+            // The script writer cannot work now (usage limit or signed out): the same video waits and the queue stops.
+            commit(setItem(get().items, item.id, { status: "waiting", note: after.error.message }));
+            break;
           } else if (after.error !== null || after.problems.length > 0) {
             const note = after.error?.message ?? after.problems.join(" ");
             commit(setItem(get().items, item.id, { status: "failed", projectId, note }));

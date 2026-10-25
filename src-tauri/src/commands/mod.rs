@@ -21,6 +21,7 @@ pub mod placement;
 pub mod projects;
 pub mod quick;
 pub mod render;
+pub mod script;
 pub mod settings;
 pub mod sfx;
 pub mod styles;

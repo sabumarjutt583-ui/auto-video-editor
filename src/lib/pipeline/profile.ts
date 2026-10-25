@@ -7,6 +7,7 @@ import { DEFAULT_RENDER, readRender } from "../render/read.ts";
 import type { AudioData, CaptionStyle, RenderData } from "../../types/editor.ts";
 import type { DetailLevel, OutputType, ProjectPatch, SceneMode, SceneSettings, TargetTool } from "../../types/project.ts";
 import type { AspectRatio, Quality } from "../../types/settings.ts";
+import { MAX_MASTER_PROMPT } from "../script/prompt.ts";
 import { NO_PAUSES, STAGE_IDS, type Pauses } from "./stages.ts";
 
 export const PROFILE_VERSION = 1;
@@ -43,6 +44,15 @@ export interface ProfileAudio {
   musicPaths: string[];
 }
 
+export type ScriptWriter = "off" | "claude";
+
+/** How this channel's scripts are written. */
+export interface ProfileScript {
+  writer: ScriptWriter;
+  /** The channel's master prompt: its style, structure, tone and rules. The topic is added to it for every video. */
+  masterPrompt: string;
+}
+
 export interface ChannelProfile {
   version: number;
   id: string;
@@ -51,6 +61,7 @@ export interface ChannelProfile {
   language: string;
   aspect: AspectRatio;
   quality: Quality;
+  script: ProfileScript;
   voice: ProfileVoice;
   scenes: SceneSettings;
   look: ProfileLook;
@@ -79,6 +90,7 @@ function str(value: unknown, max: number, fallback = ""): string {
   return typeof value === "string" ? value.trim().slice(0, max) : fallback;
 }
 
+const WRITERS: readonly ScriptWriter[] = ["off", "claude"];
 const ASPECTS: readonly AspectRatio[] = ["16:9", "9:16", "1:1"];
 const QUALITIES: readonly Quality[] = ["720p", "1080p", "4K"];
 const MODES: readonly SceneMode[] = ["sentence", "seconds", "ai"];
@@ -97,6 +109,7 @@ export function defaultProfile(id: string, name = "My channel"): ChannelProfile 
     language: "",
     aspect: "16:9",
     quality: "1080p",
+    script: { writer: "off", masterPrompt: "" },
     voice: { model: "", voice: "", style: "", cutSilence: true },
     scenes: { ...DEFAULT_SCENES },
     look: { styleId: "", detail: "medium", tool: "dalle_gemini", outputType: "image" },
@@ -134,6 +147,7 @@ export function readProfile(value: unknown, fallbackId = "channel"): ChannelProf
   const base = defaultProfile(cleanId(o.id, fallbackId), str(o.name, MAX_NAME, "My channel") || "My channel");
   const scenes = isObject(o.scenes) ? o.scenes : {};
   const voice = isObject(o.voice) ? o.voice : {};
+  const script = isObject(o.script) ? o.script : {};
   const look = isObject(o.look) ? o.look : {};
   const audio = isObject(o.audio) ? o.audio : {};
   const readAudioPart = readAudio({ musicVolume: audio.musicVolume, ducking: audio.ducking, autoSfx: audio.autoSfx, graphicSfx: audio.graphicSfx, intensity: audio.intensity, sfxVolume: audio.sfxVolume });
@@ -143,6 +157,7 @@ export function readProfile(value: unknown, fallbackId = "channel"): ChannelProf
     language: str(o.language, 12).toLowerCase().replace(/[^a-z-]/g, ""),
     aspect: pick(o.aspect, ASPECTS, base.aspect),
     quality: pick(o.quality, QUALITIES, base.quality),
+    script: { writer: pick(script.writer, WRITERS, base.script.writer), masterPrompt: str(script.masterPrompt, MAX_MASTER_PROMPT) },
     voice: {
       model: str(voice.model, 80),
       voice: str(voice.voice, 40),
@@ -252,9 +267,17 @@ export function profileEditor(profile: ChannelProfile, current: { captions: { st
 }
 
 /** What stops a run before it starts, in plain words (empty = it can start). */
-export function profileProblems(profile: ChannelProfile, input: { script: string; voiceFile: string | null }): string[] {
+export function profileProblems(profile: ChannelProfile, input: { script: string; voiceFile: string | null; topic?: string }): string[] {
   const problems: string[] = [];
   if (profile.look.styleId === "") problems.push("Choose a picture style in the channel profile.");
-  if (input.voiceFile === null && input.script.trim() === "") problems.push("Paste the script, or choose your own voice file.");
+  const writes = canWriteScript(profile) && (input.topic ?? "").trim() !== "";
+  if (input.voiceFile === null && input.script.trim() === "" && !writes) {
+    problems.push(canWriteScript(profile) ? "Paste the script, write a topic for the script writer, or choose your own voice file." : "Paste the script, or choose your own voice file.");
+  }
   return problems;
+}
+
+/** True when this channel has a script writer and a master prompt to give it. */
+export function canWriteScript(profile: ChannelProfile): boolean {
+  return profile.script.writer === "claude" && profile.script.masterPrompt.trim() !== "";
 }

@@ -10,6 +10,7 @@ import {
   FallbackCard,
   TextEngineCard,
   ImageGeneratorCard,
+  ScriptWriterCard,
   ModelsCard,
   SaveIndicator,
 } from "../components/settings";
@@ -72,6 +73,8 @@ export function SettingsPage() {
       />
 
       <ImageGeneratorCard />
+
+      <ScriptWriterCard />
 
       {settings ? (
         <>

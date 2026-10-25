@@ -240,3 +240,8 @@ Not done here (no Windows PC, no real Google account, no desktop window): the re
 ## Smart clip fit and queue (by hand)
 1. Scene 5 s with a 3 s clip: Render with "Slow, then repeat" - clip slows a little then plays again; "Repeat" - no slowing; "Hold" - last picture stays. A 9 s clip is cut at the end.
 2. Channel > Queue: paste 3 scripts separated by `---`, Start the queue. Videos finish one after another; Stop halts after cancelling the current one; a failed video does not block the next; "Try failed again" continues it.
+
+## Script writer (by hand, real claude.ai)
+1. Settings > Script writer: read the notice, accept, Sign in (your browser opens; sign in; close it or press "I have signed in"). Status becomes Connected. If not: send the screenshot of the failure report in the logs folder and fix `script` selectors in config.json.
+2. Channel > Settings > Script writing: choose Claude, write a master prompt. New video: write a topic, press "Write the script": the text appears in the Script box (no title, no markdown).
+3. Queue > topics: add 3 topics, Start. Each script is written, then the video is made. With Claude signed out the item waits and the queue stops.

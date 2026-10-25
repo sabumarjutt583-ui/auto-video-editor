@@ -119,6 +119,13 @@ macro_rules! handler {
             commands::imagegen::imagegen_verify,
             commands::imagegen::imagegen_test_image,
             commands::imagegen::imagegen_chat_ask,
+            commands::script::script_status,
+            commands::script::script_accept_consent,
+            commands::script::script_sign_in,
+            commands::script::script_confirm_signed_in,
+            commands::script::script_check,
+            commands::script::script_disconnect,
+            commands::script::script_ask,
             commands::imagegen::imagegen_chat_thread,
             commands::imagegen::imagegen_make_video,
             commands::imagegen::imagegen_video_status,
@@ -234,6 +241,13 @@ macro_rules! handler {
             commands::imagegen::imagegen_verify,
             commands::imagegen::imagegen_test_image,
             commands::imagegen::imagegen_chat_ask,
+            commands::script::script_status,
+            commands::script::script_accept_consent,
+            commands::script::script_sign_in,
+            commands::script::script_confirm_signed_in,
+            commands::script::script_check,
+            commands::script::script_disconnect,
+            commands::script::script_ask,
             commands::imagegen::imagegen_chat_thread,
             commands::imagegen::imagegen_make_video,
             commands::imagegen::imagegen_video_status,
@@ -308,6 +322,12 @@ fn main() {
             tauri::async_runtime::spawn(async {
                 let _ = render::encoder::available().await;
             });
+            match commands::script::create(app.handle()) {
+                Ok(script) => {
+                    app.manage(script);
+                }
+                Err(error) => logging::error("script", &error.details),
+            }
             match commands::imagegen::create(app.handle()) {
                 Ok(engine) => {
                     engine.start_background();

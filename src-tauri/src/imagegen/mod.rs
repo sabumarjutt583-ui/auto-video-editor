@@ -18,6 +18,7 @@ pub mod queue;
 pub mod real;
 pub mod recovery;
 pub mod save;
+pub mod script_chat;
 pub mod settings;
 pub mod tool_page;
 pub mod video;

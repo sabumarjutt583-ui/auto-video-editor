@@ -1,5 +1,5 @@
 {
-  "configVersion": "1.6",
+  "configVersion": "1.7",
   "toolUrl": "https://share.gemini.google/rqUWVwvowbjG",
   "signInUrl": "https://accounts.google.com/ServiceLogin?continue={continueUrl}",
   "signInContinueUrl": "https://gemini.google.com/app",
@@ -142,5 +142,48 @@
     { "contains": ["unusual traffic", "unusual activity", "not a robot", "captcha", "suspicious activity"], "kind": "flagged", "message": "Google is asking for a check (captcha or unusual activity). Open this account's browser window and finish it yourself. The account is paused." },
     { "contains": ["verify it's you", "verify it’s you", "2-step verification", "confirm it's you", "confirm it’s you"], "kind": "auth", "message": "Google wants to check that it is you. Click Sign in and finish the check in the window." },
     { "contains": ["terms of service", "accept the terms", "before you continue", "age verification"], "kind": "access", "message": "Google is asking you to accept something (terms or an age check). Click Sign in and finish it in the window, then close it." }
-  ]
+  ],
+  "script": {
+    "url": "https://claude.ai/new",
+    "loginUrl": "https://claude.ai/login",
+    "selectors": {
+      "input": "div.ProseMirror[contenteditable=\"true\"]",
+      "send": "button[aria-label=\"Send message\"]",
+      "response": "div[data-is-streaming]",
+      "responseText": ".font-claude-response",
+      "codeBlock": "pre",
+      "done": "button[data-testid=\"action-bar-copy\"]",
+      "stop": "button[aria-label=\"Stop response\"]",
+      "thinking": "div[data-is-streaming=\"true\"]",
+      "attach": "",
+      "uploadItem": "",
+      "fileInput": "",
+      "attachment": ""
+    },
+    "timing": {
+      "pageReadyMs": 30000,
+      "sendEnableMs": 30000,
+      "replyStartMs": 180000,
+      "pollMs": 700,
+      "stableMs": 9000,
+      "uploadMs": 45000,
+      "thinkMaxMs": 300000,
+      "finishStableMs": 2000
+    },
+    "limitTexts": [
+      "usage limit",
+      "reached your limit",
+      "hit your limit",
+      "message limit",
+      "limit reached",
+      "out of messages",
+      "resets at"
+    ],
+    "errorTexts": [
+      "something went wrong",
+      "an error occurred",
+      "couldn't complete"
+    ],
+    "softFailureTexts": []
+  }
 }
