@@ -5,6 +5,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-25
+
+### Changed
+- Several API keys for Gemini and Groq with automatic switch; Gemini or Groq writes the texts; remove web-chat prompts
+- Script writer: Claude web chat for scripts only, per-channel master prompt, topics in the queue
+- Batch queue: many scripts, made one after another
+- Short video clips: slow down then repeat (or repeat / hold); long clips are cut at the end
+- New project asks for a channel and applies its settings
+- Channels dashboard: one sidebar item, all-channels page, channel page with video progress
+- Make Video: channel profiles and a one-click pipeline (voice to final MP4)
+- Flow: scroll the New project tile into view and accept an icon-name prefix (config 1.6)
+- Find Gemini's + button by place when its label changes; play the voice sample from a blob address
+
 ## [0.6.0] - 2026-10-25
 
 ### Changed
