@@ -1,16 +1,29 @@
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 
+import { logFrontendError } from "../lib/appUpdate/api";
 import { cn } from "../lib/cn";
+import { createErrorDeduper, errorLogText } from "../lib/errorLog";
 import type { AppError } from "../types";
 
 interface ErrorNoticeProps {
   error: AppError;
 }
 
-/** A friendly error message with a "Details" toggle for the technical text. */
+const notLoggedYet = createErrorDeduper();
+
+/** A friendly error message with a "Details" toggle for the technical text. Every error the person sees is also written to the log, with the page it was on. */
 export function ErrorNotice({ error }: ErrorNoticeProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    if (error.code === "cancelled") return;
+    const text = errorLogText(error);
+    if (!notLoggedYet(`${pathname}|${text}`)) return;
+    void logFrontendError(text, pathname).catch(() => undefined);
+  }, [error, pathname]);
 
   return (
     <div role="alert" className="rounded-lg border border-danger/30 bg-danger/10 p-2.5 text-xs">

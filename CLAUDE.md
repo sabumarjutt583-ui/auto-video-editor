@@ -163,3 +163,9 @@ resources/fonts/: Noto Sans, Noto Sans CJK, Noto Sans Devanagari, Noto Sans Arab
 
 ## One Google account at a time (images)
 - Setting `oneAccountAtATime` (Rust `ImageGenSettings.one_account_at_a_time`, default true; checkbox "One Google account at a time" in components/imagegen/EngineBar.tsx). `Accounts::claim_slot_one`: the FIRST usable account (list order) that is not resting/signing in gets every slot up to "Pictures at the same time"; the next account only works while the first cannot (usage limit, signed out, paused) and the first goes first again when it is back. Off = the old round-robin over all accounts (`claim_slot`). Applies to pictures only; chat questions and videos keep their own account rotation.
+
+## Every error goes into the log (support)
+- Rust errors: `AppError::new` writes `[error]`. Picture jobs: `engine.rs handle_error` writes `[images] job <id> on account <acc-id>: <Kind>: <message> (<what happens next>)` (accounts by id, never e-mail). Web chat/video/Flow keep their own `[webchat]`/`[video]`/`[flow]` lines.
+- Errors the person SEES (`ErrorNotice`) are also logged once as `[ui] on <page>: <message> | <details>` (`logFrontendError(text, area)`, dedupe in src/lib/errorLog.ts + test); unexpected window errors stay `[window]`.
+- "Export logs" adds the newest 5 web chat failure reports (`webchat-fail-*.txt`, keys hidden, cut at 2000 chars; the .jpg screenshots stay in the logs folder).
+- API timeout text no longer names a fixed number of seconds (calls have 60 s or 150 s limits).

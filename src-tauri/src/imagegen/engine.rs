@@ -30,6 +30,7 @@ use super::save::{self, SaveError, Saved};
 use super::settings::ImageGenSettings;
 use super::store::{load_json, save_json};
 use crate::commands::error::AppError;
+use crate::logging;
 
 pub type Picture = Result<Vec<u8>, GenError>;
 pub type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
@@ -670,12 +671,19 @@ impl Engine {
         if matches!(error.kind, ErrorKind::Auth | ErrorKind::Flagged | ErrorKind::Access) {
             accounts.set_last_error(account, &error.message);
         }
-        if fail {
+        let outcome = if fail {
             run.queue.fail(&job.id, lease, error.message.clone(), Some(error.kind), now);
+            "failed for good".to_string()
         } else {
             // `Failed` here means the attempts ran out: the job shows the error and waits for "Retry".
-            let _: Requeued = run.queue.requeue(&job.id, lease, options, now);
-        }
+            let delay = options.delay_ms;
+            match run.queue.requeue(&job.id, lease, options, now) {
+                Requeued::Failed => format!("failed after {} tries", job.attempts + 1),
+                _ => format!("will try again in {} s", delay / 1000),
+            }
+        };
+        // Every picture problem goes into the log: which job, which account, what kind, what happens next.
+        logging::warn("images", &format!("job {} on account {account}: {:?}: {} ({outcome})", job.id, error.kind, error.message));
         let _ = Self::save_run(run);
         drop(state);
         if switched {

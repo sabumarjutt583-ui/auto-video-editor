@@ -132,8 +132,32 @@ pub fn export(dir: &Path, dest_dir: &Path, header: &str) -> Result<PathBuf, Stri
             text.push_str(&redact(&content));
         }
     }
+    text.push_str(&failure_reports(dir));
     fs::write(&target, text).map_err(|e| format!("{e} ({})", target.display()))?;
     Ok(target)
+}
+
+const REPORTS_KEPT: usize = 5;
+const REPORT_CHARS: usize = 2000;
+
+/// The newest web chat failure reports (`webchat-fail-<time>.txt` next to the log), keys hidden, each cut short.
+/// The screenshots (.jpg) stay in the log folder; their names are listed so they can be asked for.
+fn failure_reports(dir: &Path) -> String {
+    let mut names: Vec<String> = fs::read_dir(dir)
+        .map(|entries| entries.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.starts_with("webchat-fail-") && n.ends_with(".txt")).collect())
+        .unwrap_or_default();
+    if names.is_empty() {
+        return String::new();
+    }
+    names.sort();
+    let mut out = format!("\n{}\nWeb chat failure reports (newest {REPORTS_KEPT} of {})\n{}\n", "-".repeat(40), names.len(), "-".repeat(40));
+    for name in names.iter().rev().take(REPORTS_KEPT).rev() {
+        let body = fs::read_to_string(dir.join(name)).unwrap_or_default();
+        let text = redact(&body);
+        let cut: String = text.chars().take(REPORT_CHARS).collect();
+        out.push_str(&format!("\n[{name}] (screenshot: {})\n{cut}\n", name.replace(".txt", ".jpg")));
+    }
+    out
 }
 
 #[cfg(test)]
@@ -190,5 +214,27 @@ mod tests {
         assert!(text.starts_with("Auto Video Editor 0.1.0"));
         assert!(text.find("old line").unwrap() < text.find("new line").unwrap());
         assert!(!text.contains("gsk_abc"));
+    }
+
+    #[test]
+    fn export_adds_the_newest_chat_failure_reports() {
+        let dir = temp("export-reports");
+        fs::write(dir.join("app.log"), "line\n").unwrap();
+        for n in 1..=7 {
+            fs::write(dir.join(format!("webchat-fail-{n}.txt")), format!("kind: ResponseTimeout {n}\nkey gsk_abcdefgh1234\n")).unwrap();
+        }
+        fs::write(dir.join("webchat-fail-7.jpg"), b"x").unwrap();
+        let out = temp("export-reports-dst");
+        let text = fs::read_to_string(export(&dir, &out, "header").unwrap()).unwrap();
+        assert!(text.contains("newest 5 of 7"));
+        assert!(text.contains("ResponseTimeout 7") && text.contains("ResponseTimeout 3"));
+        assert!(!text.contains("ResponseTimeout 2"));
+        assert!(text.contains("webchat-fail-7.jpg"));
+        assert!(!text.contains("gsk_abc"));
+        // No reports, no extra section.
+        let empty = temp("export-none");
+        fs::write(empty.join("app.log"), "line\n").unwrap();
+        let plain = fs::read_to_string(export(&empty, &temp("export-none-dst"), "h").unwrap()).unwrap();
+        assert!(!plain.contains("failure reports"));
     }
 }

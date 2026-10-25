@@ -27,9 +27,13 @@ pub async fn export_logs(app: AppHandle, dest: String) -> Result<String, AppErro
     .await
 }
 
-/// The window reports an unexpected problem so it ends up in the log, too.
+/// The window reports a problem so it ends up in the log, too. `area` is the page the person was on
+/// (for example `/image-generator`); without it the line is an unexpected window error.
 #[tauri::command]
-pub async fn log_frontend_error(message: String) -> Result<(), AppError> {
-    logging::error("window", &message);
+pub async fn log_frontend_error(message: String, area: Option<String>) -> Result<(), AppError> {
+    match area.filter(|a| !a.trim().is_empty()) {
+        Some(area) => logging::error("ui", &format!("on {}: {message}", area.trim())),
+        None => logging::error("window", &message),
+    }
     Ok(())
 }

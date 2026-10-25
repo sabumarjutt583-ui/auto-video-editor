@@ -156,11 +156,8 @@ fn network_error(error: reqwest::Error) -> ApiError {
     // `without_url` keeps request URLs out of the message.
     let error = error.without_url();
     let details = if error.is_timeout() {
-        format!(
-            "The request took longer than {} seconds. {}",
-            REQUEST_TIMEOUT.as_secs(),
-            describe(&error)
-        )
+        // Calls have different limits (60 s by default, longer for text generation), so no number is named.
+        format!("The service did not answer in time. {}", describe(&error))
     } else {
         describe(&error)
     };

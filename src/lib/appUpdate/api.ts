@@ -15,6 +15,7 @@ export function installAppUpdate(jobId: string): Promise<void> {
 export function exportLogs(dest: string): Promise<string> {
   return invoke<string>("export_logs", { dest });
 }
-export function logFrontendError(message: string): Promise<void> {
-  return invoke<void>("log_frontend_error", { message });
+/** `area` is the page the person was on (an error message shown to them); without it the line is an unexpected window error. */
+export function logFrontendError(message: string, area?: string): Promise<void> {
+  return invoke<void>("log_frontend_error", { message, area: area ?? null });
 }
