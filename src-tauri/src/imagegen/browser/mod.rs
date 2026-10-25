@@ -5,4 +5,5 @@ pub mod cdp;
 pub mod locator;
 pub mod session;
 pub mod signin;
+pub mod stale;
 pub mod ws;

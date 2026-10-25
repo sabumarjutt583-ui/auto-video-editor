@@ -157,3 +157,6 @@ resources/fonts/: Noto Sans, Noto Sans CJK, Noto Sans Devanagari, Noto Sans Arab
 - TS: `VideoSource` in types/imagegen.ts, `mergeStatus` / `parseVideoSource` in lib/imagegen/video.ts (+tests), source switch in components/imagegen/VideoPanel.tsx (kept in localStorage `videoSource`, default Flow), `useVideoMaker(projectId, source, ensureConsent)`.
 - Costs seen on a Pro account (1,050 credits): images 0, Veo 3.1 Lite 8s 720p 10, Fast 20, Quality 100, Omni 1.1 Flash 720p 4/6/8/10s = 7/10/12/15, 360p = 4/5/6/7; x2 doubles the cost (the app always uses x1).
 - Not testable here: the real Flow page. Check by hand (TESTING.md "Videos (Google Flow)") and fix selectors/texts in config.json `flow`.
+
+## Browser already open on a profile (fix)
+- A second Chrome on an open profile does not start: it hands over (an `about:blank` tab appears in the old window) and ends at once with exit code 0 on Windows (21 elsewhere). `Session::open` (imagegen/browser/session.rs) now treats that as a hand-over: `browser/stale.rs close_browsers_of(profile)` closes only processes whose command line has exactly `--user-data-dir=<profile>` (PowerShell on Windows, `pkill -f` elsewhere), then the browser is started once more. Test: `a_browser_of_the_profile_without_a_devtools_port_is_closed_and_the_browser_starts`.

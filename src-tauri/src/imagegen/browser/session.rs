@@ -110,24 +110,41 @@ impl Session {
         }
         let _ = std::fs::remove_file(&file);
 
-        let mut command = Command::new(&launch.exe);
-        command.args(launch_args(launch)).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).kill_on_drop(false);
-        let mut child = command.spawn().map_err(|e| session_error(format!("The browser could not be started: {e}")))?;
-
-        let mut found = None;
-        for _ in 0..200 {
-            if let Some(found_port) = std::fs::read_to_string(&file).ok().and_then(|t| parse_active_port(&t)) {
-                found = Some(found_port);
-                break;
+        // A browser of this profile that cannot be reached (the sign-in window, or one an earlier run left) makes the new
+        // one end at once with exit code 0. It is closed and the browser is started again, once.
+        let mut attempt = 0;
+        let (mut child, port, path) = loop {
+            let mut command = Command::new(&launch.exe);
+            command.args(launch_args(launch)).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).kill_on_drop(false);
+            let mut child = command.spawn().map_err(|e| session_error(format!("The browser could not be started: {e}")))?;
+            let mut found = None;
+            let mut handed_off = false;
+            for _ in 0..200 {
+                if let Some(found_port) = std::fs::read_to_string(&file).ok().and_then(|t| parse_active_port(&t)) {
+                    found = Some(found_port);
+                    break;
+                }
+                if let Ok(Some(status)) = child.try_wait() {
+                    // Windows hands over and ends with 0; other systems end with 21 (profile in use).
+                    if (status.success() || status.code() == Some(21)) && attempt == 0 {
+                        handed_off = true;
+                        break;
+                    }
+                    return Err(session_error(format!("The browser closed right after it started ({status}). The profile may already be open in another window. Close that window and try again.")));
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
-            if let Ok(Some(status)) = child.try_wait() {
-                return Err(session_error(format!("The browser closed right after it started ({status}). The profile may already be open in another window.")));
+            if handed_off {
+                attempt += 1;
+                super::stale::close_browsers_of(&launch.profile).await;
+                let _ = std::fs::remove_file(&file);
+                continue;
             }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-        let Some((port, path)) = found else {
-            let _ = child.kill().await;
-            return Err(CdpError::Timeout("the browser did not report its DevTools port".into()));
+            let Some((port, path)) = found else {
+                let _ = child.kill().await;
+                return Err(CdpError::Timeout("the browser did not report its DevTools port".into()));
+            };
+            break (child, port, path);
         };
         let cdp = match Cdp::connect(port, &path).await {
             Ok(cdp) => cdp,

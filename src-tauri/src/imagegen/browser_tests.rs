@@ -107,6 +107,28 @@ async fn a_browser_left_running_is_attached_again_and_keeps_one_tab() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+#[tokio::test]
+async fn a_browser_of_the_profile_without_a_devtools_port_is_closed_and_the_browser_starts() {
+    let Some(exe) = test_browser() else {
+        eprintln!("skipped: no Chromium found (set AVE_TEST_CHROME)");
+        return;
+    };
+    let dir = temp_dir("stale");
+    let profile = dir.join("profile");
+    std::fs::create_dir_all(&profile).unwrap();
+    // Like the sign-in window: a browser on the profile that has no DevTools port.
+    let mut plain = tokio::process::Command::new(&exe);
+    plain.arg(format!("--user-data-dir={}", profile.display())).args(["--headless=new", "--no-first-run", "--no-default-browser-check"]).args(test_args()).arg("about:blank");
+    let mut left = plain.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn().expect("plain browser");
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    let launch = Launch { exe, profile: profile.clone(), mode: Mode::Hidden, extra_args: test_args() };
+    let session = Session::open(&launch).await.expect("the old browser is closed and a new one starts");
+    assert_eq!(session.eval("1 + 1").await.unwrap(), serde_json::json!(2));
+    session.stop().await;
+    let _ = left.kill().await;
+    let _ = std::fs::remove_dir_all(dir);
+}
+
 // ---- the worker (several prompts at once, errors, lost cards) ----
 
 use super::worker::{FreeWorker, WorkerConfig};
