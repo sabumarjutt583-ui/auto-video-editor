@@ -174,10 +174,14 @@ export type RenderFps = 24 | 30 | 60;
 export type TransitionMode = "cut" | "fade" | "mixed";
 
 /** The output choices of the final render (aspect ratio and quality are in `project.settings`). */
+/** What a video clip shorter than its scene does: slow down a little then play again, hold the last picture, or just play again. */
+export type ShortClipMode = "smart" | "hold" | "loop";
+
 export interface RenderData {
   fps: RenderFps;
   transitions: TransitionMode;
   kenBurns: boolean;
+  shortClip: ShortClipMode;
 }
 
 /** A motion graphic written by the AI for a scene (the frames are in the project's `motion/<id>/frames`). */

@@ -21,9 +21,11 @@ function editorWith(patch: Record<string, unknown>) {
 const SCENES = [scene(1, 0, 5), scene(2, 5, 10), scene(3, 10, 15), scene(4, 15, 20)];
 
 test("readRender repairs damaged data", () => {
-  assert.deepEqual(readRender(null), { fps: 30, transitions: "mixed", kenBurns: true });
-  assert.deepEqual(readRender({ fps: 25, transitions: "wild", kenBurns: false }), { fps: 30, transitions: "mixed", kenBurns: false });
+  assert.deepEqual(readRender(null), { fps: 30, transitions: "mixed", kenBurns: true, shortClip: "smart" });
+  assert.deepEqual(readRender({ fps: 25, transitions: "wild", kenBurns: false }), { fps: 30, transitions: "mixed", kenBurns: false, shortClip: "smart" });
   assert.equal(readRender({ fps: 60 }).fps, 60);
+  assert.equal(readRender({ shortClip: "loop" }).shortClip, "loop");
+  assert.equal(readRender({ shortClip: "nope" }).shortClip, "smart");
 });
 
 test("scenes get their media, motion and a transition that never starts the video", () => {

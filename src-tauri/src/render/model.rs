@@ -48,6 +48,19 @@ pub enum Motion {
     None,
 }
 
+/// What a clip that is shorter than its scene does for the rest of the scene.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ShortFill {
+    /// Slow down a little (down to 0.75x), then play again from the start.
+    #[default]
+    Smart,
+    /// Slow down a little, then hold the last picture (the old behaviour).
+    Hold,
+    /// Normal speed, play again from the start.
+    Loop,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Fit {
@@ -86,6 +99,9 @@ pub struct RenderScene {
     /// Playback speed for a clip that is shorter than its scene (1 = automatic).
     #[serde(default = "one")]
     pub speed: f64,
+    /// What a clip shorter than the scene does for the rest of the scene.
+    #[serde(default)]
+    pub short_fill: ShortFill,
     /// The transition into this scene.
     pub transition: SceneTransition,
 }

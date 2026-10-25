@@ -63,6 +63,7 @@ export type {
   Placeholder,
   RenderData,
   RenderFps,
+  ShortClipMode,
   TransitionMode,
   ScanResult,
   SceneOverride,

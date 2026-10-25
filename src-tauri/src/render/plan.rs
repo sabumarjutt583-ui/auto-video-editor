@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use super::model::{Fit, Motion, RenderScene, SourceKind, TransitionKind};
+use super::model::{Fit, Motion, RenderScene, ShortFill, SourceKind, TransitionKind};
 
 /// How far a Ken Burns move zooms in. Same as the preview (src/lib/editor/motion.ts).
 const ZOOM_AMOUNT: f64 = 0.12;
@@ -59,14 +59,23 @@ pub fn plan_scenes(scenes: &[RenderScene], fps: u32, duration: f64) -> Vec<Scene
 
 /// How fast a clip plays so that it covers `scene_seconds`: 1 when it is long enough, otherwise slower
 /// (the user's choice, or automatically down to 0.75x). What is still missing is held on the last picture.
-pub fn video_speed(clip_seconds: f64, scene_seconds: f64, user_speed: f64) -> f64 {
+/// Like `video_speed`; with `ShortFill::Loop` a short clip is not slowed down by itself (only by the person's choice).
+pub fn video_speed_for(clip_seconds: f64, scene_seconds: f64, user_speed: f64, fill: ShortFill) -> f64 {
     if clip_seconds <= 0.0 || clip_seconds >= scene_seconds - 0.02 {
         return 1.0;
     }
     if user_speed.is_finite() && user_speed < 0.999 {
         return user_speed.clamp(0.25, 1.0);
     }
+    if fill == ShortFill::Loop {
+        return 1.0;
+    }
     (clip_seconds / scene_seconds).clamp(MIN_AUTO_SPEED, 1.0)
+}
+
+/// True when the clip must play again from the start to cover the scene at this speed.
+pub fn needs_loop(clip_seconds: f64, scene_seconds: f64, speed: f64, fill: ShortFill) -> bool {
+    fill != ShortFill::Hold && clip_seconds > 0.0 && clip_seconds / speed < scene_seconds - 0.02
 }
 
 fn esc_even(value: f64) -> u32 {
@@ -165,9 +174,12 @@ pub fn clip_args(scene: &RenderScene, source: &Path, frames: i64, width: u32, he
             }
         }
         SourceKind::Video => {
-            let speed = if scene.source.last_frame { 1.0 } else { video_speed(scene.source.duration, scene_seconds, scene.speed) };
+            let speed = if scene.source.last_frame { 1.0 } else { video_speed_for(scene.source.duration, scene_seconds, scene.speed, scene.short_fill) };
             if scene.source.last_frame {
                 args.extend([s("-sseof"), s("-0.2")]);
+            } else if needs_loop(scene.source.duration, scene_seconds, speed, scene.short_fill) {
+                // The clip is too short: play it again from the start (the output is cut at `frames`).
+                args.extend([s("-stream_loop"), s("-1")]);
             }
             args.extend([s("-i"), path_arg(source)]);
             let pace = format!("setpts=PTS/{speed:.4},fps={fps}");
@@ -340,6 +352,7 @@ mod tests {
             motion: Motion::ZoomIn,
             fit: Fit::Crop,
             speed: 1.0,
+            short_fill: ShortFill::Hold,
             transition: SceneTransition { kind, seconds },
         }
     }
@@ -386,11 +399,11 @@ mod tests {
 
     #[test]
     fn short_clips_slow_down_to_three_quarters_then_hold() {
-        assert_eq!(video_speed(10.0, 5.0, 1.0), 1.0);
-        assert_eq!(video_speed(4.0, 5.0, 1.0), 0.8);
-        assert_eq!(video_speed(2.0, 5.0, 1.0), MIN_AUTO_SPEED);
-        assert_eq!(video_speed(4.0, 5.0, 0.5), 0.5, "the user's choice wins");
-        assert_eq!(video_speed(5.0, 5.0, 0.5), 1.0, "a long enough clip is never slowed");
+        assert_eq!(video_speed_for(10.0, 5.0, 1.0, ShortFill::Hold), 1.0);
+        assert_eq!(video_speed_for(4.0, 5.0, 1.0, ShortFill::Hold), 0.8);
+        assert_eq!(video_speed_for(2.0, 5.0, 1.0, ShortFill::Hold), MIN_AUTO_SPEED);
+        assert_eq!(video_speed_for(4.0, 5.0, 0.5, ShortFill::Hold), 0.5, "the user's choice wins");
+        assert_eq!(video_speed_for(5.0, 5.0, 0.5, ShortFill::Hold), 1.0, "a long enough clip is never slowed");
     }
 
     #[test]
@@ -430,6 +443,25 @@ mod tests {
         let args = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");
         assert!(args.contains("setpts=PTS/0.8000"), "{args}");
         assert!(args.contains("tpad=stop_mode=clone"), "{args}");
+        assert!(!args.contains("-stream_loop"), "hold: {args}");
+
+        // A short clip plays again from the start; "smart" slows it a little first, "loop" does not.
+        video.short_fill = ShortFill::Smart;
+        let covered = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");
+        assert!(!covered.contains("-stream_loop"), "slowing to 0.8x already covers the scene: {covered}");
+        video.source.duration = 3.0;
+        let smart = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");
+        assert!(smart.contains("-stream_loop -1 -i /p/a.mp4"), "{smart}");
+        assert!(smart.contains("setpts=PTS/0.7500"), "{smart}");
+        video.short_fill = ShortFill::Loop;
+        let looped = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");
+        assert!(looped.contains("-stream_loop -1") && looped.contains("setpts=PTS/1.0000"), "{looped}");
+        // A long clip is never looped: it is cut at the end of the scene.
+        video.source.duration = 9.0;
+        let long = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");
+        assert!(!long.contains("-stream_loop"), "{long}");
+        video.source.duration = 4.0;
+        video.short_fill = ShortFill::Hold;
         video.fit = Fit::Blur;
         let args = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");
         assert!(args.contains("overlay=(W-w)/2:(H-h)/2"), "{args}");

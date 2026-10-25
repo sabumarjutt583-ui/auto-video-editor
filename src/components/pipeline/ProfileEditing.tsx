@@ -3,7 +3,7 @@ import { Music, Trash2 } from "lucide-react";
 import { pickMusicFiles } from "../../lib/dialog";
 import { PRESETS } from "../../lib/captions/presets";
 import { MAX_MUSIC_FILES, type ChannelProfile } from "../../lib/pipeline/profile";
-import type { CaptionPreset, DuckingPreset, RenderFps, SfxIntensity, TransitionMode } from "../../types/editor";
+import type { CaptionPreset, DuckingPreset, RenderFps, SfxIntensity, ShortClipMode, TransitionMode } from "../../types/editor";
 import { Button, Card, Checkbox, Field, IconButton, NumberField, Select } from "../ui";
 
 interface Props {
@@ -106,6 +106,13 @@ export function ProfileEditing({ profile, onChange }: Props) {
               <option value="24">24</option>
               <option value="30">30</option>
               <option value="60">60</option>
+            </Select>
+          </Field>
+          <Field label="Short video clips" htmlFor="p-short" hint="A clip that is too long is cut at the end of the scene.">
+            <Select id="p-short" value={render.shortClip} onChange={(e) => onChange({ ...profile, render: { ...render, shortClip: e.target.value as ShortClipMode } })}>
+              <option value="smart">Slow down a little, then repeat</option>
+              <option value="loop">Repeat from the start</option>
+              <option value="hold">Hold the last picture</option>
             </Select>
           </Field>
         </div>

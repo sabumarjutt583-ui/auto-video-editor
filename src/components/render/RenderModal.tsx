@@ -6,7 +6,7 @@ import { useProjectStore } from "../../store/projectStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { readEditor } from "../../lib/editor/model";
 import { outputSize } from "../../lib/editor/size";
-import type { AspectRatio, Project, Quality, RenderData, RenderFps, TransitionMode } from "../../types";
+import type { AspectRatio, Project, Quality, RenderData, RenderFps, ShortClipMode, TransitionMode } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
 import { JobBar } from "../voice/JobBar";
 import { RenderCheck } from "../graphics";
@@ -28,6 +28,11 @@ const FPS: { value: `${RenderFps}`; label: string }[] = [
   { value: "24", label: "24" },
   { value: "30", label: "30" },
   { value: "60", label: "60" },
+];
+const SHORT: { value: ShortClipMode; label: string }[] = [
+  { value: "smart", label: "Slow, then repeat" },
+  { value: "loop", label: "Repeat" },
+  { value: "hold", label: "Hold last picture" },
 ];
 const MODES: { value: TransitionMode; label: string }[] = [
   { value: "cut", label: "Cut" },
@@ -57,6 +62,7 @@ export function RenderModal({ project, editor, view, onClose }: { project: Proje
         <Field label="Quality" hint={`${size.width} × ${size.height}`}><SegmentedControl<Quality> label="Quality" value={project.settings.quality} onChange={(quality) => setSettings({ quality })} options={QUALITIES} /></Field>
         <Field label="Frames per second"><SegmentedControl<`${RenderFps}`> label="Frames per second" value={`${editor.render.fps}`} onChange={(v) => setRender({ fps: Number(v) as RenderFps })} options={FPS} /></Field>
         <Field label="Transitions" hint="Cut: none. Fade: cross-fades. Mixed: mostly cuts, some fades and slides. A choice made for one scene always wins."><SegmentedControl<TransitionMode> label="Transitions" value={editor.render.transitions} onChange={(transitions) => setRender({ transitions })} options={MODES} /></Field>
+        <Field label="Short video clips" hint="When a video clip is shorter than its scene. A clip that is too long is cut at the end of the scene."><SegmentedControl<ShortClipMode> label="Short video clips" value={editor.render.shortClip} onChange={(shortClip) => setRender({ shortClip })} options={SHORT} /></Field>
         <Checkbox label="Ken Burns (slow zoom and pan on pictures)" checked={editor.render.kenBurns} onChange={(e) => setRender({ kenBurns: e.target.checked })} />
         <p className="text-xs text-muted">Format: MP4 (H.264 + AAC). {best ? `Encoder: ${best.label}.` : view.encoders === null ? "Checking encoders…" : "No H.264 encoder found."}{forceCpu ? " (CPU only, set in Settings)" : ""}</p>
       </div>

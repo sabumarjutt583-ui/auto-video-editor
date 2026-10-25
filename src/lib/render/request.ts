@@ -1,5 +1,5 @@
 import type { AspectRatio, Quality } from "../../types/settings.ts";
-import type { CaptionLine, MotionGraphic, CaptionStyle, EditorData, KenBurns, MediaFile, SceneOverride, SfxCue, VideoFit } from "../../types/editor.ts";
+import type { CaptionLine, MotionGraphic, CaptionStyle, EditorData, KenBurns, MediaFile, SceneOverride, SfxCue, ShortClipMode, VideoFit } from "../../types/editor.ts";
 import type { Project, Scene } from "../../types/project.ts";
 import { buildMixRequest, type MixRequest } from "../audio/mixRequest.ts";
 import { buildAssRequest, type AssRequest } from "../captions/assRequest.ts";
@@ -29,6 +29,7 @@ export interface RenderScene {
   motion: RenderMotion;
   fit: VideoFit;
   speed: number;
+  shortFill: ShortClipMode;
   transition: { kind: TransitionKind; seconds: number };
 }
 
@@ -118,6 +119,7 @@ export function buildRenderScenes(scenes: readonly Scene[], editor: EditorData, 
       motion: real && editor.render.kenBurns ? resolveMotion(override.kenBurns, scene.index) : "none",
       fit: override.videoFit,
       speed: override.speed,
+      shortFill: editor.render.shortClip,
       transition: { kind, seconds: previous ? transitionLength(kind, scene.duration, previous.duration) : 0 },
     });
   });
