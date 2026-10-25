@@ -1,9 +1,10 @@
 import { Film, Square } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { buildVideoItems, hasVideo } from "../../lib/imagegen/video";
+import { buildVideoItems, hasVideo, parseVideoSource } from "../../lib/imagegen/video";
 import { formatTimecode } from "../../lib/scenes/timecode";
 import type { Project } from "../../types";
+import type { VideoSource } from "../../types/imagegen";
 import { ErrorNotice } from "../ErrorNotice";
 import { Button, Checkbox } from "../ui";
 import { useVideoMaker } from "./useVideoMaker";
@@ -12,9 +13,26 @@ function clock(ms: number): string {
   return new Date(ms).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-/** "Videos": makes a short video for chosen scenes with Gemini's "Create video", one video per Google account at a time. */
+const SOURCE_KEY = "videoSource";
+
+const SOURCES: ReadonlyArray<{ id: VideoSource; label: string; note: string }> = [
+  { id: "flow", label: "Google Flow", note: "Veo videos, about 10 credits each (1,050 credits a month on a Pro account). Uses the scene's picture as the first frame." },
+  { id: "gemini", label: "Gemini", note: "Gemini's \"Create video\": a few videos a day per account." },
+  { id: "auto", label: "Auto", note: "Flow first; when no account has Flow credits left, Gemini makes the video." },
+];
+
+function storedSource(): VideoSource {
+  try {
+    return parseVideoSource(localStorage.getItem(SOURCE_KEY));
+  } catch {
+    return "flow";
+  }
+}
+
+/** "Videos": makes a short video for chosen scenes with Google Flow or Gemini, one video per Google account at a time. */
 export function VideoPanel({ project, ensureConsent }: { project: Project; ensureConsent: () => Promise<boolean> }) {
-  const maker = useVideoMaker(project.id, ensureConsent);
+  const [source, setSource] = useState<VideoSource>(storedSource);
+  const maker = useVideoMaker(project.id, source, ensureConsent);
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(project.scenes.filter((s) => s.mediaType === "video" && !hasVideo(s, project.mediaMap)).map((s) => s.id)));
   const [animate, setAnimate] = useState(true);
   const [skipDone, setSkipDone] = useState(true);
@@ -36,11 +54,31 @@ export function VideoPanel({ project, ensureConsent }: { project: Project; ensur
     <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5" aria-label="Videos">
       <div className="flex flex-col gap-1">
         <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
-          <Film size={18} aria-hidden /> Videos (Gemini, no API key)
+          <Film size={18} aria-hidden /> Videos (no API key)
         </h2>
         <p className="text-sm text-muted">
-          Each Google account makes one video at a time with Gemini's "Create video" (about 10 seconds each). Every account has a daily limit: when it is out of videos the app waits for the time Gemini names and uses the other accounts meanwhile.
+          Each Google account makes one video at a time. An account with no videos or credits left rests, and the other accounts carry on.
         </p>
+        <div className="flex flex-wrap items-center gap-2 pt-1" role="radiogroup" aria-label="Where to make the videos">
+          {SOURCES.map((option) => (
+            <Button
+              key={option.id}
+              variant={source === option.id ? "primary" : undefined}
+              disabled={maker.running}
+              onClick={() => {
+                setSource(option.id);
+                try {
+                  localStorage.setItem(SOURCE_KEY, option.id);
+                } catch {
+                  /* a private window: the choice is only kept for now */
+                }
+              }}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+        <p className="text-xs text-muted">{SOURCES.find((o) => o.id === source)?.note}</p>
         {status && (
           <p className="text-sm" role="status">
             {status.ready} {status.ready === 1 ? "account" : "accounts"} can make videos now

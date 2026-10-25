@@ -1,6 +1,6 @@
 import type { MediaFile } from "../../types/editor.ts";
 import type { AppError } from "../../types/error.ts";
-import type { VideoResult } from "../../types/imagegen.ts";
+import type { VideoResult, VideoSource, VideoStatus } from "../../types/imagegen.ts";
 import type { Project, ProjectPatch, Scene } from "../../types/project.ts";
 import { readEditor } from "../editor/model.ts";
 import { fromImported } from "../media/files.ts";
@@ -169,4 +169,17 @@ export async function runVideoQueue(items: readonly VideoItem[], deps: QueueDeps
   await Promise.all(Array.from({ length: count }, () => worker()));
   deps.onWaiting(null);
   return { made, failed, left: queue };
+}
+
+/** Joins the status of Flow and Gemini for "Flow first, then Gemini": accounts that can work, and the first return time. */
+export function mergeStatus(a: VideoStatus, b: VideoStatus): VideoStatus {
+  const times = [a.backAt, b.backAt].filter((t) => t > 0);
+  return { ready: a.ready + b.ready, resting: a.resting + b.resting, backAt: times.length > 0 ? Math.min(...times) : 0 };
+}
+
+const SOURCES: readonly VideoSource[] = ["gemini", "flow", "auto"];
+
+/** A stored value as a video source ("flow" when it is not one of them: Flow gives the most videos per account). */
+export function parseVideoSource(value: string | null): VideoSource {
+  return SOURCES.find((s) => s === value) ?? "flow";
 }

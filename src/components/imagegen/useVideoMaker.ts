@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { toAppError } from "../../lib/errors";
 import { imagegenMakeVideo, imagegenVideoStatus } from "../../lib/imagegen/api";
-import { registerVideo, runVideoQueue, type VideoItem } from "../../lib/imagegen/video";
+import { mergeStatus, registerVideo, runVideoQueue, type VideoItem } from "../../lib/imagegen/video";
 import { useProjectStore } from "../../store/projectStore";
 import type { AppError } from "../../types";
-import type { VideoStatus } from "../../types/imagegen";
+import type { VideoSource, VideoStatus } from "../../types/imagegen";
 
 export type SceneVideoState = { kind: "queued" } | { kind: "making" } | { kind: "done" } | { kind: "failed"; error: AppError };
 
@@ -20,8 +20,14 @@ export interface VideoMaker {
   stop: () => void;
 }
 
+/** How many accounts can make videos for this source ("auto" joins Flow and Gemini). */
+async function statusOf(source: VideoSource): Promise<VideoStatus> {
+  if (source === "auto") return mergeStatus(await imagegenVideoStatus("flow"), await imagegenVideoStatus("gemini"));
+  return imagegenVideoStatus(source);
+}
+
 /** Runs the video queue of the open project: one video per ready Google account at a time. */
-export function useVideoMaker(projectId: string, ensureConsent: () => Promise<boolean>): VideoMaker {
+export function useVideoMaker(projectId: string, source: VideoSource, ensureConsent: () => Promise<boolean>): VideoMaker {
   const [status, setStatus] = useState<VideoStatus | null>(null);
   const [states, setStates] = useState<Record<string, SceneVideoState>>({});
   const [running, setRunning] = useState(false);
@@ -31,11 +37,11 @@ export function useVideoMaker(projectId: string, ensureConsent: () => Promise<bo
 
   const refresh = useCallback(async () => {
     try {
-      setStatus(await imagegenVideoStatus());
+      setStatus(await statusOf(source));
     } catch {
       setStatus(null);
     }
-  }, []);
+  }, [source]);
 
   useEffect(() => {
     void refresh();
@@ -52,14 +58,14 @@ export function useVideoMaker(projectId: string, ensureConsent: () => Promise<bo
       setRunning(true);
       setSummary("");
       setStates(Object.fromEntries(items.map((item) => [item.sceneId, { kind: "queued" } as SceneVideoState])));
-      let ready = (await imagegenVideoStatus().catch(() => null))?.ready ?? 1;
+      let ready = (await statusOf(source).catch(() => null))?.ready ?? 1;
       try {
         const report = await runVideoQueue(items, {
           make: async (item) => {
             set(item.sceneId, { kind: "making" });
-            ready = (await imagegenVideoStatus().catch(() => null))?.ready ?? ready;
+            ready = (await statusOf(source).catch(() => null))?.ready ?? ready;
             try {
-              return await imagegenMakeVideo(projectId, item.prompt, item.image, item.fileName, `video-${item.sceneId}-${Date.now()}`);
+              return await imagegenMakeVideo(projectId, item.prompt, item.image, item.fileName, `video-${item.sceneId}-${Date.now()}`, source);
             } catch (caught) {
               const error = toAppError(caught, "The video could not be made.");
               // A scene that only waits for an account goes back to the line.
@@ -93,7 +99,7 @@ export function useVideoMaker(projectId: string, ensureConsent: () => Promise<bo
         void refresh();
       }
     },
-    [projectId, ensureConsent, refresh],
+    [projectId, source, ensureConsent, refresh],
   );
 
   const stop = useCallback(() => {

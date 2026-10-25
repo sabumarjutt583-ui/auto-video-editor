@@ -173,6 +173,9 @@ export interface VideoResult {
   modified: number;
 }
 
+/** Where videos are made: Gemini "Create video", Google Flow, or Flow first and Gemini when Flow has no credits. */
+export type VideoSource = "gemini" | "flow" | "auto";
+
 /** Google accounts that can make videos now / are out of videos (mirrors `VideoStatus`). */
 export interface VideoStatus {
   ready: number;

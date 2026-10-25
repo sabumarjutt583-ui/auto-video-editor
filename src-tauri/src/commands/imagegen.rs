@@ -9,6 +9,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use crate::commands::error::AppError;
 use crate::commands::library::library_root;
 use crate::commands::projects::project_folder;
+use crate::imagegen::accounts::VideoSource;
 use crate::imagegen::browser::locator;
 use crate::imagegen::config::EngineConfig;
 use crate::imagegen::engine::{Sink, Snapshot};
@@ -206,6 +207,7 @@ pub async fn imagegen_make_video(
     image: Option<String>,
     file_name: String,
     job_id: String,
+    source: Option<String>,
 ) -> Result<VideoResult, AppError> {
     if !plain_media_name(&file_name) || !file_name.to_lowercase().ends_with(".mp4") {
         return Err(AppError::new("That video file name cannot be used.", format!("file name: {file_name}")));
@@ -225,7 +227,18 @@ pub async fn imagegen_make_video(
         return Err(AppError::cancelled());
     }
     let report = |msg: String| job.progress(&msg, 30.0);
-    let made = ig.make_video(&prompt, picture.as_deref(), Some(&report)).await?;
+    let made = match source.as_deref() {
+        Some("flow") => ig.make_video(VideoSource::Flow, &prompt, picture.as_deref(), Some(&report)).await?,
+        // Auto: Google Flow first; when every account is out of Flow credits (or none is ready), Gemini takes it.
+        Some("auto") => match ig.make_video(VideoSource::Flow, &prompt, picture.as_deref(), Some(&report)).await {
+            Ok(made) => made,
+            Err(error) if error.details.starts_with("video_wait") || error.details.starts_with("no account") => {
+                ig.make_video(VideoSource::Gemini, &prompt, picture.as_deref(), Some(&report)).await?
+            }
+            Err(error) => return Err(error),
+        },
+        _ => ig.make_video(VideoSource::Gemini, &prompt, picture.as_deref(), Some(&report)).await?,
+    };
     let account_name = made.account_name.clone();
     let name = crate::commands::blocking::run_blocking(move || -> Result<String, AppError> {
         std::fs::create_dir_all(&media).map_err(|e| AppError::new("The media folder could not be made.", e.to_string()))?;
@@ -247,8 +260,8 @@ pub async fn imagegen_make_video(
 
 /// How many Google accounts can make a video now, and when the resting ones are back.
 #[tauri::command]
-pub async fn imagegen_video_status(ig: Ig<'_>) -> Result<crate::imagegen::ops::VideoStatus, AppError> {
-    Ok(ig.video_status())
+pub async fn imagegen_video_status(ig: Ig<'_>, source: Option<String>) -> Result<crate::imagegen::ops::VideoStatus, AppError> {
+    Ok(ig.video_status(if source.as_deref() == Some("flow") { VideoSource::Flow } else { VideoSource::Gemini }))
 }
 
 #[tauri::command]

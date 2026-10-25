@@ -238,6 +238,28 @@ impl FreeWorker {
         result
     }
 
+    /// Makes one video in Google Flow (one project per account; one chat question or video at a time).
+    pub async fn flow_with(&self, prompt: &str, image: Option<&std::path::Path>, timeout: Duration, progress: chat::Progress<'_>) -> Result<Vec<u8>, GenError> {
+        self.inner.chat_busy.fetch_add(1, Ordering::SeqCst);
+        let result = self.flow_inner(prompt, image, timeout, progress).await;
+        self.inner.chat_busy.fetch_sub(1, Ordering::SeqCst);
+        self.touch();
+        result
+    }
+
+    async fn flow_inner(&self, prompt: &str, image: Option<&std::path::Path>, timeout: Duration, progress: chat::Progress<'_>) -> Result<Vec<u8>, GenError> {
+        let (session, _, _) = self.ready().await?;
+        let _turn = self.inner.chat_lock.lock().await;
+        if self.mode() == Mode::Window {
+            let _ = session.minimize().await;
+        }
+        let result = super::flow::make(&session, &self.config().engine, prompt, image, timeout, progress).await;
+        if self.mode() == Mode::Window {
+            let _ = session.minimize().await;
+        }
+        result
+    }
+
     async fn video_inner(&self, prompt: &str, image: Option<&std::path::Path>, timeout: Duration, progress: chat::Progress<'_>) -> Result<Vec<u8>, GenError> {
         let (session, _, _) = self.ready().await?;
         let _turn = self.inner.chat_lock.lock().await;

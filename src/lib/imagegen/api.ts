@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-import type { AddReport, ImageGenSettings, ImageGenSnapshot, MediaInfo, NewImageJob, SavedImage, TestImage, VideoResult, VideoStatus } from "../../types/imagegen";
+import type { AddReport, ImageGenSettings, ImageGenSnapshot, MediaInfo, NewImageJob, SavedImage, TestImage, VideoResult, VideoSource, VideoStatus } from "../../types/imagegen";
 
 export const imagegenState = () => invoke<ImageGenSnapshot>("imagegen_state");
 export const imagegenSetSettings = (settings: ImageGenSettings) => invoke<void>("imagegen_set_settings", { settings });
@@ -58,6 +58,6 @@ export interface ChatAnswer {
 export const imagegenChatAsk = (prompt: string) => invoke<ChatAnswer>("imagegen_chat_ask", { prompt });
 
 /** One video from a prompt (and, with `image`, from that picture of the project's media folder), made by the next Google account that has videos left. */
-export const imagegenMakeVideo = (projectId: string, prompt: string, image: string | null, fileName: string, jobId: string) =>
-  invoke<VideoResult>("imagegen_make_video", { projectId, prompt, image, fileName, jobId });
-export const imagegenVideoStatus = () => invoke<VideoStatus>("imagegen_video_status");
+export const imagegenMakeVideo = (projectId: string, prompt: string, image: string | null, fileName: string, jobId: string, source: VideoSource = "gemini") =>
+  invoke<VideoResult>("imagegen_make_video", { projectId, prompt, image, fileName, jobId, source });
+export const imagegenVideoStatus = (source: Exclude<VideoSource, "auto"> = "gemini") => invoke<VideoStatus>("imagegen_video_status", { source });

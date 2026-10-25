@@ -318,7 +318,7 @@ pub async fn ask_thread(session: &Session, engine: &EngineConfig, prompt: &str, 
 }
 
 /// The remote object id of the first element an expression gives (None when it gives nothing).
-async fn object_id(session: &Session, tab: &Tab, expression: &str) -> Result<Option<String>, GenError> {
+pub(super) async fn object_id(session: &Session, tab: &Tab, expression: &str) -> Result<Option<String>, GenError> {
     let mut params = json!({ "expression": expression, "returnByValue": false });
     if let Some(id) = tab.frame.context_id {
         params["contextId"] = json!(id);

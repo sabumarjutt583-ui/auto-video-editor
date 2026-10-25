@@ -218,6 +218,105 @@ impl Default for VideoConfig {
     }
 }
 
+/// Google Flow (flow.google.com): one project per account, a picture as the "Start" frame, Veo makes the video.
+/// Texts are regular expressions on the visible text of the page (Flow's markup has no stable names), so a
+/// changed page is fixed by a settings update. Defaults are the page as captured on 2026-10-25.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct FlowConfig {
+    pub url: String,
+    /// Part of the address that shows a project is open.
+    pub project_url_part: String,
+    pub new_project_text: String,
+    pub prompt_input: String,
+    pub send_button: String,
+    /// The small settings button of the prompt box ("Video · 720p · 8s ... x1").
+    pub chip_text: String,
+    pub video_tab: String,
+    pub frames_tab: String,
+    pub ingredients_tab: String,
+    pub ratio: String,
+    /// The exact name of the model in the list, and the regex that finds the model button itself.
+    pub model: String,
+    pub model_label: String,
+    pub resolution: String,
+    pub seconds: u32,
+    pub count: u32,
+    /// A video that would cost more credits than this is not started (a wrong setting must not burn credits).
+    pub max_credits_per_video: u32,
+    /// "Generating will use 10 credits": group 1 is the cost.
+    pub cost_regex: String,
+    /// "1,030 Google Flow credits": group 1 is the balance.
+    pub balance_regex: String,
+    pub account_button: String,
+    pub start_slot: String,
+    pub upload_text: String,
+    pub add_to_prompt: String,
+    /// A progress label on a tile while it is made ("14%").
+    pub progress_regex: String,
+    pub more_button: String,
+    pub download_text: String,
+    /// The download size to take ("720p  Original size").
+    pub quality_text: String,
+    /// Only a video's menu has this entry (a picture's menu has "Animate" instead).
+    pub video_menu_marker: String,
+    pub image_menu_marker: String,
+    pub limit_texts: Vec<String>,
+    pub error_texts: Vec<String>,
+    /// Texts of a page that needs the person (never worked around).
+    pub block_texts: Vec<String>,
+    /// How long to rest an account that has too few credits (its credits come back monthly or daily).
+    pub default_rest_minutes: u64,
+    pub start_wait_ms: u64,
+    pub max_wait_ms: u64,
+    pub poll_ms: u64,
+    pub download_ms: u64,
+}
+
+impl Default for FlowConfig {
+    fn default() -> Self {
+        let words = |list: &[&str]| list.iter().map(|w| (*w).to_string()).collect();
+        Self {
+            url: "https://flow.google.com/".into(),
+            project_url_part: "/project/".into(),
+            new_project_text: "^\\s*\\+?\\s*New project\\s*$".into(),
+            prompt_input: "[contenteditable=\"true\"], textarea, [role=\"textbox\"]".into(),
+            send_button: "button[aria-label*=\"send\" i], button[aria-label*=\"generate\" i], button[aria-label*=\"create\" i]".into(),
+            chip_text: "^\\s*(Video\\s*·|.*Nano Banana|Veo|Omni)".into(),
+            video_tab: "^\\s*Video\\s*$".into(),
+            frames_tab: "^\\s*Frames\\s*$".into(),
+            ingredients_tab: "^\\s*Ingredients\\s*$".into(),
+            ratio: "16:9".into(),
+            model: "Veo 3.1 - Lite".into(),
+            model_label: "^\\s*(Veo 3\\.1 - \\w+|Omni [\\d.]+ \\w+)\\s*$".into(),
+            resolution: "720p".into(),
+            seconds: 8,
+            count: 1,
+            max_credits_per_video: 20,
+            cost_regex: "Generating will use\\s+([\\d,]+)\\s+credits".into(),
+            balance_regex: "([\\d,]+)\\s+Google Flow credits".into(),
+            account_button: "button:has(img[src*=\"googleusercontent\"]), button[aria-label*=\"account\" i]".into(),
+            start_slot: "^\\s*Start\\s*$".into(),
+            upload_text: "^\\s*Upload media\\s*$".into(),
+            add_to_prompt: "^\\s*Add to prompt\\s*$".into(),
+            progress_regex: "^\\s*\\d{1,3}%\\s*$".into(),
+            more_button: "button[aria-label*=\"more\" i]".into(),
+            download_text: "^\\s*Download\\s*$".into(),
+            quality_text: "^\\s*720p[\\s\\S]*Original size".into(),
+            video_menu_marker: "Publish to YouTube".into(),
+            image_menu_marker: "Animate".into(),
+            limit_texts: words(&["not enough credits", "out of credits", "insufficient credits", "no credits left", "run out of credits"]),
+            error_texts: words(&["something went wrong", "couldn't generate", "could not generate", "unable to generate", "generation failed"]),
+            block_texts: words(&["unusual activity", "unusual traffic", "not a robot", "verify it's you", "verify it’s you"]),
+            default_rest_minutes: 720,
+            start_wait_ms: 120_000,
+            max_wait_ms: 900_000,
+            poll_ms: 1_500,
+            download_ms: 120_000,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineConfig {
@@ -239,6 +338,8 @@ pub struct EngineConfig {
     pub chat: ChatConfig,
     #[serde(default)]
     pub video: VideoConfig,
+    #[serde(default)]
+    pub flow: FlowConfig,
 }
 
 fn bad(message: &str, details: impl Into<String>) -> AppError {
@@ -372,7 +473,7 @@ mod tests {
         assert!(EngineConfig::parse("not json").is_err());
         let no_ratio = BUNDLED_JSON.replace("{ratio}", "16-9");
         assert!(EngineConfig::parse(&no_ratio).is_err());
-        let bad_version = BUNDLED_JSON.replace("\"1.4\"", "\"x\"");
+        let bad_version = BUNDLED_JSON.replace("\"1.5\"", "\"x\"");
         assert!(EngineConfig::parse(&bad_version).is_err());
     }
 
@@ -381,6 +482,7 @@ mod tests {
         let config = EngineConfig::bundled();
         assert_eq!(config.chat, ChatConfig::default(), "the bundled file and the built-in defaults agree");
         assert_eq!(config.video, VideoConfig::default(), "the video settings too");
+        assert_eq!(config.flow, FlowConfig::default(), "the Flow settings too");
         let without_chat = {
             let mut value: serde_json::Value = serde_json::from_str(BUNDLED_JSON).unwrap();
             value.as_object_mut().unwrap().remove("chat");

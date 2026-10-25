@@ -4,7 +4,7 @@ import test from "node:test";
 import type { AppError } from "../../types/error.ts";
 import type { VideoResult } from "../../types/imagegen.ts";
 import type { Scene } from "../../types/project.ts";
-import { buildVideoItems, registerVideo, runVideoQueue, waitSignal, WAIT_MARGIN_MS, type QueueDeps, type VideoItem } from "./video.ts";
+import { buildVideoItems, mergeStatus, parseVideoSource, registerVideo, runVideoQueue, waitSignal, WAIT_MARGIN_MS, type QueueDeps, type VideoItem } from "./video.ts";
 
 function scene(index: number, extra: Partial<Scene> = {}): Scene {
   return { id: `S0${index}`, index, start: (index - 1) * 5, end: index * 5, duration: 5, prompt: `prompt ${index}`, motionPrompt: "", matchedFile: null, mediaType: "image", ...extra } as Scene;
@@ -109,4 +109,18 @@ test("several accounts make several videos at the same time", async () => {
   await runVideoQueue(items("S01", "S02", "S03", "S04"), t.deps);
   assert.equal(peak, 3);
   assert.equal(t.made.length, 4);
+});
+
+test("the status of Flow and Gemini is joined for the Auto source", () => {
+  assert.deepEqual(mergeStatus({ ready: 2, resting: 1, backAt: 9_000 }, { ready: 3, resting: 0, backAt: 0 }), { ready: 5, resting: 1, backAt: 9_000 });
+  assert.deepEqual(mergeStatus({ ready: 0, resting: 1, backAt: 9_000 }, { ready: 0, resting: 1, backAt: 5_000 }).backAt, 5_000);
+  assert.deepEqual(mergeStatus({ ready: 0, resting: 0, backAt: 0 }, { ready: 0, resting: 0, backAt: 0 }), { ready: 0, resting: 0, backAt: 0 });
+});
+
+test("a stored video source is read safely", () => {
+  assert.equal(parseVideoSource("gemini"), "gemini");
+  assert.equal(parseVideoSource("auto"), "auto");
+  assert.equal(parseVideoSource("flow"), "flow");
+  assert.equal(parseVideoSource(null), "flow");
+  assert.equal(parseVideoSource("nonsense"), "flow");
 });

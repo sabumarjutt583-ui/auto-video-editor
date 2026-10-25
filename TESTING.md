@@ -205,3 +205,10 @@ Not done here (no Windows PC, no real Google account, no desktop window): the re
 3. Pick a scene that has a picture with "Animate the scene's picture" on: the picture is attached and animated.
 4. Make videos until Gemini says "You're out of videos for now": the account must show as out of videos with the time Gemini names, other accounts go on, and with "Keep going" on the queue waits for that time.
 5. If a step fails with "page may have changed": open Settings > Admin edition > Engine config, or edit the `video` block of config.json (toolsButton, menuItem, createText, video, moreButton, limitTexts).
+
+## Videos (Google Flow), by hand
+1. Settings, Google accounts: add an account and press Sign in. Open the Flow home page once in that account's window if Google asks for anything.
+2. Image Generator, project scenes, Videos: choose **Google Flow**, tick one scene that has a picture, press Make 1 video.
+3. Watch the account's browser window if shown: it should open a Flow project, open the settings (Video, Frames, 16:9, Veo 3.1 - Lite, 720p, 8s, x1), put the picture into Start, type the prompt and send.
+4. After about 2 minutes the file `media/<timecode>.mp4` appears and the scene gets the video. Check: same person/scene as the picture, 720p, credits down by 10 in the account menu.
+5. Failure cases: with 0 credits the account must rest (no video started); a "unusual activity" page must pause the account. If a button is not found, the error says which one: fix its text/selector in resources/image-engine/config.json `flow` (or by a library package) and try again.

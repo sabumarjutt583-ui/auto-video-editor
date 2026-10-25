@@ -78,6 +78,24 @@ pub enum Phase {
     Testing,
 }
 
+/// Where a video is made. Each source has its own limits per account.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VideoSource {
+    #[default]
+    Gemini,
+    Flow,
+}
+
+impl VideoSource {
+    fn index(self) -> usize {
+        match self {
+            Self::Gemini => 0,
+            Self::Flow => 1,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 struct Runtime {
     /// Chat questions in flight, and the pause after a chat limit (separate from the image limits).
@@ -85,8 +103,9 @@ struct Runtime {
     chat_cooldown_until: u64,
     chat_limit_level: u32,
     /// Video makers in flight, and the time the account has no videos left until (separate from chats and images).
-    video_active: u32,
-    video_cooldown_until: u64,
+    /// Index 0 = Gemini "Create video", 1 = Google Flow (they have separate limits and credits).
+    video_active: [u32; 2],
+    video_cooldown_until: [u64; 2],
     active: u32,
     cooldown_until: u64,
     cooldown_reason: String,
@@ -361,6 +380,30 @@ impl Accounts {
 
     /// The account that should make the next video: usable, not out of videos, and not making one right now.
     pub fn claim_video(&mut self, now: u64) -> Option<String> {
+        self.claim_video_for(VideoSource::Gemini, now)
+    }
+
+    pub fn release_video(&mut self, id: &str) {
+        self.release_video_for(VideoSource::Gemini, id);
+    }
+
+    /// The account has no videos left until `until` (epoch ms).
+    pub fn video_limit_until(&mut self, id: &str, until: u64) {
+        self.video_limit_for(VideoSource::Gemini, id, until);
+    }
+
+    /// When the first account that is out of videos comes back (0 when none rests).
+    pub fn next_video_end(&self, now: u64) -> u64 {
+        self.next_video_end_for(VideoSource::Gemini, now)
+    }
+
+    /// How many usable accounts could make a video right now, and how many are out of videos.
+    pub fn video_counts(&self, now: u64) -> (usize, usize) {
+        self.video_counts_for(VideoSource::Gemini, now)
+    }
+
+    pub fn claim_video_for(&mut self, src: VideoSource, now: u64) -> Option<String> {
+        let k = src.index();
         let count = self.file.accounts.len();
         for step in 0..count {
             let index = (self.chat_next + step) % count;
@@ -369,47 +412,48 @@ impl Accounts {
                 continue;
             }
             let rt = self.runtime.get(&account.id);
-            if rt.is_some_and(|r| r.phase.is_some() || r.video_cooldown_until > now || r.video_active > 0) {
+            if rt.is_some_and(|r| r.phase.is_some() || r.video_cooldown_until[k] > now || r.video_active[k] > 0) {
                 continue;
             }
             let id = account.id.clone();
-            self.rt(&id).video_active += 1;
+            self.rt(&id).video_active[k] += 1;
             self.chat_next = (index + 1) % count;
             return Some(id);
         }
         None
     }
 
-    pub fn release_video(&mut self, id: &str) {
+    pub fn release_video_for(&mut self, src: VideoSource, id: &str) {
         let rt = self.rt(id);
-        rt.video_active = rt.video_active.saturating_sub(1);
+        let k = src.index();
+        rt.video_active[k] = rt.video_active[k].saturating_sub(1);
     }
 
-    /// The account has no videos left until `until` (epoch ms).
-    pub fn video_limit_until(&mut self, id: &str, until: u64) {
+    pub fn video_limit_for(&mut self, src: VideoSource, id: &str, until: u64) {
         let rt = self.rt(id);
-        rt.video_cooldown_until = rt.video_cooldown_until.max(until);
+        let k = src.index();
+        rt.video_cooldown_until[k] = rt.video_cooldown_until[k].max(until);
     }
 
-    /// When the first account that is out of videos comes back (0 when none rests).
-    pub fn next_video_end(&self, now: u64) -> u64 {
+    pub fn next_video_end_for(&self, src: VideoSource, now: u64) -> u64 {
+        let k = src.index();
         self.file
             .accounts
             .iter()
             .filter(|a| Self::can_take_work(a))
-            .filter_map(|a| self.runtime.get(&a.id).map(|r| r.video_cooldown_until))
+            .filter_map(|a| self.runtime.get(&a.id).map(|r| r.video_cooldown_until[k]))
             .filter(|until| *until > now)
             .min()
             .unwrap_or(0)
     }
 
-    /// How many usable accounts could make a video right now, and how many are out of videos.
-    pub fn video_counts(&self, now: u64) -> (usize, usize) {
+    pub fn video_counts_for(&self, src: VideoSource, now: u64) -> (usize, usize) {
+        let k = src.index();
         let mut ready = 0;
         let mut resting = 0;
         for account in self.file.accounts.iter().filter(|a| Self::can_take_work(a)) {
             match self.runtime.get(&account.id) {
-                Some(r) if r.video_cooldown_until > now => resting += 1,
+                Some(r) if r.video_cooldown_until[k] > now => resting += 1,
                 _ => ready += 1,
             }
         }
@@ -663,6 +707,19 @@ mod tests {
         assert_eq!(accounts.next_video_end(10), 50_000);
         assert_eq!(accounts.video_counts(10).1, 1);
         assert_eq!(accounts.claim_video(50_001).as_deref(), Some(first.as_str()));
+    }
+
+    #[test]
+    fn flow_and_gemini_videos_have_separate_limits() {
+        let mut accounts = Accounts::default();
+        let id = ready_account(&mut accounts, "one", "a@x.com");
+        accounts.video_limit_for(VideoSource::Flow, &id, 90_000);
+        assert_eq!(accounts.claim_video_for(VideoSource::Flow, 10), None, "no Flow credits left");
+        assert_eq!(accounts.claim_video_for(VideoSource::Gemini, 10).as_deref(), Some(id.as_str()), "Gemini is not affected");
+        accounts.release_video_for(VideoSource::Gemini, &id);
+        assert_eq!(accounts.video_counts_for(VideoSource::Flow, 10), (0, 1));
+        assert_eq!(accounts.next_video_end_for(VideoSource::Flow, 10), 90_000);
+        assert_eq!(accounts.next_video_end(10), 0);
     }
 
     #[test]
