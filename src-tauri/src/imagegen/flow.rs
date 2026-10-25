@@ -107,9 +107,16 @@ struct Spot {
 
 /// All visible elements whose own text matches the regex (the deepest ones), as click points, top to bottom.
 async fn find_spots(session: &Session, tab: &Tab, pattern: &str) -> Result<Vec<Spot>, GenError> {
+    find_spots_with(session, tab, pattern, false).await
+}
+
+/// Like `find_spots`. With `scroll`, a match that is below or above the window (a small browser window, a long page)
+/// is scrolled into view first, so it can be pressed; only used for buttons that sit in the page itself.
+async fn find_spots_with(session: &Session, tab: &Tab, pattern: &str, scroll: bool) -> Result<Vec<Spot>, GenError> {
     let expression = format!(
-        "(function (rx) {{ var re = new RegExp(rx, 'i'); var els = document.querySelectorAll('button,[role=button],[role=tab],[role=option],[role=menuitem],[role=radio],li,a,div,span,p,h1,h2,h3'); var out = []; for (var i = 0; i < els.length; i++) {{ var e = els[i]; var t = (e.innerText || '').trim(); if (!t || !re.test(t)) continue; var deeper = false; for (var j = 0; j < e.children.length; j++) {{ var c = (e.children[j].innerText || '').trim(); if (c && re.test(c)) {{ deeper = true; break; }} }} if (deeper) continue; var b = e.getBoundingClientRect(); if (b.width < 2 || b.height < 2) continue; if (b.bottom < 0 || b.top > innerHeight || b.right < 0 || b.left > innerWidth) continue; out.push({{ x: b.left + b.width / 2, y: b.top + b.height / 2 }}); }} out.sort(function (a, b) {{ return a.y - b.y; }}); return out; }})({})",
-        chat::js(pattern)
+        "(function (rx, scroll) {{ var re = new RegExp(rx, 'i'); var els = document.querySelectorAll('button,[role=button],[role=tab],[role=option],[role=menuitem],[role=radio],li,a,div,span,p,h1,h2,h3'); var out = []; var away = null; for (var i = 0; i < els.length; i++) {{ var e = els[i]; var t = (e.innerText || '').trim(); if (!t || !re.test(t)) continue; var deeper = false; for (var j = 0; j < e.children.length; j++) {{ var c = (e.children[j].innerText || '').trim(); if (c && re.test(c)) {{ deeper = true; break; }} }} if (deeper) continue; var b = e.getBoundingClientRect(); if (b.width < 2 || b.height < 2) continue; if (b.bottom < 0 || b.top > innerHeight || b.right < 0 || b.left > innerWidth) {{ if (!away) away = e; continue; }} out.push({{ x: b.left + b.width / 2, y: b.top + b.height / 2 }}); }} if (!out.length && scroll && away) {{ away.scrollIntoView({{ block: 'center', inline: 'center' }}); var r = away.getBoundingClientRect(); if (r.width >= 2 && r.height >= 2) out.push({{ x: r.left + r.width / 2, y: r.top + r.height / 2 }}); }} out.sort(function (a, b) {{ return a.y - b.y; }}); return out; }})({}, {})",
+        chat::js(pattern),
+        scroll
     );
     let value = eval(session, tab, &expression, "Looking for a button").await?;
     Ok(value.as_array().map(|a| a.iter().filter_map(|v| Some(Spot { x: v["x"].as_f64()?, y: v["y"].as_f64()? })).collect()).unwrap_or_default())
@@ -162,9 +169,14 @@ async fn key(session: &Session, tab: &Tab, name: &str, code: u32) -> Result<(), 
 /// Presses the button with this visible text (waits up to `ms` for it). `lowest`: take the one lowest on the page
 /// (the prompt box is at the bottom); otherwise the first from the top.
 async fn press_text(session: &Session, tab: &Tab, pattern: &str, ms: u64, lowest: bool) -> Result<bool, GenError> {
+    press_text_with(session, tab, pattern, ms, lowest, false).await
+}
+
+/// `press_text`; with `scroll` a button outside the window is scrolled into view first.
+async fn press_text_with(session: &Session, tab: &Tab, pattern: &str, ms: u64, lowest: bool, scroll: bool) -> Result<bool, GenError> {
     let deadline = tokio::time::Instant::now() + Duration::from_millis(ms);
     loop {
-        let spots = find_spots(session, tab, pattern).await?;
+        let spots = find_spots_with(session, tab, pattern, scroll).await?;
         let pick = if lowest { spots.last() } else { spots.first() };
         if let Some(spot) = pick {
             press(session, tab, *spot).await?;
@@ -213,7 +225,7 @@ async fn open_project(session: &Session, tab: &Tab, engine: &EngineConfig) -> Re
     let here = eval(session, tab, "location.href", "Reading the address").await?.as_str().unwrap_or_default().to_string();
     if !here.contains(&cfg.project_url_part) {
         logging::info(LOG, "step: making this account's Flow project");
-        if !press_text(session, tab, &cfg.new_project_text, 20_000, false).await? {
+        if !press_text_with(session, tab, &cfg.new_project_text, 20_000, false, true).await? {
             if text.to_lowercase().contains("sign in") {
                 return Err(flow_error(ErrorKind::Auth, "This Google account is signed out of Flow. Click Sign in for it in Settings."));
             }

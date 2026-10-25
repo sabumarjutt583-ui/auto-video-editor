@@ -279,7 +279,7 @@ impl Default for FlowConfig {
         Self {
             url: "https://flow.google.com/".into(),
             project_url_part: "/project/".into(),
-            new_project_text: "^\\s*\\+?\\s*New project\\s*$".into(),
+            new_project_text: "^\\s*(\\+|add\\w*)?\\s*New project\\s*$".into(),
             prompt_input: "[contenteditable=\"true\"], textarea, [role=\"textbox\"]".into(),
             send_button: "button[aria-label*=\"send\" i], button[aria-label*=\"generate\" i], button[aria-label*=\"create\" i]".into(),
             chip_text: "^\\s*(Video\\s*·|.*Nano Banana|Veo|Omni)".into(),
@@ -473,7 +473,7 @@ mod tests {
         assert!(EngineConfig::parse("not json").is_err());
         let no_ratio = BUNDLED_JSON.replace("{ratio}", "16-9");
         assert!(EngineConfig::parse(&no_ratio).is_err());
-        let bad_version = BUNDLED_JSON.replace("\"1.5\"", "\"x\"");
+        let bad_version = BUNDLED_JSON.replace("\"1.6\"", "\"x\"");
         assert!(EngineConfig::parse(&bad_version).is_err());
     }
 

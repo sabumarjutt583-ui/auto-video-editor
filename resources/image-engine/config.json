@@ -1,5 +1,5 @@
 {
-  "configVersion": "1.5",
+  "configVersion": "1.6",
   "toolUrl": "https://share.gemini.google/rqUWVwvowbjG",
   "signInUrl": "https://accounts.google.com/ServiceLogin?continue={continueUrl}",
   "signInContinueUrl": "https://gemini.google.com/app",
@@ -75,7 +75,7 @@
   "flow": {
       "url": "https://flow.google.com/",
       "projectUrlPart": "/project/",
-      "newProjectText": "^\\s*\\+?\\s*New project\\s*$",
+      "newProjectText": "^\\s*(\\+|add\\w*)?\\s*New project\\s*$",
       "promptInput": "[contenteditable=\"true\"], textarea, [role=\"textbox\"]",
       "sendButton": "button[aria-label*=\"send\" i], button[aria-label*=\"generate\" i], button[aria-label*=\"create\" i]",
       "chipText": "^\\s*(Video\\s*·|.*Nano Banana|Veo|Omni)",
