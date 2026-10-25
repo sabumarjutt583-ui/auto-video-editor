@@ -160,3 +160,23 @@ export interface MediaInfo {
   duration: number;
   modified: number;
 }
+
+/** A finished video (mirrors `VideoResult` in commands/imagegen.rs). */
+export interface VideoResult {
+  /** Project-relative, e.g. "media/S01_000.0-005.1.mp4". */
+  path: string;
+  accountName: string;
+  width: number;
+  height: number;
+  /** Seconds. */
+  duration: number;
+  modified: number;
+}
+
+/** Google accounts that can make videos now / are out of videos (mirrors `VideoStatus`). */
+export interface VideoStatus {
+  ready: number;
+  resting: number;
+  /** Epoch ms when the first resting account is back (0 when none rests). */
+  backAt: number;
+}

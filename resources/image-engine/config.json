@@ -1,5 +1,5 @@
 {
-  "configVersion": "1.3",
+  "configVersion": "1.4",
   "toolUrl": "https://share.gemini.google/rqUWVwvowbjG",
   "signInUrl": "https://accounts.google.com/ServiceLogin?continue={continueUrl}",
   "signInContinueUrl": "https://gemini.google.com/app",
@@ -54,6 +54,23 @@
     "limitTexts": ["reached your limit", "usage limit", "limit for today", "try again tomorrow", "come back later", "reached the limit"],
     "errorTexts": ["something went wrong", "i'm having trouble", "couldn't complete"],
     "softFailureTexts": ["encountering an error", "having a hard time fulfilling", "something else instead", "can't help with that", "cannot help with that"]
+  },
+  "video": {
+    "toolsButton": "button[aria-label=\"Open upload file menu\"]",
+    "menuItem": "button, [role=\"menuitem\"], [role=\"option\"], .mat-mdc-menu-item, .mdc-list-item",
+    "createText": "^\\s*Create video\\s*$",
+    "modeHint": "Describe your video",
+    "video": "model-response video",
+    "readyTexts": ["your video is ready"],
+    "limitTexts": ["out of videos", "videos will be available again", "as soon as your limit resets", "video limit"],
+    "errorTexts": ["couldn't generate", "could not generate", "unable to generate", "something went wrong", "can't create that video", "cannot create that video"],
+    "resetRegex": "available again on\\s+([A-Za-z]{3,9})\\.?\\s+(\\d{1,2})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*[AaPp][Mm])",
+    "moreButton": "model-response button[aria-label*=\"more\" i]",
+    "downloadText": "^\\s*Download video\\s*$",
+    "defaultRestMinutes": 360,
+    "maxWaitMs": 900000,
+    "pollMs": 1500,
+    "downloadMs": 120000
   },
   "errorPatterns": [
     { "contains": ["API Error 429"], "kind": "rate_limit", "message": "Usage limit reached for this Google account." },

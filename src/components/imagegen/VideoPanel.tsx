@@ -1,0 +1,90 @@
+import { Film, Square } from "lucide-react";
+import { useMemo, useState } from "react";
+
+import { buildVideoItems, hasVideo } from "../../lib/imagegen/video";
+import { formatTimecode } from "../../lib/scenes/timecode";
+import type { Project } from "../../types";
+import { ErrorNotice } from "../ErrorNotice";
+import { Button, Checkbox } from "../ui";
+import { useVideoMaker } from "./useVideoMaker";
+
+function clock(ms: number): string {
+  return new Date(ms).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+/** "Videos": makes a short video for chosen scenes with Gemini's "Create video", one video per Google account at a time. */
+export function VideoPanel({ project, ensureConsent }: { project: Project; ensureConsent: () => Promise<boolean> }) {
+  const maker = useVideoMaker(project.id, ensureConsent);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(project.scenes.filter((s) => s.mediaType === "video" && !hasVideo(s, project.mediaMap)).map((s) => s.id)));
+  const [animate, setAnimate] = useState(true);
+  const [skipDone, setSkipDone] = useState(true);
+  const [keepGoing, setKeepGoing] = useState(true);
+  const scenes = useMemo(() => [...project.scenes].sort((a, b) => a.index - b.index), [project.scenes]);
+  const items = useMemo(() => buildVideoItems(scenes, project.mediaMap, { only: selected, animatePictures: animate, skipDone }), [scenes, project.mediaMap, selected, animate, skipDone]);
+  const { status } = maker;
+
+  function toggle(id: string, on: boolean) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  return (
+    <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5" aria-label="Videos">
+      <div className="flex flex-col gap-1">
+        <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+          <Film size={18} aria-hidden /> Videos (Gemini, no API key)
+        </h2>
+        <p className="text-sm text-muted">
+          Each Google account makes one video at a time with Gemini's "Create video" (about 10 seconds each). Every account has a daily limit: when it is out of videos the app waits for the time Gemini names and uses the other accounts meanwhile.
+        </p>
+        {status && (
+          <p className="text-sm" role="status">
+            {status.ready} {status.ready === 1 ? "account" : "accounts"} can make videos now
+            {status.resting > 0 && `, ${status.resting} out of videos (first one is back ${status.backAt > 0 ? clock(status.backAt) : "later"})`}.
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <Checkbox label="Animate the scene's picture when it has one" checked={animate} onChange={(e) => setAnimate(e.target.checked)} />
+        <Checkbox label="Skip scenes that already have a video" checked={skipDone} onChange={(e) => setSkipDone(e.target.checked)} />
+        <Checkbox label="Keep going when accounts come back" checked={keepGoing} onChange={(e) => setKeepGoing(e.target.checked)} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={() => setSelected(new Set(scenes.filter((s) => s.mediaType === "video").map((s) => s.id)))}>Scenes marked as video</Button>
+        <Button onClick={() => setSelected(new Set(scenes.map((s) => s.id)))}>All scenes</Button>
+        <Button onClick={() => setSelected(new Set())}>None</Button>
+        {maker.running ? (
+          <Button variant="danger" icon={Square} onClick={maker.stop}>
+            Stop after the running videos
+          </Button>
+        ) : (
+          <Button variant="primary" icon={Film} disabled={items.length === 0} onClick={() => void maker.start(items, keepGoing)}>
+            Make {items.length} {items.length === 1 ? "video" : "videos"}
+          </Button>
+        )}
+      </div>
+
+      {maker.running && <p className="text-sm text-muted" role="status">{maker.waitingFor !== null ? `Every account is out of videos. Waiting until ${clock(maker.waitingFor)}.` : "Making videos. One video takes about 1 to 3 minutes. You can leave this page open in the background."}</p>}
+      {maker.summary && <p className="text-sm" role="status">{maker.summary}</p>}
+
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {scenes.map((scene) => {
+          const state = maker.states[scene.id];
+          const label = state?.kind === "making" ? "making…" : state?.kind === "queued" ? "waiting" : state?.kind === "done" ? "done" : state?.kind === "failed" ? "failed" : hasVideo(scene, project.mediaMap) ? "has video" : "";
+          return (
+            <li key={scene.id} className="flex flex-col gap-1 rounded-lg border border-line px-3 py-2 text-sm">
+              <Checkbox label={`${formatTimecode(scene.id, scene.start, scene.end)}${label ? ` · ${label}` : ""}`} checked={selected.has(scene.id)} onChange={(e) => toggle(scene.id, e.target.checked)} disabled={maker.running} />
+              {state?.kind === "failed" && <ErrorNotice error={state.error} />}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}

@@ -18,6 +18,7 @@ import { Controls } from "./Controls";
 import { DeleteImagesBar } from "./DeleteImagesBar";
 import { PromptEditModal } from "./PromptEditModal";
 import { SceneCard } from "./SceneCard";
+import { VideoPanel } from "./VideoPanel";
 import { useConsent } from "./useConsent";
 
 function NeedsProject({ message }: { message: string }) {
@@ -196,6 +197,7 @@ export function ProjectImagesView() {
           />
         ))}
       </ul>
+      <VideoPanel key={project.id} project={project} ensureConsent={needsConsent} />
       {editingScene && <PromptEditModal sceneId={editingScene.id} prompt={editingScene.prompt} onSave={(text, again) => savePrompt(editingScene.id, text, again)} onClose={() => setEditing(null)} />}
     </div>
   );

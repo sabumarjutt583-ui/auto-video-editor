@@ -207,3 +207,11 @@ New styles and sound effects are delivered separately (see **Settings > Library 
 
 ## Voice-over in several parts
 If your voice-over comes in parts, use the **Voice-over parts** bar at the top of the Prompt Generator. Click **Add next part** to start a new part (called Part 2, Part 3 ...), then upload its voice and continue with timing, scenes and prompts. Click **Rename** to give the open part a name. Click a part name to go back to it; nothing is lost. Style, cast and settings are shared by all parts. Remove a part with the bin icon next to its name.
+
+
+## Videos with Gemini (no API key)
+In **Image Generator > Project scenes** the **Videos** panel makes short videos (about 10 seconds each) with Gemini's "Create video", using your signed-in Google accounts.
+1. Choose the scenes (start with "Scenes marked as video", or pick some by hand).
+2. Leave "Animate the scene's picture" on to bring a picture to life, or turn it off to make the video from the scene's words.
+3. Press **Make N videos**. Each ready account makes one video at a time (1 to 3 minutes each). The finished `.mp4` is saved in the project's media folder with the scene's timecode name, and the Auto Editor uses it.
+Every Google account can make only a few videos a day (about 4 to 5 on Pro). When Gemini says an account is out of videos, the app shows when it is back, uses your other accounts meanwhile, and (with "Keep going when accounts come back") waits and continues. Use the videos for your most important scenes and pictures with camera motion for the rest.

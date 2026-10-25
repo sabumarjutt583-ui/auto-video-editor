@@ -229,6 +229,28 @@ impl FreeWorker {
         result
     }
 
+    /// Makes one video in a fresh chat of this account's browser (one chat question or video at a time).
+    pub async fn video_with(&self, prompt: &str, image: Option<&std::path::Path>, timeout: Duration, progress: chat::Progress<'_>) -> Result<Vec<u8>, GenError> {
+        self.inner.chat_busy.fetch_add(1, Ordering::SeqCst);
+        let result = self.video_inner(prompt, image, timeout, progress).await;
+        self.inner.chat_busy.fetch_sub(1, Ordering::SeqCst);
+        self.touch();
+        result
+    }
+
+    async fn video_inner(&self, prompt: &str, image: Option<&std::path::Path>, timeout: Duration, progress: chat::Progress<'_>) -> Result<Vec<u8>, GenError> {
+        let (session, _, _) = self.ready().await?;
+        let _turn = self.inner.chat_lock.lock().await;
+        if self.mode() == Mode::Window {
+            let _ = session.minimize().await;
+        }
+        let result = super::video::make(&session, &self.config().engine, prompt, image, timeout, progress).await;
+        if self.mode() == Mode::Window {
+            let _ = session.minimize().await;
+        }
+        result
+    }
+
     fn start_poller(&self) {
         if !self.inner.poller_running.swap(true, Ordering::SeqCst) {
             let worker = self.clone();

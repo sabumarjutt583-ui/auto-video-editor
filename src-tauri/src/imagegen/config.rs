@@ -163,6 +163,61 @@ impl Default for ChatConfig {
     }
 }
 
+/// Where things are for making a video in Gemini's chat ("Create video" mode). Defaults are the page as seen on 2026-10-24.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct VideoConfig {
+    /// The "+" button of the message box (its menu holds "Create video").
+    pub tools_button: String,
+    /// The entries of that menu.
+    pub menu_item: String,
+    /// The text (regex) of the "Create video" entry.
+    pub create_text: String,
+    /// Text of the message box that shows video mode is on.
+    pub mode_hint: String,
+    /// The finished video.
+    pub video: String,
+    /// Words that mean the video is finished.
+    pub ready_texts: Vec<String>,
+    /// Words that mean the account has no videos left now.
+    pub limit_texts: Vec<String>,
+    /// Words that mean Gemini failed to make the video.
+    pub error_texts: Vec<String>,
+    /// Finds the reset time in the page text (groups: month, day, time).
+    pub reset_regex: String,
+    /// The "..." button under the answer and its "Download video" entry (used when the video cannot be read from the page).
+    pub more_button: String,
+    pub download_text: String,
+    /// How long to rest an account when the reset time cannot be read.
+    pub default_rest_minutes: u64,
+    pub max_wait_ms: u64,
+    pub poll_ms: u64,
+    pub download_ms: u64,
+}
+
+impl Default for VideoConfig {
+    fn default() -> Self {
+        let words = |list: &[&str]| list.iter().map(|w| (*w).to_string()).collect();
+        Self {
+            tools_button: "button[aria-label=\"Open upload file menu\"]".into(),
+            menu_item: "button, [role=\"menuitem\"], [role=\"option\"], .mat-mdc-menu-item, .mdc-list-item".into(),
+            create_text: "^\\s*Create video\\s*$".into(),
+            mode_hint: "Describe your video".into(),
+            video: "model-response video".into(),
+            ready_texts: words(&["your video is ready"]),
+            limit_texts: words(&["out of videos", "videos will be available again", "as soon as your limit resets", "video limit"]),
+            error_texts: words(&["couldn't generate", "could not generate", "unable to generate", "something went wrong", "can't create that video", "cannot create that video"]),
+            reset_regex: "available again on\\s+([A-Za-z]{3,9})\\.?\\s+(\\d{1,2})\\s+at\\s+(\\d{1,2}:\\d{2}\\s*[AaPp][Mm])".into(),
+            more_button: "model-response button[aria-label*=\"more\" i]".into(),
+            download_text: "^\\s*Download video\\s*$".into(),
+            default_rest_minutes: 360,
+            max_wait_ms: 900_000,
+            poll_ms: 1_500,
+            download_ms: 120_000,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EngineConfig {
@@ -182,6 +237,8 @@ pub struct EngineConfig {
     pub human_checks: Vec<HumanCheck>,
     #[serde(default)]
     pub chat: ChatConfig,
+    #[serde(default)]
+    pub video: VideoConfig,
 }
 
 fn bad(message: &str, details: impl Into<String>) -> AppError {
@@ -315,7 +372,7 @@ mod tests {
         assert!(EngineConfig::parse("not json").is_err());
         let no_ratio = BUNDLED_JSON.replace("{ratio}", "16-9");
         assert!(EngineConfig::parse(&no_ratio).is_err());
-        let bad_version = BUNDLED_JSON.replace("\"1.3\"", "\"x\"");
+        let bad_version = BUNDLED_JSON.replace("\"1.4\"", "\"x\"");
         assert!(EngineConfig::parse(&bad_version).is_err());
     }
 
@@ -323,6 +380,7 @@ mod tests {
     fn the_chat_settings_have_defaults_and_must_be_https() {
         let config = EngineConfig::bundled();
         assert_eq!(config.chat, ChatConfig::default(), "the bundled file and the built-in defaults agree");
+        assert_eq!(config.video, VideoConfig::default(), "the video settings too");
         let without_chat = {
             let mut value: serde_json::Value = serde_json::from_str(BUNDLED_JSON).unwrap();
             value.as_object_mut().unwrap().remove("chat");

@@ -65,6 +65,7 @@ impl TestServer {
                             loads.fetch_add(1, Ordering::SeqCst);
                             ("200 OK", CHAT.to_string())
                         }
+                        "/video.mp4" => ("200 OK", format!("\0\0\0 ftypisom{}", "x".repeat(4000))),
                         "/beacon" => {
                             sends.fetch_add(1, Ordering::SeqCst);
                             ("200 OK", String::new())

@@ -197,3 +197,11 @@ By hand, not done here (no Windows PC, no desktop window, no real Google account
 | Fake Gemini chat page (headless Chromium) | slow answer with Stop button (start window shorter than the wait), loaded once and sent once, soft failure, usage limit, no answer = `no_response`, long message waits for the pasted-text attachment, captcha page = flagged, signed-out = auth |
 
 Not done here (no Windows PC, no real Google account, no desktop window): the real Gemini page, the Recycle Bin on Windows (the move is tested with a fake bin; the `trash` crate does the real move), the full by-hand checklist of sections 3 and 4. Check by hand: web chat with the browser mode "hidden" shows no Chrome window; a 40-scene project writes 2 batches in one chat; Manual mode builds the same prompts from pasted answers; delete a picture and see it in the Recycle Bin; Undo after Clear all prompts.
+
+
+## Videos (Gemini "Create video"), by hand
+1. Settings, Google accounts: at least one signed-in account that can make videos (Pro).
+2. Image Generator, Project scenes, panel "Videos": pick 1 scene, press Make 1 video. A tab opens in the hidden browser; after 1 to 3 minutes `media/S01_....mp4` appears and the Auto Editor timeline uses it.
+3. Pick a scene that has a picture with "Animate the scene's picture" on: the picture is attached and animated.
+4. Make videos until Gemini says "You're out of videos for now": the account must show as out of videos with the time Gemini names, other accounts go on, and with "Keep going" on the queue waits for that time.
+5. If a step fails with "page may have changed": open Settings > Admin edition > Engine config, or edit the `video` block of config.json (toolsButton, menuItem, createText, video, moreButton, limitTexts).

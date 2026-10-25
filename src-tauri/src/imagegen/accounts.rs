@@ -84,6 +84,9 @@ struct Runtime {
     chat_active: u32,
     chat_cooldown_until: u64,
     chat_limit_level: u32,
+    /// Video makers in flight, and the time the account has no videos left until (separate from chats and images).
+    video_active: u32,
+    video_cooldown_until: u64,
     active: u32,
     cooldown_until: u64,
     cooldown_reason: String,
@@ -356,6 +359,63 @@ impl Accounts {
         Some(id)
     }
 
+    /// The account that should make the next video: usable, not out of videos, and not making one right now.
+    pub fn claim_video(&mut self, now: u64) -> Option<String> {
+        let count = self.file.accounts.len();
+        for step in 0..count {
+            let index = (self.chat_next + step) % count;
+            let account = &self.file.accounts[index];
+            if !Self::can_take_work(account) {
+                continue;
+            }
+            let rt = self.runtime.get(&account.id);
+            if rt.is_some_and(|r| r.phase.is_some() || r.video_cooldown_until > now || r.video_active > 0) {
+                continue;
+            }
+            let id = account.id.clone();
+            self.rt(&id).video_active += 1;
+            self.chat_next = (index + 1) % count;
+            return Some(id);
+        }
+        None
+    }
+
+    pub fn release_video(&mut self, id: &str) {
+        let rt = self.rt(id);
+        rt.video_active = rt.video_active.saturating_sub(1);
+    }
+
+    /// The account has no videos left until `until` (epoch ms).
+    pub fn video_limit_until(&mut self, id: &str, until: u64) {
+        let rt = self.rt(id);
+        rt.video_cooldown_until = rt.video_cooldown_until.max(until);
+    }
+
+    /// When the first account that is out of videos comes back (0 when none rests).
+    pub fn next_video_end(&self, now: u64) -> u64 {
+        self.file
+            .accounts
+            .iter()
+            .filter(|a| Self::can_take_work(a))
+            .filter_map(|a| self.runtime.get(&a.id).map(|r| r.video_cooldown_until))
+            .filter(|until| *until > now)
+            .min()
+            .unwrap_or(0)
+    }
+
+    /// How many usable accounts could make a video right now, and how many are out of videos.
+    pub fn video_counts(&self, now: u64) -> (usize, usize) {
+        let mut ready = 0;
+        let mut resting = 0;
+        for account in self.file.accounts.iter().filter(|a| Self::can_take_work(a)) {
+            match self.runtime.get(&account.id) {
+                Some(r) if r.video_cooldown_until > now => resting += 1,
+                _ => ready += 1,
+            }
+        }
+        (ready, resting)
+    }
+
     /// Takes a chat slot of ONE account (a chat thread lives in that account). False when it cannot take work now.
     pub fn claim_chat_for(&mut self, id: &str, now: u64) -> bool {
         let Some(account) = self.get(id) else { return false };
@@ -588,6 +648,21 @@ mod tests {
         accounts.set_connected(&id, email);
         accounts.set_verified(&id, Some(true), "");
         id
+    }
+
+    #[test]
+    fn an_account_out_of_videos_rests_until_its_reset_time() {
+        let mut accounts = Accounts::default();
+        ready_account(&mut accounts, "one", "a@x.com");
+        ready_account(&mut accounts, "two", "b@x.com");
+        let first = accounts.claim_video(10).unwrap();
+        assert!(accounts.claim_video(10).is_some_and(|second| second != first), "one video at a time per account");
+        accounts.release_video(&first);
+        accounts.video_limit_until(&first, 50_000);
+        assert_eq!(accounts.claim_video(10), None, "the other one is busy, this one is out of videos");
+        assert_eq!(accounts.next_video_end(10), 50_000);
+        assert_eq!(accounts.video_counts(10).1, 1);
+        assert_eq!(accounts.claim_video(50_001).as_deref(), Some(first.as_str()));
     }
 
     #[test]

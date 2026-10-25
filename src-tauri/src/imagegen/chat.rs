@@ -39,11 +39,11 @@ impl ChatReply {
     }
 }
 
-fn js(text: &str) -> String {
+pub(super) fn js(text: &str) -> String {
     serde_json::to_string(text).unwrap_or_else(|_| "\"\"".to_string())
 }
 
-fn from_cdp(error: &CdpError, what: &str) -> GenError {
+pub(super) fn from_cdp(error: &CdpError, what: &str) -> GenError {
     classify_browser_error(&error.to_string(), what)
 }
 
@@ -137,7 +137,7 @@ async fn read_state(session: &Session, tab: &Tab, chat: &ChatConfig) -> Result<P
 }
 
 /// What to say when the chat page did not behave: a page that needs a person, a signed-out account, or the page changed.
-async fn diagnose(session: &Session, tab: &Tab, engine: &EngineConfig, fallback: &str) -> GenError {
+pub(super) async fn diagnose(session: &Session, tab: &Tab, engine: &EngineConfig, fallback: &str) -> GenError {
     if let Ok(state) = tool_page::sign_state_in(session, &tab.frame, engine).await {
         if let Some(error) = tool_page::human_error(engine, &format!("{}\n{}", state.title, state.text)) {
             return error;
@@ -153,7 +153,7 @@ async fn diagnose(session: &Session, tab: &Tab, engine: &EngineConfig, fallback:
 }
 
 /// Waits for the message box to exist. The first thing on a fresh chat page.
-async fn wait_for_input(session: &Session, tab: &Tab, engine: &EngineConfig) -> Result<(), GenError> {
+pub(super) async fn wait_for_input(session: &Session, tab: &Tab, engine: &EngineConfig) -> Result<(), GenError> {
     let chat = &engine.chat;
     let deadline = tokio::time::Instant::now() + Duration::from_millis(chat.timing.page_ready_ms);
     loop {
@@ -167,7 +167,7 @@ async fn wait_for_input(session: &Session, tab: &Tab, engine: &EngineConfig) -> 
     }
 }
 
-async fn type_and_send(session: &Session, tab: &Tab, chat: &ChatConfig, prompt: &str) -> Result<(), GenError> {
+pub(super) async fn type_and_send(session: &Session, tab: &Tab, chat: &ChatConfig, prompt: &str) -> Result<(), GenError> {
     let focus = format!("(function () {{ var e = document.querySelector({}); if (!e) return false; e.focus(); return true; }})()", js(&chat.selectors.input));
     if session.eval_in(&tab.frame, &focus).await.map_err(|e| from_cdp(&e, "Opening the message box"))? != Value::Bool(true) {
         return Err(GenError::new(ErrorKind::Session, "Gemini's message box disappeared."));
@@ -327,7 +327,7 @@ async fn object_id(session: &Session, tab: &Tab, expression: &str) -> Result<Opt
     Ok(result.pointer("/result/objectId").and_then(Value::as_str).map(str::to_string))
 }
 
-async fn click(session: &Session, tab: &Tab, selector: &str) -> Result<bool, GenError> {
+pub(super) async fn click(session: &Session, tab: &Tab, selector: &str) -> Result<bool, GenError> {
     let expression = format!("(function () {{ var b = document.querySelector({}); if (!b) return false; b.click(); return true; }})()", js(selector));
     Ok(session.eval_in(&tab.frame, &expression).await.map_err(|e| from_cdp(&e, "Opening the upload menu"))? == Value::Bool(true))
 }
@@ -361,7 +361,7 @@ async fn find_file_input(session: &Session, tab: &Tab, chat: &ChatConfig) -> Res
 }
 
 /// Uploads the pictures into the message and waits until the page shows all of them.
-async fn attach_images(session: &Session, tab: &Tab, engine: &EngineConfig, images: &[PathBuf]) -> Result<(), GenError> {
+pub(super) async fn attach_images(session: &Session, tab: &Tab, engine: &EngineConfig, images: &[PathBuf]) -> Result<(), GenError> {
     let chat = &engine.chat;
     let input = find_file_input(session, tab, chat).await?;
     let files: Vec<String> = images.iter().map(|p| p.to_string_lossy().into_owned()).collect();

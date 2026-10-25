@@ -173,6 +173,84 @@ pub async fn imagegen_chat_thread(
     Ok(ThreadAnswer { text: answer.reply.text, code: answer.reply.code, account_id: answer.account_id, account_name: answer.account_name, thread_url: answer.url })
 }
 
+/// A video made from a scene.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoResult {
+    /// Project-relative path, e.g. `media/S01_000.0-005.1.mp4`.
+    pub path: String,
+    pub account_name: String,
+    pub width: u32,
+    pub height: u32,
+    /// Seconds.
+    pub duration: f64,
+    /// Seconds since 1970 (file change time).
+    pub modified: u64,
+}
+
+fn plain_media_name(name: &str) -> bool {
+    !name.is_empty() && !name.contains(['/', '\\']) && !name.starts_with('.') && name.len() < 120
+}
+
+/// Makes one video from a prompt (and, when `image` is given, from that picture of the project's `media` folder) with
+/// the next Google account that still has videos, and saves it in `media` under `file_name` (an `.mp4` name; an
+/// existing different file is never overwritten). Progress and Cancel go through the job `job_id`; Cancel is only
+/// looked at before the video starts, never in the middle of it.
+#[tauri::command]
+pub async fn imagegen_make_video(
+    app: tauri::AppHandle,
+    jobs: tauri::State<'_, crate::jobs::JobRegistry>,
+    ig: Ig<'_>,
+    project_id: String,
+    prompt: String,
+    image: Option<String>,
+    file_name: String,
+    job_id: String,
+) -> Result<VideoResult, AppError> {
+    if !plain_media_name(&file_name) || !file_name.to_lowercase().ends_with(".mp4") {
+        return Err(AppError::new("That video file name cannot be used.", format!("file name: {file_name}")));
+    }
+    let dir = project_folder(&app, &project_id)?;
+    let media = dir.join("media");
+    let picture = match image.as_deref() {
+        None => None,
+        Some(relative) => {
+            let name = relative.strip_prefix("media/").filter(|n| plain_media_name(n));
+            let path = name.map(|n| media.join(n)).filter(|p| p.is_file());
+            Some(path.ok_or_else(|| AppError::new("The picture of this scene could not be found.", format!("image: {relative}")))?)
+        }
+    };
+    let job = jobs.begin(&job_id, "video", crate::jobs::event_sink(app))?;
+    if job.is_cancelled() {
+        return Err(AppError::cancelled());
+    }
+    let report = |msg: String| job.progress(&msg, 30.0);
+    let made = ig.make_video(&prompt, picture.as_deref(), Some(&report)).await?;
+    let account_name = made.account_name.clone();
+    let name = crate::commands::blocking::run_blocking(move || -> Result<String, AppError> {
+        std::fs::create_dir_all(&media).map_err(|e| AppError::new("The media folder could not be made.", e.to_string()))?;
+        let name = crate::imagegen::queue::unique_target(&file_name, &|candidate| media.join(candidate).exists());
+        crate::imagegen::store::write_durable(&media.join(&name), &made.bytes).map_err(|e| AppError::new("The video could not be saved in the project's media folder.", e.to_string()))?;
+        Ok(name)
+    })
+    .await?;
+    // The size and length are read from the saved file; a file that cannot be read still counts (the Auto Editor reads it again).
+    let file = dir.join("media").join(&name);
+    let modified = std::fs::metadata(&file).ok().and_then(|m| m.modified().ok()).and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map_or(0, |d| d.as_secs());
+    let info = match crate::probe::probe_text(&file, "The new video could not be read.").await {
+        Ok(text) => crate::probe::parse_info(&text),
+        Err(_) => crate::probe::ProbeInfo::default(),
+    };
+    let video = info.first(crate::probe::StreamKind::Video);
+    Ok(VideoResult { path: format!("media/{name}"), account_name, width: video.map_or(0, |v| v.width), height: video.map_or(0, |v| v.height), duration: info.duration.unwrap_or(0.0), modified })
+}
+
+/// How many Google accounts can make a video now, and when the resting ones are back.
+#[tauri::command]
+pub async fn imagegen_video_status(ig: Ig<'_>) -> Result<crate::imagegen::ops::VideoStatus, AppError> {
+    Ok(ig.video_status())
+}
+
 #[tauri::command]
 pub async fn imagegen_test_image(ig: Ig<'_>, id: String) -> Result<TestImage, AppError> {
     ig.test_image(&id).await

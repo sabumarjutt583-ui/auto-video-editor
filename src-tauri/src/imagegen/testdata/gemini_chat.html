@@ -5,7 +5,9 @@
 <main id="chat"></main>
 <rich-textarea><div class="ql-editor" role="textbox" contenteditable="true" aria-label="Enter a prompt for Gemini"></div></rich-textarea>
 <button aria-label="Open upload file menu" id="plus">+</button>
-<div id="menu" hidden><button data-test-id="local-images-files-uploader-button" id="upl">Upload files</button></div>
+<div id="menu" hidden><button data-test-id="local-images-files-uploader-button" id="upl">Upload files</button><button id="cv">Create video</button></div>
+<div id="hint"></div>
+<div id="banner"></div>
 <div id="previews"></div>
 <button aria-label="Send message" id="send">Send</button>
 <script>
@@ -26,6 +28,16 @@
     });
     picker.click();
   });
+  window.videoMode = false;
+  document.getElementById('cv').addEventListener('click', function () {
+    // A switch, like the real menu entry: a second click turns it off again.
+    window.videoMode = !window.videoMode;
+    document.getElementById('hint').innerText = window.videoMode ? 'Describe your video' : '';
+    document.getElementById('menu').hidden = true;
+  });
+  if (location.search.indexOf('limited') >= 0) {
+    document.getElementById('banner').innerText = "You\u2019re out of videos for now\nVideos will be available again on Oct 25 at 11:35 AM, or upgrade to keep going.";
+  }
   var sendButton = document.getElementById('send');
   input.addEventListener('input', function () {
     // A long text is turned into a pasted-text attachment: Send is blocked for a moment.
@@ -36,6 +48,29 @@
     if (!prompt) return;
     input.innerText = '';
     fetch('/beacon');
+    if (window.videoMode) {
+      var files = previews.children.length;
+      previews.innerHTML = '';
+      window.__videoFiles = files;
+      var reply = document.createElement('model-response');
+      var box = document.createElement('message-content');
+      reply.appendChild(box);
+      if (prompt.indexOf('[outofvideos]') >= 0) {
+        chat.appendChild(reply);
+        box.innerText = 'I can create more videos as soon as your limit resets. Check your usage in Settings.';
+        document.getElementById('banner').innerText = "You\u2019re out of videos for now\nVideos will be available again on Oct 26 at 3:05 PM, or upgrade to keep going.";
+        return;
+      }
+      if (prompt.indexOf('[novideo]') >= 0) { return; }
+      setTimeout(function () {
+        chat.appendChild(reply);
+        box.innerText = 'Your video is ready! (' + files + ' pictures)';
+        var video = document.createElement('video');
+        video.src = '/video.mp4';
+        box.appendChild(video);
+      }, 1200);
+      return;
+    }
     if (prompt.indexOf('[captcha]') >= 0) { document.body.innerHTML = '<p>Our systems have detected unusual traffic from your computer network</p>'; return; }
     if (prompt.indexOf('[signedout]') >= 0) { var acc = document.querySelector('a[aria-label^="Google Account"]'); if (acc) acc.remove(); var si = document.createElement('a'); si.href = 'https://accounts.google.com/ServiceLogin?x=1'; si.textContent = 'Sign in'; document.body.appendChild(si); return; }
     var stop = document.createElement('button');

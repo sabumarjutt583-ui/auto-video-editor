@@ -37,6 +37,21 @@ pub struct TestImage {
 pub const TEST_PROMPT: &str = "A single ripe yellow banana on a plain white table, soft studio light, simple photograph";
 
 /// The answer of a thread question and where it lives.
+/// A finished video.
+pub struct VideoMade {
+    pub bytes: Vec<u8>,
+    pub account_name: String,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VideoStatus {
+    pub ready: usize,
+    pub resting: usize,
+    /// Epoch ms when the first resting account can make videos again (0 when none rests).
+    pub back_at: u64,
+}
+
 pub struct ThreadReply {
     pub reply: ChatReply,
     pub account_id: String,
@@ -223,6 +238,71 @@ impl ImageGen {
             return Err(AppError::new(format!("Every Google account is resting after a usage limit. Try again in about {minutes} minute(s)."), "chat limit"));
         }
         Err(AppError::new("No Google account is ready. Add one in Settings, Google accounts, and press Sign in.", "no account for chat"))
+    }
+
+    /// Makes one video with the next free Google account. An account that is out of videos rests until its reset
+    /// time and the video moves on to the next account. When every account is out of videos the error's details
+    /// are `video_wait:<epoch ms>` (the earliest time one comes back); when they are all busy, `video_busy`.
+    pub async fn make_video(&self, prompt: &str, image: Option<&std::path::Path>, progress: chat::Progress<'_>) -> Result<VideoMade, AppError> {
+        let settings = self.engine.settings();
+        let config = self.engine.config();
+        if !settings.consent_given(config.major().unwrap_or(1)) {
+            return Err(AppError::new("Please read and accept the Google account notice first (Settings, Image Generator).", "consent not accepted"));
+        }
+        let timeout = Duration::from_secs(u64::from(settings.timeout_sec).max(120));
+        let attempts = self.engine.read_accounts(|accounts| accounts.file.accounts.len()).max(1);
+        let mut last: Option<GenError> = None;
+        for _ in 0..attempts {
+            let Some(id) = self.engine.with_accounts(|accounts, now| accounts.claim_video(now)) else { break };
+            let result = match self.real.worker(&id, &settings) {
+                Ok(worker) => worker.video_with(prompt, image, timeout, progress).await,
+                Err(error) => Err(error),
+            };
+            let error = match result {
+                Ok(bytes) => {
+                    self.engine.with_accounts(|accounts, _| accounts.release_video(&id));
+                    let account_name = self.engine.read_accounts(|a| a.get(&id).map(|x| x.name.clone()).unwrap_or_default());
+                    return Ok(VideoMade { bytes, account_name });
+                }
+                Err(error) => error,
+            };
+            self.engine.with_accounts(|accounts, now| {
+                accounts.release_video(&id);
+                match error.kind {
+                    ErrorKind::RateLimit => accounts.video_limit_until(&id, now + error.retry_after_ms.max(60_000)),
+                    ErrorKind::Auth => accounts.mark_auth_error(&id, &error.message),
+                    ErrorKind::Flagged => accounts.mark_flagged(&id, &error.message, now),
+                    _ => {}
+                }
+            });
+            if matches!(error.kind, ErrorKind::RateLimit | ErrorKind::Auth | ErrorKind::Flagged | ErrorKind::Session | ErrorKind::Network | ErrorKind::Aborted) {
+                last = Some(error);
+            } else {
+                return Err(to_app_error(&error));
+            }
+        }
+        let now = super::engine::now_ms();
+        let (ready, _) = self.engine.read_accounts(|accounts| accounts.video_counts(now));
+        let wait = self.engine.read_accounts(|accounts| accounts.next_video_end(now));
+        if ready == 0 && wait > 0 {
+            let minutes = wait.saturating_sub(now).div_ceil(60_000).max(1);
+            return Err(AppError::new(format!("Every Google account is out of videos. The first one is back in about {minutes} minute(s)."), format!("video_wait:{wait}")));
+        }
+        if let Some(error) = last {
+            return Err(to_app_error(&error));
+        }
+        if ready > 0 {
+            return Err(AppError::new("All Google accounts are making a video right now.", "video_busy"));
+        }
+        Err(AppError::new("No Google account is ready. Add one in Settings, Google accounts, and press Sign in.", "no account for video"))
+    }
+
+    /// For the page: how many accounts can make a video now, and how many are out of videos (with the first return time).
+    pub fn video_status(&self) -> VideoStatus {
+        let now = super::engine::now_ms();
+        let (ready, resting) = self.engine.read_accounts(|accounts| accounts.video_counts(now));
+        let back_at = self.engine.read_accounts(|accounts| accounts.next_video_end(now));
+        VideoStatus { ready, resting, back_at }
     }
 
     pub fn add_account(&self, name: &str) -> String {

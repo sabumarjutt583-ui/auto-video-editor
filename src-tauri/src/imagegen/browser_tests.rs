@@ -113,13 +113,19 @@ use super::worker::{FreeWorker, WorkerConfig};
 use std::sync::Arc;
 
 async fn worker(name: &str) -> Option<(FreeWorker, TestServer, std::path::PathBuf)> {
+    worker_with(name, |_| {}).await
+}
+
+async fn worker_with(name: &str, change: impl FnOnce(&mut super::config::EngineConfig)) -> Option<(FreeWorker, TestServer, std::path::PathBuf)> {
     let exe = test_browser().or_else(|| {
         eprintln!("skipped: no Chromium found (set AVE_TEST_CHROME)");
         None
     })?;
     let server = TestServer::start().await;
     let dir = temp_dir(name);
-    let config = WorkerConfig { exe, profile: dir.join("profile"), mode: Mode::Hidden, extra_args: test_args(), engine: Arc::new(server.config()) };
+    let mut engine = server.config();
+    change(&mut engine);
+    let config = WorkerConfig { exe, profile: dir.join("profile"), mode: Mode::Hidden, extra_args: test_args(), engine: Arc::new(engine) };
     Some((FreeWorker::new(config), server, dir))
 }
 
@@ -328,4 +334,55 @@ async fn a_captcha_page_and_a_signed_out_chat_pause_the_account_and_are_not_work
     assert_eq!(signed_out.kind, ErrorKind::Auth, "{}", signed_out.message);
     let _ = std::fs::remove_dir_all(dir);
     let _ = std::fs::remove_dir_all(dir2);
+}
+
+// ---- videos ----
+
+#[tokio::test]
+async fn a_video_is_made_in_create_video_mode_and_read_from_the_page() {
+    let Some((worker, _server, dir)) = worker("video-ok").await else { return };
+    let bytes = worker.video_with("A fox in the snow", None, Duration::from_secs(60), None).await.expect("video");
+    assert!(super::video::looks_like_video(&bytes), "{} bytes", bytes.len());
+    // A second video: a fresh chat, the mode is switched on again (and never switched off by a second click).
+    let again = worker.video_with("A whale", None, Duration::from_secs(60), None).await.expect("second video");
+    assert_eq!(again.len(), bytes.len());
+    worker.close().await;
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test]
+async fn a_picture_can_be_attached_to_be_animated() {
+    let Some((worker, _server, dir)) = worker("video-image").await else { return };
+    let picture = dir.join("S01_000.0-005.0.png");
+    std::fs::write(&picture, b"png data").unwrap();
+    let bytes = worker.video_with("Slow push in", Some(&picture), Duration::from_secs(60), None).await.expect("video from a picture");
+    assert!(super::video::looks_like_video(&bytes));
+    let missing = worker.video_with("x", Some(&dir.join("nope.png")), Duration::from_secs(5), None).await.expect_err("missing picture");
+    assert_eq!(missing.kind, ErrorKind::BadRequest);
+    assert_eq!(worker.video_with("   ", None, Duration::from_secs(5), None).await.expect_err("empty prompt").kind, ErrorKind::BadRequest);
+    worker.close().await;
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test]
+async fn an_account_that_is_out_of_videos_reports_when_it_is_back_and_sends_nothing() {
+    let Some((worker, server, dir)) = worker_with("video-limit-first", |engine| engine.chat.url.push_str("?limited=1")).await else { return };
+    let sends_before = server.chat_sends.load(std::sync::atomic::Ordering::SeqCst);
+    let error = worker.video_with("A fox", None, Duration::from_secs(30), None).await.expect_err("out of videos");
+    assert_eq!(error.kind, ErrorKind::RateLimit);
+    assert!(error.retry_after_ms > 0, "the account must rest");
+    assert_eq!(server.chat_sends.load(std::sync::atomic::Ordering::SeqCst), sends_before, "nothing was sent to an account that has no videos");
+    worker.close().await;
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test]
+async fn the_limit_message_after_sending_is_read_with_its_reset_time() {
+    let Some((worker, _server, dir)) = worker("video-limit-after").await else { return };
+    let error = worker.video_with("[outofvideos] a fox", None, Duration::from_secs(30), None).await.expect_err("limit after send");
+    assert_eq!(error.kind, ErrorKind::RateLimit);
+    // "Oct 26 at 3:05 PM" is read from the page; it is in the future or in the past of the test clock, but always a valid wait.
+    assert!(error.retry_after_ms >= 60_000, "{}", error.retry_after_ms);
+    worker.close().await;
+    let _ = std::fs::remove_dir_all(dir);
 }
