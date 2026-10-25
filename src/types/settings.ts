@@ -1,4 +1,5 @@
 export type AspectRatio = "16:9" | "9:16" | "1:1";
+export type TextProvider = "gemini" | "groq";
 export type Quality = "720p" | "1080p" | "4K";
 
 /** Non-secret settings, stored as JSON in the app data folder (mirrors settings.rs). */
@@ -9,12 +10,8 @@ export interface AppSettings {
   groqTextModel: string;
   /** The OpenAI model that looks at reference pictures when making a custom style. */
   openaiModel: string;
-  /** Write texts with Gemini's web chat (Google accounts) instead of the Gemini API key. */
-  textViaChat: boolean;
-  /** Prompts are written by hand (copy and paste), not by an engine. */
-  textManual?: boolean;
-  /** Scenes per message in the web chat (5 to 25). */
-  chatBatchSize: number;
+  /** Who writes the texts (scene groups, characters, prompts) with an API key. Word timing is always Groq. */
+  textProvider: TextProvider;
   /** Scenes per request with the Gemini API key (5 to 20). */
   apiBatchSize: number;
   /** Requests at the same time with the Gemini API key (1 to 3). */
@@ -23,9 +20,6 @@ export interface AppSettings {
   ttsModel: string;
   ttsVoice: string;
   ttsStyle: string;
-  /** Polite pause before the next web chat message: a random time between these seconds (0 to 120). */
-  chatPauseMinSec: number;
-  chatPauseMaxSec: number;
   /** Empty lines after every prompt in Copy all and Export TXT (1 to 3). */
   exportEmptyLines: number;
   /** Write the id before every prompt in Copy all and Export TXT. */

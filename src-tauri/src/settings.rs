@@ -50,12 +50,8 @@ pub struct Settings {
     pub groq_text_model: String,
     /// The OpenAI model that looks at reference pictures when making a custom style (needs an OpenAI key).
     pub openai_model: String,
-    /// Write texts with Gemini's web chat (the Google accounts of the Image Generator) instead of the Gemini API key.
-    pub text_via_chat: bool,
-    /// Write prompts by hand: copy the messages into any AI chat and paste the answers back (overrides the two above).
-    pub text_manual: bool,
-    /// Scenes per message in the web chat (5 to 25).
-    pub chat_batch_size: u8,
+    /// Who writes the texts (scene groups, cast, prompts): "gemini" or "groq" (API keys). Word timing is always Groq.
+    pub text_provider: String,
     /// Scenes per request with the Gemini API key (5 to 20).
     pub api_batch_size: u8,
     /// Requests sent at the same time with the Gemini API key (1 to 3).
@@ -64,9 +60,6 @@ pub struct Settings {
     pub tts_model: String,
     pub tts_voice: String,
     pub tts_style: String,
-    /// Polite pause before the next web chat message, a random time between these two numbers of seconds (0 to 120; 0 and 0 = no pause).
-    pub chat_pause_min_sec: u8,
-    pub chat_pause_max_sec: u8,
     /// Empty lines after every prompt in Copy all and Export TXT (1 to 3).
     pub export_empty_lines: u8,
     /// Write the id (S01_000.0-005.1 or P01) before every prompt in Copy all and Export TXT.
@@ -125,16 +118,12 @@ impl Default for Settings {
             fallback_to_groq: false,
             groq_text_model: DEFAULT_GROQ_TEXT_MODEL.to_string(),
             openai_model: DEFAULT_OPENAI_MODEL.to_string(),
-            text_via_chat: false,
-            text_manual: false,
-            chat_batch_size: 10,
+            text_provider: "gemini".to_string(),
             api_batch_size: 10,
             api_parallel: 2,
             tts_model: crate::tts::voices::DEFAULT_MODEL.to_string(),
             tts_voice: crate::tts::voices::DEFAULT_VOICE.to_string(),
             tts_style: String::new(),
-            chat_pause_min_sec: 4,
-            chat_pause_max_sec: 12,
             export_empty_lines: 2,
             export_include_ids: true,
             export_folder: String::new(),
@@ -234,16 +223,14 @@ impl Settings {
         let tts_model = clean_model_name(&self.tts_model, false).unwrap_or_else(|| crate::tts::voices::DEFAULT_MODEL.to_string());
         let tts_voice = if crate::tts::voices::is_voice(&self.tts_voice) { self.tts_voice.clone() } else { crate::tts::voices::DEFAULT_VOICE.to_string() };
         let tts_style: String = self.tts_style.trim().chars().take(300).collect();
-        let (pause_min, pause_max) = (self.chat_pause_min_sec.min(120), self.chat_pause_max_sec.min(120));
+        let text_provider = if self.text_provider == "groq" { "groq" } else { "gemini" }.to_string();
         Ok(Self {
             tts_model,
             tts_voice,
             tts_style,
-            chat_batch_size: self.chat_batch_size.clamp(5, 25),
+            text_provider,
             api_batch_size: self.api_batch_size.clamp(5, 20),
             api_parallel: self.api_parallel.clamp(1, 3),
-            chat_pause_min_sec: pause_min.min(pause_max),
-            chat_pause_max_sec: pause_min.max(pause_max),
             brand_kit_id,
             channel_profile_id,
             style_favorites,
@@ -400,12 +387,22 @@ mod tests {
     }
 
     #[test]
+    fn the_text_writer_is_gemini_or_groq_and_old_chat_settings_are_ignored() {
+        let mut settings = Settings { text_provider: "groq".into(), ..Settings::default() };
+        assert_eq!(settings.clone().validated().unwrap().text_provider, "groq");
+        settings.text_provider = "chat".into();
+        assert_eq!(settings.validated().unwrap().text_provider, "gemini");
+        let old: Settings = serde_json::from_str(r#"{"textViaChat":true,"textManual":true,"chatBatchSize":12,"chatPauseMinSec":3}"#).unwrap();
+        assert_eq!(old.text_provider, "gemini");
+    }
+
+    #[test]
     fn defaults_match_the_spec() {
         let settings = Settings::default();
         assert_eq!(settings.gemini_model, "gemini-3.8-flash");
         assert_eq!(settings.groq_whisper_model, "whisper-large-v3-turbo");
         assert!(!settings.fallback_to_groq);
-        assert!(!settings.text_via_chat, "the API key is the default");
+        assert_eq!(settings.text_provider, "gemini");
         assert_eq!(settings.openai_model, DEFAULT_OPENAI_MODEL);
         assert!(settings.graphic_presets.is_empty() && settings.brand_kits.is_empty(), "files from before the graphics system still load");
         assert_eq!((settings.export_empty_lines, settings.export_include_ids), (2, true));

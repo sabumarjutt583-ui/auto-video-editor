@@ -508,7 +508,7 @@ mod tests {
         assert!(EngineConfig::parse("not json").is_err());
         let no_ratio = BUNDLED_JSON.replace("{ratio}", "16-9");
         assert!(EngineConfig::parse(&no_ratio).is_err());
-        let bad_version = BUNDLED_JSON.replace("\"1.6\"", "\"x\"");
+        let bad_version = BUNDLED_JSON.replace("\"configVersion\": \"1.7\"", "\"configVersion\": \"x\"");
         assert!(EngineConfig::parse(&bad_version).is_err());
     }
 

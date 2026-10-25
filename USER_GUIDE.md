@@ -33,7 +33,7 @@ What you need: a Gemini API key and a Groq API key (Settings), and at least one 
 
 ## Quick prompts (no project)
 
-Open **Prompt Generator**. The first choice, **Quick prompts**, needs no project. Paste your script, pick *every sentence*, *every line* or *every scene* (the AI groups sentences by meaning), press **Build the prompts**, choose a style and write the prompts. Prompts are called P01, P02 ... With **Voice + timing** you can add a voice-over and get timecodes (S01_000.0-005.1) instead. Your work saves itself and comes back when you reopen the app. **New quick session** clears it. **Save as project** turns it into a normal project (so you can use the Image Generator and the Auto Editor). Use **Engine** to write with your Gemini key or with the free web chat.
+Open **Prompt Generator**. The first choice, **Quick prompts**, needs no project. Paste your script, pick *every sentence*, *every line* or *every scene* (the AI groups sentences by meaning), press **Build the prompts**, choose a style and write the prompts. Prompts are called P01, P02 ... With **Voice + timing** you can add a voice-over and get timecodes (S01_000.0-005.1) instead. Your work saves itself and comes back when you reopen the app. **New quick session** clears it. **Save as project** turns it into a normal project (so you can use the Image Generator and the Auto Editor). Use **Written by** to let Gemini or Groq write the prompts (your API keys).
 
 **Copy all / Export TXT** leave empty lines between prompts (1, 2 or 3, you choose), and **Include IDs** switches the ID before each prompt on or off. To make pictures from copied prompts, paste them into Image Generator > Only images.
 
@@ -117,19 +117,11 @@ The page has two modes. **Project scenes** makes one picture per scene of the op
 
 If an account reaches its daily limit, only that account waits (the time is shown); the others continue. If Google asks you to check something (captcha, "unusual activity"), the account is paused and you see the message: open the account's browser, do the check yourself, then Verify.
 
-## Writing prompts with the Gemini web chat, or by hand
+## Who writes the prompts: Gemini or Groq
 
-In the Prompt Generator (Project and Quick) you choose the **Engine**: **API key**, **Gemini web chat (automatic)** or **Manual (copy & paste)**.
+In the Prompt Generator (Project and Quick) choose **Written by: Gemini** or **Groq** (the same choice is in Settings, *Who writes the texts*). Both use your API keys. The word timing of your voice (SRT) is always done by Groq.
 
-**Gemini web chat.** The app uses the Google accounts you added in Settings. It works in a hidden browser (no Chrome window appears). It sends one setup message, waits for `READY`, then sends your scenes in batches of 20 (change this in Settings, Text engine) in the same chat. While Gemini is thinking the app only waits ("Gemini is thinking... 42 s"); it never refreshes the page or sends a message twice. If Gemini gives a generic error, the app waits 30 seconds and tries once in a new chat. If that fails too, it stops and shows Gemini's reply in Details. Cancel stops after the current answer is finished.
-
-**Checked prompts.** Every prompt must end with your style's exact style lock and contain the exact looks of every character and the location text. If Gemini forgot something, the app adds it and marks the row **fixed** (hover to see what changed). A row marked **check** looks odd (for example very short) but was not changed.
-
-**Manual (copy & paste).** Press "Prepare messages". Copy message 1 (Setup) into any AI chat (Gemini, ChatGPT, Claude...), then each batch message in the same chat. Paste each answer into the box under the message and press **Use answer**. The app tells you if scene IDs are missing and gives you a follow-up message for them. No browser, account or key is needed.
-
-**Your words.** Scene text is your own script, not the speech recognition text (without a script the Scenes step says so). Scenes shorter than 2 seconds are joined to a neighbour (Scenes step, "Shortest scene").
-
-**Deleting.** Prompts step: the bin button on a row, the checkboxes with "Delete selected", and "Clear all prompts" (your script and scenes stay). An Undo bar stays for 10 seconds. Image Generator: delete one picture, the selected ones, or "Delete all images". Pictures go to the Recycle Bin / Trash and are not made again; in a project the scene shows as missing and you can press Regenerate.
+**Several keys.** In Settings you can save up to 10 Gemini keys and up to 10 Groq keys (for example from different Google accounts). The first key is used until it reaches its limit; then the app rests that key for a while and switches to the next one by itself. The list shows "Resting after its limit" with the time left. A key that is refused (wrong or removed) is skipped for an hour. If every key is used up, you see the error, and with *If the chosen writer fails, ask the other one* ticked the other provider is asked.
 
 ## Motion graphics (free, written by the AI)
 
@@ -175,9 +167,9 @@ If the web chat shows a captcha or "unusual activity" page, the account is pause
 
 ## Settings
 
-**Text engine.** Scene groups, characters and prompts are written by Gemini. Choose *Gemini API key* (fast, daily limit) or *Web chat (free)*, which uses the Google accounts of the Image Generator and needs no key.
+**Who writes the texts.** Scene groups, characters and prompts are written by Gemini or Groq (API keys). Choose one in Settings.
 
-- **API keys**: paste, **Save**, **Test Key**, **Delete**. Keys are kept only in your computer's secure keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service). They are never written to files or logs.
+- **API keys**: paste, **Save**, **Test Key**, **Delete**. Gemini and Groq take up to 10 keys each (**Add another key**); when one reaches its limit the next is used. Keys are kept only in your computer's secure keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service). They are never written to files or logs.
 - **OpenAI key** (optional): only used to let an OpenAI model look at pictures when you make a custom style.
 - **Models**, **defaults** (aspect ratio, quality, export folder), **Video encoding**, **Library updates**, **Updates**, **Help and logs**.
 

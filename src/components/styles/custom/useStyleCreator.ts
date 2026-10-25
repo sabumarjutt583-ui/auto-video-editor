@@ -6,7 +6,6 @@ import { isCancelled, toAppError } from "../../../lib/errors";
 import { MY_STYLES, newCustomId } from "../../../lib/styleModel";
 import { useKeyStore } from "../../../store/keyStore";
 import { runJob } from "../../../store/jobStore";
-import { useSettingsStore } from "../../../store/settingsStore";
 import { useStyleStore } from "../../../store/styleStore";
 import type { AnalyzeEngine, AppError, PreparedImage, StyleProfile, StyleRefs } from "../../../types";
 
@@ -21,7 +20,6 @@ export function useStyleCreator(start: CreatorStart, onSaved: (style: StyleProfi
   const editing = start.mode === "edit" ? start.style : null;
   const keys = useKeyStore((state) => state.status);
   const refreshKeys = useKeyStore((state) => state.refreshAll);
-  const settings = useSettingsStore((state) => state.settings);
   const styles = useStyleStore((state) => state.styles);
   const loadStyles = useStyleStore((state) => state.load);
 
@@ -34,7 +32,7 @@ export function useStyleCreator(start: CreatorStart, onSaved: (style: StyleProfi
   const hadEngine = savedEngine === "gemini" || savedEngine === "openai" || savedEngine === "chat";
   const [chosenEngine, setChosenEngine] = useState<AnalyzeEngine | null>(hadEngine ? (savedEngine as AnalyzeEngine) : null);
   // Until the person picks one, the engine follows what is set up (keys and Settings), which is only known a moment after opening.
-  const engine = chosenEngine ?? defaultEngine(keysSet, settings?.textViaChat ?? false);
+  const engine = chosenEngine ?? defaultEngine(keysSet);
   const setEngine = setChosenEngine;
   const [images, setImages] = useState<PreparedImage[]>(start.mode === "edit" ? (start.refs?.images ?? []) : []);
   const [draft, setDraft] = useState<StyleProfile | null>(start.mode === "edit" && start.step === "review" ? start.style : null);

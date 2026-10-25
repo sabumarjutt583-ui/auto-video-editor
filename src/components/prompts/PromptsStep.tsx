@@ -9,10 +9,6 @@ import { generateText } from "../../lib/ai";
 import { writeTextFile } from "../../lib/files";
 import { clampEmptyLines, copyBlock, copyLines, toCsv, toJson } from "../../lib/prompts/export";
 import { generatePrompts, reassemble, type PromptContext } from "../../lib/prompts/generate";
-import { randomPauseMs, runChatPrompts } from "../../lib/prompts/chat/runner";
-import { logFrontendError } from "../../lib/appUpdate/api";
-import { loadThread, saveThread } from "../../lib/prompts/chat/threadStore";
-import { webChatTransport } from "../../lib/prompts/chat/tauriTransport";
 import { needsMotion } from "../../lib/prompts/assemble";
 import { requestCancel, runJob, selectJob, useJobStore } from "../../store/jobStore";
 import { useProjectStore } from "../../store/projectStore";
@@ -25,7 +21,6 @@ import { JobBar } from "../voice/JobBar";
 import { ExportBar } from "./ExportBar";
 import { OptionsCard } from "./OptionsCard";
 import { PromptRow } from "./PromptRow";
-import { ManualPanel } from "./ManualPanel";
 import { clearPrompts, restorePrompts, withoutDeleted, type RemovedPrompt } from "../../lib/prompts/delete";
 import { EngineSwitch } from "../quick/EngineSwitch";
 
@@ -73,7 +68,6 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
   const written = scenes.filter((scene) => scene.prompt.trim() !== "").length;
   const editedCount = scenes.filter((scene) => scene.edited).length;
   const busy = running || job !== null;
-  const manual = appSettings?.textManual === true;
 
   const run = useCallback(
     async (targetIds: ReadonlySet<string>) => {
@@ -84,31 +78,13 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
       setRunning(true);
       deletedRef.current = new Set();
       try {
-        const viaChat = appSettings?.textViaChat === true;
-        const result = await runJob("ai", "Writing prompts with Gemini", async (jobId) => {
-          const current = useProjectStore.getState().project?.scenes ?? scenes;
-          if (viaChat) {
-            const chatResult = await runChatPrompts({
-              scenes: current,
-              targetIds,
-              context,
-              transport: webChatTransport(jobId),
-              tag: project.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "P",
-              batchSize: Math.min(25, Math.max(5, appSettings?.chatBatchSize ?? 10)),
-              pauseBetween: () => randomPauseMs(appSettings?.chatPauseMinSec ?? 4, appSettings?.chatPauseMaxSec ?? 12),
-              onLog: (line) => void logFrontendError(line, "/prompt-generator (chat run)").catch(() => undefined),
-              thread: loadThread(project.id),
-              onThread: (thread) => saveThread(project.id, thread),
-              onBatch: ({ batch: number, total, account }) => setBatch({ number, total, account }),
-              onScenes: (next) => update({ scenes: withoutDeleted(next, useProjectStore.getState().project?.scenes ?? next, deletedRef.current) }),
-            });
-            return { scenes: chatResult.scenes, failed: chatResult.failed ? { batch: chatResult.failed.batch, error: chatResult.failed.error } : null };
-          }
+        const writer = appSettings?.textProvider === "groq" ? "Groq" : "Gemini";
+        const result = await runJob("ai", `Writing prompts with ${writer}`, async (jobId) => {
           return generatePrompts({
             scenes: useProjectStore.getState().project?.scenes ?? scenes,
             targetIds,
             context,
-            resendOnError: !appSettings?.textViaChat,
+            resendOnError: true,
             batchSize: Math.min(20, Math.max(5, appSettings?.apiBatchSize ?? 10)),
             parallel: Math.min(3, Math.max(1, appSettings?.apiParallel ?? 2)),
             call: async (system, prompt) => (await generateText(prompt, system, true, jobId)).text,
@@ -128,7 +104,7 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
         setBatch(null);
       }
     },
-    [context, scenes, update, appSettings?.textViaChat, appSettings?.chatBatchSize, appSettings?.chatPauseMinSec, appSettings?.chatPauseMaxSec, appSettings?.apiBatchSize, appSettings?.apiParallel, project.id],
+    [context, scenes, update, appSettings?.textProvider, appSettings?.apiBatchSize, appSettings?.apiParallel, project.id],
   );
 
   const generateMissing = () => void run(new Set(scenes.filter((s) => s.prompt.trim() === "" && !s.edited).map((s) => s.id)));
@@ -213,9 +189,8 @@ export function PromptsStep({ project, quick = false }: { project: Project; quic
       <OptionsCard project={project} style={style} onSettings={setSettings} onAspect={setAspect} />
 
       {!quick && <EngineSwitch />}
-      {manual && <ManualPanel scenes={scenes} context={context} tag={project.id.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "P"} batchSize={Math.min(25, Math.max(5, appSettings?.chatBatchSize ?? 10))} onScenes={(next) => update({ scenes: next })} deleted={deletedRef.current} />}
 
-      <div className={manual ? "hidden" : "flex flex-wrap items-center gap-2"}>
+      <div className="flex flex-wrap items-center gap-2">
         <Button variant="primary" icon={Sparkles} disabled={busy || !context || missing === 0} onClick={generateMissing}>
           {hasPrompts ? `Write the ${missing} missing prompts` : "Generate prompts"}
         </Button>

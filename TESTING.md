@@ -117,7 +117,7 @@ Not tested here: Windows installer and a clean Windows PC, GPU encoders, real Gr
 `cargo test` 382 passed (`--features admin` builds without warnings); `npm run test:ts` 243 passed; `tsc` clean; user bundle has no admin code. Real Chromium against a fake Gemini chat page: answers, code blocks, fresh chat per question, usage limit -> rate limit, answer that never starts, stable-text fallback. Motion: CSS and `renderFrame` graphics drawn frame by frame with transparency, blank / screen-covering / static / throwing / not-animated graphics rejected with a reason, retry feeds the reason back, three failures give a friendly error. Render: an overlay appears at its start time, is gone after its last frame (pixel checks).
 
 Manual checks on a computer with a Google account:
-- Settings > Text engine > Web chat, then Prompt Generator "Generate prompts": answers arrive without a Gemini key. If nothing is typed or the answer is never read, the Gemini page changed: update the `chat` selectors in resources/image-engine/config.json (library package `image_engine`).
+- (Prompts through the web chat were removed; the chat is still used by the style analysis, the script writer and pictures.)
 - Auto Editor > Motion > Make a motion graphic; check the preview, render, and that the graphic sits over the picture and under the captions.
 - Not tested: the real Gemini page (selectors come from a DOM capture), the real "limit reached" text, the small production FFmpeg (all parts the overlay needs are in scripts/ci/ffmpeg-components.sh).
 
@@ -245,3 +245,7 @@ Not done here (no Windows PC, no real Google account, no desktop window): the re
 1. Settings > Script writer: read the notice, accept, Sign in (your browser opens; sign in; close it or press "I have signed in"). Status becomes Connected. If not: send the screenshot of the failure report in the logs folder and fix `script` selectors in config.json.
 2. Channel > Settings > Script writing: choose Claude, write a master prompt. New video: write a topic, press "Write the script": the text appears in the Script box (no title, no markdown).
 3. Queue > topics: add 3 topics, Start. Each script is written, then the video is made. With Claude signed out the item waits and the queue stops.
+
+### Several API keys, Gemini/Groq writer (2026-10-25, Linux sandbox)
+- Automatic: cargo tests for key slots/rest times (keys.rs), fail-over (api/rotate.rs: limit -> next key, refused key, all keys limited, no key text in errors), settings (`text_provider`, old chat settings ignored); TS tests for slot helpers.
+- By hand (real keys): Settings > Gemini: save 2 keys, Test Key on each; write prompts for 40 scenes with the first key at its limit and see "Resting after its limit" and the second key taking over; same for Groq (Written by: Groq) and for the SRT step with 2 Groq keys; delete key 1 and see key 2 still work; old project/settings from before still open.

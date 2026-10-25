@@ -97,16 +97,22 @@ pub struct TranscribeRequest<'a> {
     pub file: &'a Path,
     pub duration: f64,
     pub temp_dir: PathBuf,
-    pub key: &'a str,
     pub model: &'a str,
     pub language: Option<&'a str>,
 }
 
 /// Transcribes the whole voice with word times. Reports progress and stops quickly on Cancel.
 pub async fn transcribe_voice(job: &Job, request: TranscribeRequest<'_>) -> Result<Vec<SpokenWord>, AppError> {
-    transcribe_with(job, request, |key, model, language, name, audio| {
-        let (key, model, language, name) = (key.to_string(), model.to_string(), language.map(str::to_string), name.to_string());
-        async move { groq::transcribe(&key, &model, language.as_deref(), &name, audio).await }
+    transcribe_with(job, request, |model, language, name, audio| {
+        let (model, language, name) = (model.to_string(), language.map(str::to_string), name.to_string());
+        async move {
+            // Every saved Groq key is tried: the next one is used when a key hits its limit.
+            crate::api::rotate::run_api(crate::keys::Provider::Groq, |key| {
+                let (model, language, name, audio) = (model.clone(), language.clone(), name.clone(), audio.clone());
+                async move { groq::transcribe(&key, &model, language.as_deref(), &name, audio).await }
+            })
+            .await
+        }
     })
     .await
 }
@@ -114,10 +120,10 @@ pub async fn transcribe_voice(job: &Job, request: TranscribeRequest<'_>) -> Resu
 /// Same as `transcribe_voice`, with the Groq call replaced (so tests need no network).
 pub async fn transcribe_with<F, Fut>(job: &Job, request: TranscribeRequest<'_>, call: F) -> Result<Vec<SpokenWord>, AppError>
 where
-    F: Fn(&str, &str, Option<&str>, &str, Vec<u8>) -> Fut,
+    F: Fn(&str, Option<&str>, &str, Vec<u8>) -> Fut,
     Fut: std::future::Future<Output = Result<Vec<HeardWord>, crate::api::error::ApiError>>,
 {
-    let TranscribeRequest { file, duration, temp_dir, key, model, language } = request;
+    let TranscribeRequest { file, duration, temp_dir, model, language } = request;
     std::fs::create_dir_all(&temp_dir).map_err(|e| AppError::new("A temporary folder could not be created.", e.to_string()))?;
 
     let chunks = if duration > MAX_CHUNK_SECONDS {
@@ -143,7 +149,7 @@ where
             job.progress(&format!("Listening to the voice ({} of {})", index + 1, chunks.len()), base + step * 0.3);
             let heard = tokio::select! {
                 () = job.cancelled() => return Err(AppError::cancelled()),
-                heard = call(key, model, language, &format!("chunk-{index}.mp3"), audio) => heard?,
+                heard = call(model, language, &format!("chunk-{index}.mp3"), audio) => heard?,
             };
             words.extend(offset_words(heard, chunk.start, duration));
             job.progress(&format!("Listening to the voice ({} of {})", index + 1, chunks.len()), base + step);
@@ -229,8 +235,8 @@ mod tests {
         assert!(make_wav(&wav, 5));
         let registry = JobRegistry::default();
         let (job, log) = test_job(&registry, "tr");
-        let request = TranscribeRequest { file: &wav, duration: 5.0, temp_dir: dir.join("tmp"), key: "k", model: "m", language: Some("ko") };
-        let words = transcribe_with(&job, request, |_, _, language, name, audio| {
+        let request = TranscribeRequest { file: &wav, duration: 5.0, temp_dir: dir.join("tmp"), model: "m", language: Some("ko") };
+        let words = transcribe_with(&job, request, |_, language, name, audio| {
             assert_eq!(language, Some("ko"));
             assert_eq!(name, "chunk-0.mp3");
             assert!(audio.len() > 500, "the prepared chunk should hold real audio");
@@ -255,8 +261,8 @@ mod tests {
         assert!(make_wav(&wav, 2));
         let registry = JobRegistry::default();
         let (job, _) = test_job(&registry, "tr-err");
-        let request = TranscribeRequest { file: &wav, duration: 2.0, temp_dir: dir.join("tmp"), key: "k", model: "m", language: None };
-        let error = transcribe_with(&job, request, |_, _, _, _, _| async { Err(ApiError::RateLimited("HTTP 429".into())) }).await.unwrap_err();
+        let request = TranscribeRequest { file: &wav, duration: 2.0, temp_dir: dir.join("tmp"), model: "m", language: None };
+        let error = transcribe_with(&job, request, |_, _, _, _| async { Err(ApiError::RateLimited("HTTP 429".into())) }).await.unwrap_err();
         assert!(error.message.contains("Rate limit"));
         assert!(!dir.join("tmp").exists());
         let _ = std::fs::remove_dir_all(&dir);
@@ -278,9 +284,9 @@ mod tests {
             tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
             canceller.cancel("tr-cancel");
         });
-        let request = TranscribeRequest { file: &wav, duration: 2.0, temp_dir: dir.join("tmp"), key: "k", model: "m", language: None };
+        let request = TranscribeRequest { file: &wav, duration: 2.0, temp_dir: dir.join("tmp"), model: "m", language: None };
         let started = std::time::Instant::now();
-        let error = transcribe_with(&job, request, |_, _, _, _, _| async {
+        let error = transcribe_with(&job, request, |_, _, _, _| async {
             tokio::time::sleep(std::time::Duration::from_secs(60)).await;
             Ok(Vec::new())
         })

@@ -2,21 +2,19 @@ import { CircleCheck, ExternalLink as ExternalLinkIcon, FlaskConical, KeyRound, 
 import { useId, useState } from "react";
 
 import { toAppError } from "../../lib/errors";
-import { testKey } from "../../lib/keys";
+import { restText, slotForNewKey, slotsFull, testKey } from "../../lib/keys";
 import { openExternalLink, type ExternalLink } from "../../lib/links";
 import { useKeyStore } from "../../store/keyStore";
-import type { AppError, Provider } from "../../types";
+import type { AppError, KeySlotInfo, Provider } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
 import { Button, Card } from "../ui";
 import { KeyStatusBadge } from "./KeyStatusBadge";
 import { SecretInput } from "./SecretInput";
 
-type Busy = "save" | "test" | "delete";
-
 type Outcome =
-  | { kind: "saved" }
-  | { kind: "works" }
-  | { kind: "deleted" }
+  | { kind: "saved"; slot: number }
+  | { kind: "works"; slot: number }
+  | { kind: "deleted"; slot: number }
   | { kind: "error"; error: AppError };
 
 interface ApiKeyCardProps {
@@ -29,23 +27,26 @@ interface ApiKeyCardProps {
   testModel?: string;
 }
 
-/** Save, test and delete the API key of one provider. The saved key is never shown again. */
+/** Save, test and delete the API keys of one provider. With several keys the next one is used when one reaches its limit. The saved keys are never shown again. */
 export function ApiKeyCard({ provider, title, description, linkLabel, link, testModel }: ApiKeyCardProps) {
   const inputId = useId();
   const status = useKeyStore((state) => state.status[provider]);
+  const slots = useKeyStore((state) => state.slots[provider]);
   const save = useKeyStore((state) => state.save);
   const remove = useKeyStore((state) => state.remove);
 
   // The key being typed lives only here, and is cleared as soon as it is saved.
   const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState<Busy | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState<number | null>(null);
 
-  const isSet = status === "set";
+  const saved = slots.filter((s) => s.status === "set");
   const hasDraft = draft.trim().length > 0;
+  const full = slotsFull(slots);
+  const several = slots.length > 1;
 
-  async function run(action: Busy, job: () => Promise<Outcome>) {
+  async function run(action: string, job: () => Promise<Outcome>) {
     setBusy(action);
     setOutcome(null);
     try {
@@ -59,24 +60,25 @@ export function ApiKeyCard({ provider, title, description, linkLabel, link, test
 
   const handleSave = () => {
     if (!hasDraft || busy) return;
+    const slot = slotForNewKey(slots);
     void run("save", async () => {
-      await save(provider, draft);
+      await save(provider, draft, slot);
       setDraft("");
-      return { kind: "saved" };
+      return { kind: "saved", slot };
     });
   };
 
-  const handleTest = () =>
-    run("test", async () => {
-      await testKey(provider, testModel);
-      return { kind: "works" };
+  const handleTest = (slot: number) =>
+    run(`test-${slot}`, async () => {
+      await testKey(provider, testModel, slot);
+      return { kind: "works", slot };
     });
 
-  const handleDelete = () =>
-    run("delete", async () => {
-      await remove(provider);
-      setConfirmingDelete(false);
-      return { kind: "deleted" };
+  const handleDelete = (slot: number) =>
+    run(`delete-${slot}`, async () => {
+      await remove(provider, slot);
+      setConfirmingDelete(null);
+      return { kind: "deleted", slot };
     });
 
   const handleOpenLink = async () => {
@@ -87,25 +89,42 @@ export function ApiKeyCard({ provider, title, description, linkLabel, link, test
     }
   };
 
-  const testHint = !isSet ? "Save a key first" : hasDraft ? "Save the new key first" : "Check that the saved key works";
+  const label = !several ? "API key" : full ? "Replace the last key" : saved.length > 0 ? "Add another key" : "API key";
+  const placeholder =
+    saved.length === 0
+      ? "Paste your key here"
+      : several && !full
+      ? "Paste another key here. When one key reaches its limit, the next one is used."
+      : "Paste a new key here to replace the saved one.";
 
   return (
     <Card title={title} description={description} icon={KeyRound}>
+      {saved.length > 0 && (
+        <ul className="flex flex-col gap-2" aria-label="Saved keys">
+          {saved.map((entry) => (
+            <KeyRow
+              key={entry.slot}
+              entry={entry}
+              numbered={several}
+              busy={busy}
+              confirming={confirmingDelete === entry.slot}
+              onTest={() => void handleTest(entry.slot)}
+              onAskDelete={() => setConfirmingDelete(entry.slot)}
+              onCancelDelete={() => setConfirmingDelete(null)}
+              onDelete={() => void handleDelete(entry.slot)}
+            />
+          ))}
+        </ul>
+      )}
+
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <label htmlFor={inputId} className="text-sm font-medium">
-            API key
+            {label}
           </label>
-          <KeyStatusBadge status={status} />
+          {saved.length === 0 && <KeyStatusBadge status={status} />}
         </div>
-        <SecretInput
-          id={inputId}
-          value={draft}
-          onChange={setDraft}
-          onSubmit={handleSave}
-          placeholder={isSet ? "Key saved. Paste a new key here to replace it." : "Paste your key here"}
-          disabled={busy !== null}
-        />
+        <SecretInput id={inputId} value={draft} onChange={setDraft} onSubmit={handleSave} placeholder={placeholder} disabled={busy !== null} />
         <button
           type="button"
           onClick={() => void handleOpenLink()}
@@ -114,65 +133,88 @@ export function ApiKeyCard({ provider, title, description, linkLabel, link, test
           {linkLabel}
           <ExternalLinkIcon size={12} aria-hidden />
         </button>
+        {several && (
+          <p className="text-xs text-muted">
+            You can save up to {slots.length} keys (for example from different Google accounts). The first key is used until it reaches its limit, then the next one takes over by itself.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="primary" icon={Save} onClick={handleSave} disabled={!hasDraft || busy !== null} loading={busy === "save"}>
           Save
         </Button>
-        <Button
-          icon={FlaskConical}
-          onClick={() => void handleTest()}
-          disabled={!isSet || hasDraft || busy !== null}
-          loading={busy === "test"}
-          title={testHint}
-        >
-          Test Key
-        </Button>
-        {confirmingDelete ? (
-          <span className="inline-flex items-center gap-2 text-sm">
-            <span className="text-muted">Delete this key?</span>
-            <Button variant="danger" onClick={() => void handleDelete()} loading={busy === "delete"} disabled={busy !== null}>
-              Yes, delete
-            </Button>
-            <Button onClick={() => setConfirmingDelete(false)} disabled={busy !== null}>
-              Cancel
-            </Button>
-          </span>
-        ) : (
-          <Button
-            variant="danger"
-            icon={Trash2}
-            onClick={() => setConfirmingDelete(true)}
-            disabled={!isSet || busy !== null}
-            title={isSet ? "Remove the saved key" : "There is no saved key"}
-          >
-            Delete
-          </Button>
-        )}
       </div>
 
-      <div aria-live="polite">{outcome && <OutcomeMessage outcome={outcome} />}</div>
+      <div aria-live="polite">{outcome && <OutcomeMessage outcome={outcome} numbered={several} />}</div>
     </Card>
   );
 }
 
-function OutcomeMessage({ outcome }: { outcome: Outcome }) {
+interface KeyRowProps {
+  entry: KeySlotInfo;
+  numbered: boolean;
+  busy: string | null;
+  confirming: boolean;
+  onTest: () => void;
+  onAskDelete: () => void;
+  onCancelDelete: () => void;
+  onDelete: () => void;
+}
+
+function KeyRow({ entry, numbered, busy, confirming, onTest, onAskDelete, onCancelDelete, onDelete }: KeyRowProps) {
+  const name = numbered ? `Key ${entry.slot}` : "Saved key";
+  return (
+    <li className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2">
+      <span className="text-sm font-medium">{name}</span>
+      {entry.restingSeconds > 0 ? (
+        <span className="text-xs text-warning">Resting after its limit ({restText(entry.restingSeconds)} left)</span>
+      ) : (
+        <KeyStatusBadge status="set" />
+      )}
+      <span className="ml-auto inline-flex flex-wrap items-center gap-2">
+        {confirming ? (
+          <>
+            <span className="text-sm text-muted">Delete this key?</span>
+            <Button variant="danger" onClick={onDelete} loading={busy === `delete-${entry.slot}`} disabled={busy !== null}>
+              Yes, delete
+            </Button>
+            <Button onClick={onCancelDelete} disabled={busy !== null}>
+              Cancel
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button icon={FlaskConical} onClick={onTest} disabled={busy !== null} loading={busy === `test-${entry.slot}`} title="Check that this key works">
+              Test Key
+            </Button>
+            <Button variant="danger" icon={Trash2} onClick={onAskDelete} disabled={busy !== null} title="Remove this key">
+              Delete
+            </Button>
+          </>
+        )}
+      </span>
+    </li>
+  );
+}
+
+function OutcomeMessage({ outcome, numbered }: { outcome: Outcome; numbered: boolean }) {
+  const which = (slot: number) => (numbered ? `Key ${slot}` : "Key");
   switch (outcome.kind) {
     case "works":
       return (
         <p className="flex items-center gap-2 text-sm font-medium text-success">
-          <CircleCheck size={16} aria-hidden /> Key works
+          <CircleCheck size={16} aria-hidden /> {which(outcome.slot)} works
         </p>
       );
     case "saved":
       return (
         <p className="flex items-center gap-2 text-sm font-medium text-success">
-          <CircleCheck size={16} aria-hidden /> Key saved. Press Test Key to check it.
+          <CircleCheck size={16} aria-hidden /> {which(outcome.slot)} saved. Press Test Key to check it.
         </p>
       );
     case "deleted":
-      return <p className="text-sm text-muted">Key deleted.</p>;
+      return <p className="text-sm text-muted">{which(outcome.slot)} deleted.</p>;
     case "error":
       return <ErrorNotice error={outcome.error} />;
   }

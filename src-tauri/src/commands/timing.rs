@@ -65,7 +65,7 @@ pub async fn transcribe_voice(
     if !file.is_file() {
         return Err(AppError::new("The voice file is missing from the project.", format!("{} does not exist", file.display())));
     }
-    let key = run_blocking(|| keys::require(Provider::Groq)).await?;
+    run_blocking(|| keys::require(Provider::Groq)).await?;
     let app_for_settings = app.clone();
     let model = run_blocking(move || settings::load(&app_for_settings)).await?.groq_whisper_model;
 
@@ -76,7 +76,6 @@ pub async fn transcribe_voice(
         file: &file,
         duration: info.duration,
         temp_dir,
-        key: &key,
         model: &model,
         language: language.as_deref(),
     };

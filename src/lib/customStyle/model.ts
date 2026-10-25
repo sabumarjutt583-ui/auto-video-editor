@@ -101,9 +101,8 @@ export function engineChoices(keys: { gemini: boolean; openai: boolean }): Engin
   ];
 }
 
-/** The engine to start with: the web chat when Settings uses it for texts, else a key that is set. */
-export function defaultEngine(keys: { gemini: boolean; openai: boolean }, textViaChat: boolean): AnalyzeEngine {
-  if (textViaChat) return "chat";
+/** The engine to start with: a key that is set, else the web chat. */
+export function defaultEngine(keys: { gemini: boolean; openai: boolean }): AnalyzeEngine {
   if (keys.gemini) return "gemini";
   if (keys.openai) return "openai";
   return "chat";

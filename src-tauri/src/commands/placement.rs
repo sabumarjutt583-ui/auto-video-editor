@@ -1,24 +1,20 @@
 //! Looks at small pictures of the scenes to find where the main subject is (graphics are placed away from it).
-//! Uses the current text engine: the Gemini API, or the Gemini web chat when "text via chat" is on.
+//! Uses the Gemini API (all saved Gemini keys, the next one when a limit is reached).
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use tauri::{AppHandle, State};
 
-use crate::api::gemini;
+use crate::api::{gemini, rotate};
 use crate::audio::paths::resolve;
-use crate::commands::ai::chat_question;
 use crate::commands::blocking::run_blocking;
 use crate::commands::error::AppError;
 use crate::commands::projects::project_folder;
-use crate::imagegen::chat::json_from_reply;
-use crate::imagegen::ops::ImageGen;
 use crate::jobs::{event_sink, JobRegistry};
-use crate::keys::{self, Provider};
+use crate::keys::Provider;
 use crate::settings;
 
-/// The web chat takes four pictures per question; the same limit is used for both engines.
+/// Pictures per question.
 pub const MAX_PICTURES: usize = 4;
 
 /// Only the preview pictures the app made itself (`thumbs/<name>.jpg`) may be sent.
@@ -39,7 +35,6 @@ pub fn check_pictures(pictures: &[String]) -> Result<(), AppError> {
 pub async fn placement_ask(
     app: AppHandle,
     jobs: State<'_, JobRegistry>,
-    ig: State<'_, Arc<ImageGen>>,
     project_id: String,
     system: String,
     prompt: String,
@@ -52,16 +47,6 @@ pub async fn placement_ask(
     let job = jobs.begin(&job_id, "placement", event_sink(app.clone()))?;
     let settings_app = app.clone();
     let settings = run_blocking(move || settings::load(&settings_app)).await?;
-    if settings.text_via_chat {
-        job.progress("Asking Gemini in the web chat", 10.0);
-        let question = chat_question(Some(&system), &format!("{prompt}\nThe pictures are attached to this message, in order."), true);
-        let reply = tokio::select! {
-            () = job.cancelled() => return Err(AppError::cancelled()),
-            reply = ig.chat_ask_images(&question, &paths) => reply?,
-        };
-        return Ok(json_from_reply(&reply).unwrap_or(reply.text));
-    }
-    let key = run_blocking(|| keys::require(Provider::Gemini)).await?;
     let mut parts = vec![serde_json::json!({ "text": prompt })];
     for path in &paths {
         let bytes = std::fs::read(path).map_err(|e| AppError::new("A preview picture could not be read.", e.to_string()))?;
@@ -70,7 +55,10 @@ pub async fn placement_ask(
     job.progress("Asking Gemini", 10.0);
     let answer = tokio::select! {
         () = job.cancelled() => return Err(AppError::cancelled()),
-        answer = gemini::generate_parts(&key, &settings.gemini_model, Some(&system), parts, true) => answer,
+        answer = rotate::run(Provider::Gemini, |key| {
+            let (model, system, parts) = (settings.gemini_model.clone(), system.clone(), parts.clone());
+            async move { gemini::generate_parts(&key, &model, Some(&system), parts, true).await }
+        }) => answer,
     }?;
     Ok(answer)
 }

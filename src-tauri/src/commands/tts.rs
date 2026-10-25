@@ -11,6 +11,7 @@ use tokio::task::JoinSet;
 
 use crate::api::clean_model_name;
 use crate::api::error::ApiError;
+use crate::api::rotate;
 use crate::api::gemini_tts::{speak, Spoken};
 use crate::commands::blocking::run_blocking;
 use crate::commands::error::AppError;
@@ -77,10 +78,11 @@ fn checked(request: &TtsRequest) -> Result<(String, String), AppError> {
     Ok((model, request.style.trim().chars().take(300).collect()))
 }
 
-async fn speak_with_tries(key: &str, model: &str, voice: &str, text: &str) -> Result<Spoken, ApiError> {
+async fn speak_with_tries(model: &str, voice: &str, text: &str) -> Result<Spoken, ApiError> {
     let mut last = ApiError::BadResponse("no try".to_string());
     for attempt in 0..TRIES {
-        match speak(key, model, voice, text).await {
+        // Every saved Gemini key is tried before a limit is reported.
+        match rotate::run_api(Provider::Gemini, |key| async move { speak(&key, model, voice, text).await }).await {
             Ok(spoken) => return Ok(spoken),
             // A wrong key or a full quota will not get better by asking again.
             Err(error @ (ApiError::InvalidKey(_) | ApiError::RateLimited(_))) => return Err(error),
@@ -100,8 +102,7 @@ async fn speak_with_tries(key: &str, model: &str, voice: &str, text: &str) -> Re
 pub async fn tts_preview(voice: String, model: String, style: String, text: String) -> Result<String, AppError> {
     let request = TtsRequest { text: text.chars().take(400).collect(), voice, model, style };
     let (model, style) = checked(&request)?;
-    let key = run_blocking(|| keys::require(Provider::Gemini)).await?;
-    let spoken = speak_with_tries(&key, &model, &request.voice, &tts::spoken_text(&style, request.text.trim())).await?;
+    let spoken = speak_with_tries(&model, &request.voice, &tts::spoken_text(&style, request.text.trim())).await?;
     let samples = wav::trim_silence(&wav::samples_from_pcm(&spoken.pcm), spoken.rate, 100);
     Ok(format!("data:audio/wav;base64,{}", crate::api::base64::encode(&wav::wav_bytes(&samples, spoken.rate))))
 }
@@ -112,7 +113,7 @@ pub async fn tts_generate(app: AppHandle, jobs: State<'_, JobRegistry>, project_
     let (model, style) = checked(&request)?;
     let folder: PathBuf = project_folder(&app, &project_id)?.join("audio").join("tts");
     let job = jobs.begin(&job_id, "tts", event_sink(app.clone()))?;
-    let key = run_blocking(|| keys::require(Provider::Gemini)).await?;
+    run_blocking(|| keys::require(Provider::Gemini)).await?;
 
     let chunks = split_script(&request.text, DEFAULT_BUDGET);
     let total = chunks.len();
@@ -146,13 +147,13 @@ pub async fn tts_generate(app: AppHandle, jobs: State<'_, JobRegistry>, project_
         if pieces[index].is_some() {
             continue;
         }
-        let (key, model, voice) = (key.clone(), model.clone(), request.voice.clone());
+        let (model, voice) = (model.clone(), request.voice.clone());
         let text = tts::spoken_text(&style, &chunk.text);
         texts.insert(index, chunk.text.clone());
         let limit = limit.clone();
         running.spawn(async move {
             let _slot = limit.acquire_owned().await;
-            (index, speak_with_tries(&key, &model, &voice, &text).await)
+            (index, speak_with_tries(&model, &voice, &text).await)
         });
     }
     while !running.is_empty() {

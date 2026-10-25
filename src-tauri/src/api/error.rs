@@ -49,7 +49,7 @@ impl ApiError {
         }
     }
 
-    fn map_details(self, change: impl FnOnce(String) -> String) -> Self {
+    pub(crate) fn map_details(self, change: impl FnOnce(String) -> String) -> Self {
         match self {
             ApiError::InvalidKey(d) => ApiError::InvalidKey(change(d)),
             ApiError::RateLimited(d) => ApiError::RateLimited(change(d)),

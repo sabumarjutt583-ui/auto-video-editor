@@ -8,6 +8,7 @@ pub mod gemini;
 pub mod gemini_tts;
 pub mod groq;
 pub mod openai;
+pub mod rotate;
 
 /// Checks and tidies a model name typed by the user. Returns `None` if it is not usable.
 ///

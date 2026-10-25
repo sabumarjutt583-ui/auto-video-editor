@@ -1,17 +1,13 @@
 import { generateText } from "../../ai.ts";
-import { logFrontendError } from "../../appUpdate/api.ts";
 import { toAppError } from "../../errors.ts";
 import { generatePrompts, type PromptContext } from "../../prompts/generate.ts";
-import { randomPauseMs, runChatPrompts } from "../../prompts/chat/runner.ts";
-import { loadThread, saveThread } from "../../prompts/chat/threadStore.ts";
-import { webChatTransport } from "../../prompts/chat/tauriTransport.ts";
 import { runJob } from "../../../store/jobStore.ts";
 import { useProjectStore } from "../../../store/projectStore.ts";
 import { useSettingsStore } from "../../../store/settingsStore.ts";
 import { useStyleStore } from "../../../store/styleStore.ts";
 import { openProjectOf, patchProject, type StageContext } from "./context.ts";
 
-/** Prompts: one picture prompt per scene, in the channel's style (Gemini API key, or the web chat when Settings says so). */
+/** Prompts: one picture prompt per scene, in the channel's style (written by Gemini or Groq, as chosen in Settings). */
 export async function promptsStage(ctx: StageContext): Promise<void> {
   if (!useStyleStore.getState().loaded) await useStyleStore.getState().load();
   const project = openProjectOf(ctx);
@@ -25,24 +21,7 @@ export async function promptsStage(ctx: StageContext): Promise<void> {
   const onScenes = (next: typeof project.scenes) => patchProject(ctx, { scenes: next });
   const latest = () => useProjectStore.getState().project?.scenes ?? project.scenes;
 
-  const outcome = await runJob("ai", "Writing prompts with Gemini", async (jobId) => {
-    if (settings?.textViaChat === true) {
-      const chat = await runChatPrompts({
-        scenes: latest(),
-        targetIds,
-        context,
-        transport: webChatTransport(jobId),
-        tag: ctx.projectId.replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase() || "P",
-        batchSize: Math.min(25, Math.max(5, settings.chatBatchSize ?? 10)),
-        pauseBetween: () => randomPauseMs(settings.chatPauseMinSec ?? 4, settings.chatPauseMaxSec ?? 12),
-        onLog: (line) => void logFrontendError(line, "make video (chat run)").catch(() => undefined),
-        thread: loadThread(ctx.projectId),
-        onThread: (thread) => saveThread(ctx.projectId, thread),
-        onBatch: ({ batch, total }) => ctx.say(`Prompts: batch ${batch} of ${total}`),
-        onScenes,
-      });
-      return { scenes: chat.scenes, failed: chat.failed ? { batch: chat.failed.batch, error: chat.failed.error } : null };
-    }
+  const outcome = await runJob("ai", `Writing prompts with ${settings?.textProvider === "groq" ? "Groq" : "Gemini"}`, async (jobId) => {
     return generatePrompts({
       scenes: latest(),
       targetIds,

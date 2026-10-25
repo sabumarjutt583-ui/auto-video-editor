@@ -116,10 +116,9 @@ test("engines that need a key say so, and the start engine follows the settings"
   assert.match(choices.find((c) => c.value === "gemini")?.unavailable ?? "", /Gemini key/);
   assert.equal(choices.find((c) => c.value === "openai")?.unavailable, null);
   assert.equal(choices.find((c) => c.value === "chat")?.unavailable, null);
-  assert.equal(defaultEngine({ gemini: true, openai: true }, true), "chat");
-  assert.equal(defaultEngine({ gemini: true, openai: true }, false), "gemini");
-  assert.equal(defaultEngine({ gemini: false, openai: true }, false), "openai");
-  assert.equal(defaultEngine({ gemini: false, openai: false }, false), "chat");
+  assert.equal(defaultEngine({ gemini: true, openai: true }), "gemini");
+  assert.equal(defaultEngine({ gemini: false, openai: true }), "openai");
+  assert.equal(defaultEngine({ gemini: false, openai: false }), "chat");
 });
 
 test("a prompt must end with the style lock", () => {

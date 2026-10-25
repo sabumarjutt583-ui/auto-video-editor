@@ -1,5 +1,5 @@
 export type { AppError } from "./error";
-export type { KeyStatus, Provider } from "./keys";
+export type { KeySlotInfo, KeyStatus, Provider } from "./keys";
 export type { AnalyzeAnswer, AnalyzeEngine, AnalyzeRequest, PreparedImage, StyleRefs } from "./customStyle";
 export type { AppSettings, AspectRatio, Quality } from "./settings";
 export { SCHEMA_VERSION } from "./project";
