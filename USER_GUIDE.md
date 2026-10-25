@@ -218,3 +218,6 @@ Every Google account can make only a few videos a day (about 4 to 5 on Pro). Whe
 
 ## Videos with Google Flow
 In the Image Generator, Videos card, choose where the videos are made: **Google Flow** (Veo, about 10 credits per 8-second video; a Pro account has about 1,050 credits a month), **Gemini** (a few videos a day per account) or **Auto** (Flow first, Gemini when Flow credits are used up). The scene's picture becomes the first frame, so the video keeps the same person and place. Each Google account makes one video at a time; an account without credits rests and the others carry on. If Google asks for a check (captcha), the account is paused: open its window and finish the check yourself.
+
+## Make the voice-over inside the app
+In Prompt Generator, Voice step, use **Make the voice with Gemini**: paste the script, pick a model and a voice (press **Listen** to hear it), optionally write a style such as "in a calm, warm storyteller voice", then press **Make voice**. Long scripts are made in pieces; if something fails, press the button again and the finished pieces are not made twice. It uses your Gemini API key (Settings). You can still upload your own voice-over instead.

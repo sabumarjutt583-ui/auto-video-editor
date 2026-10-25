@@ -12,6 +12,7 @@ import { useProjectStore } from "../../store/projectStore";
 import type { AppError, CleanupParams, Project, SilenceReport, VoiceCleanup } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
 import { Button, Card, SegmentedControl } from "../ui";
+import { GenerateVoiceCard } from "./GenerateVoiceCard";
 import { JobBar } from "./JobBar";
 import { SilencePanel } from "./SilencePanel";
 import { UnlockDialog } from "./UnlockDialog";
@@ -180,6 +181,8 @@ export function VoiceStep({ project }: { project: Project }) {
 
       {error && <ErrorNotice error={error} />}
       {notice && <p className="text-sm text-muted">{notice}</p>}
+
+      {!voiceLocked && <GenerateVoiceCard project={project} disabled={busy || voiceLocked} onGenerated={importFile} />}
 
       {!original ? (
         <Card title="Your voice-over" description="Drop the narration here. It is copied into the project, your original stays where it is.">

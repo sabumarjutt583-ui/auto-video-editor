@@ -212,3 +212,12 @@ Not done here (no Windows PC, no real Google account, no desktop window): the re
 3. Watch the account's browser window if shown: it should open a Flow project, open the settings (Video, Frames, 16:9, Veo 3.1 - Lite, 720p, 8s, x1), put the picture into Start, type the prompt and send.
 4. After about 2 minutes the file `media/<timecode>.mp4` appears and the scene gets the video. Check: same person/scene as the picture, 720p, credits down by 10 in the account menu.
 5. Failure cases: with 0 credits the account must rest (no video started); a "unusual activity" page must pause the account. If a button is not found, the error says which one: fix its text/selector in resources/image-engine/config.json `flow` (or by a library package) and try again.
+
+## Voice from a script (by hand, needs a Gemini API key)
+1. Prompt Generator > Voice > "Make the voice with Gemini". Paste 2 short English sentences, press Listen for 3 different voices: each plays.
+2. Make voice with the default model: the voice appears in the waveform below, with the length in the note. Do the same with a Korean paragraph.
+3. Paste about 5 minutes of text (6+ pieces): the progress shows "piece N of M"; the joined voice has no jumps in loudness between pieces.
+4. Press Cancel in the middle: "Cancelled", finished pieces are kept. Press Make voice again: the note says how many pieces were "kept from the last try".
+5. Switch the model to 2.5 Flash and make a short voice. A wrong key shows the "key was not accepted" message.
+6. Check whether the style note ("in a calm, warm storyteller voice") is only heard as a style and never read aloud. If it is read aloud, change `spoken_text` in src-tauri/src/tts/mod.rs.
+7. Urdu / Nepali: try a short text and write down whether the model reads it well.

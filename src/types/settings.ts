@@ -19,6 +19,10 @@ export interface AppSettings {
   apiBatchSize: number;
   /** Requests at the same time with the Gemini API key (1 to 3). */
   apiParallel: number;
+  /** Gemini speech model, ready-made voice and last style note for "Generate voice". */
+  ttsModel: string;
+  ttsVoice: string;
+  ttsStyle: string;
   /** Polite pause before the next web chat message: a random time between these seconds (0 to 120). */
   chatPauseMinSec: number;
   chatPauseMaxSec: number;

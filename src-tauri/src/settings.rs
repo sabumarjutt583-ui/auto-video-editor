@@ -60,6 +60,10 @@ pub struct Settings {
     pub api_batch_size: u8,
     /// Requests sent at the same time with the Gemini API key (1 to 3).
     pub api_parallel: u8,
+    /// The Gemini speech model and ready-made voice used to make a voice-over from a script, and the last style note.
+    pub tts_model: String,
+    pub tts_voice: String,
+    pub tts_style: String,
     /// Polite pause before the next web chat message, a random time between these two numbers of seconds (0 to 120; 0 and 0 = no pause).
     pub chat_pause_min_sec: u8,
     pub chat_pause_max_sec: u8,
@@ -119,6 +123,9 @@ impl Default for Settings {
             chat_batch_size: 10,
             api_batch_size: 10,
             api_parallel: 2,
+            tts_model: crate::tts::voices::DEFAULT_MODEL.to_string(),
+            tts_voice: crate::tts::voices::DEFAULT_VOICE.to_string(),
+            tts_style: String::new(),
             chat_pause_min_sec: 4,
             chat_pause_max_sec: 12,
             export_empty_lines: 2,
@@ -208,8 +215,14 @@ impl Settings {
             return Err(invalid("The brand kit id is not valid."));
         }
 
+        let tts_model = clean_model_name(&self.tts_model, false).unwrap_or_else(|| crate::tts::voices::DEFAULT_MODEL.to_string());
+        let tts_voice = if crate::tts::voices::is_voice(&self.tts_voice) { self.tts_voice.clone() } else { crate::tts::voices::DEFAULT_VOICE.to_string() };
+        let tts_style: String = self.tts_style.trim().chars().take(300).collect();
         let (pause_min, pause_max) = (self.chat_pause_min_sec.min(120), self.chat_pause_max_sec.min(120));
         Ok(Self {
+            tts_model,
+            tts_voice,
+            tts_style,
             chat_batch_size: self.chat_batch_size.clamp(5, 25),
             api_batch_size: self.api_batch_size.clamp(5, 20),
             api_parallel: self.api_parallel.clamp(1, 3),

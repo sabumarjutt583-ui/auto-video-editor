@@ -393,25 +393,30 @@ impl Accounts {
     }
 
     /// The account that should make the next video: usable, not out of videos, and not making one right now.
+    #[cfg(test)]
     pub fn claim_video(&mut self, now: u64) -> Option<String> {
         self.claim_video_for(VideoSource::Gemini, now)
     }
 
+    #[cfg(test)]
     pub fn release_video(&mut self, id: &str) {
         self.release_video_for(VideoSource::Gemini, id);
     }
 
     /// The account has no videos left until `until` (epoch ms).
+    #[cfg(test)]
     pub fn video_limit_until(&mut self, id: &str, until: u64) {
         self.video_limit_for(VideoSource::Gemini, id, until);
     }
 
     /// When the first account that is out of videos comes back (0 when none rests).
+    #[cfg(test)]
     pub fn next_video_end(&self, now: u64) -> u64 {
         self.next_video_end_for(VideoSource::Gemini, now)
     }
 
     /// How many usable accounts could make a video right now, and how many are out of videos.
+    #[cfg(test)]
     pub fn video_counts(&self, now: u64) -> (usize, usize) {
         self.video_counts_for(VideoSource::Gemini, now)
     }

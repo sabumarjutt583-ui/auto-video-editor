@@ -25,3 +25,4 @@ pub mod settings;
 pub mod sfx;
 pub mod styles;
 pub mod timing;
+pub mod tts;

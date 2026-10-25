@@ -29,6 +29,7 @@ mod sfx;
 mod styles;
 mod thumbnails;
 mod timing;
+mod tts;
 
 /// Every command of the app. The Admin Edition has the same list plus its own commands.
 #[cfg(not(feature = "admin"))]
@@ -59,6 +60,9 @@ macro_rules! handler {
             commands::audio::project_file_path,
             commands::audio::preview_silence,
             commands::ai::generate_text,
+            commands::tts::tts_options,
+            commands::tts::tts_preview,
+            commands::tts::tts_generate,
             commands::files::write_text_file,
             commands::captions::fonts_dir,
             commands::sfx::list_sfx,
@@ -168,6 +172,9 @@ macro_rules! handler {
             commands::audio::project_file_path,
             commands::audio::preview_silence,
             commands::ai::generate_text,
+            commands::tts::tts_options,
+            commands::tts::tts_preview,
+            commands::tts::tts_generate,
             commands::files::write_text_file,
             commands::captions::fonts_dir,
             commands::sfx::list_sfx,

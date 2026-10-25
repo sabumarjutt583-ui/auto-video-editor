@@ -5,6 +5,7 @@ pub mod base64;
 pub mod client;
 pub mod error;
 pub mod gemini;
+pub mod gemini_tts;
 pub mod groq;
 pub mod openai;
 
