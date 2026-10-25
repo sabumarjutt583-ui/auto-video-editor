@@ -1,13 +1,13 @@
 import { create } from "zustand";
 
-import { readEditor } from "../lib/editor/model";
 import { isCancelled, toAppError } from "../lib/errors";
 import { stageDone } from "../lib/pipeline/plan";
-import { profileEditor, profileProblems, profileToPatch, type ChannelProfile } from "../lib/pipeline/profile";
+import { profileProblems, type ChannelProfile } from "../lib/pipeline/profile";
 import { runPipeline } from "../lib/pipeline/runner";
 import { STAGE_IDS, type StageId } from "../lib/pipeline/stages";
 import { initialView, reduceView, restart, withDetail, type RunView } from "../lib/pipeline/view";
 import { runStage } from "../lib/pipeline/impl";
+import { applyChannelProfile } from "../lib/pipeline/impl/applyProfile";
 import { createProject } from "../lib/projects";
 import type { AppError } from "../types";
 import { requestCancel, useJobStore } from "./jobStore";
@@ -129,13 +129,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
         await useProjectStore.getState().open(created.id);
         const project = useProjectStore.getState().project;
         if (!project) throw new Error("The new project could not be opened.");
-        const editor = readEditor(project);
-        useProjectStore.getState().update({
-          ...profileToPatch(input.profile),
-          channelId: input.profile.id,
-          script: input.script,
-          editor: { ...editor, ...profileEditor(input.profile, editor) },
-        });
+        applyChannelProfile(input.profile, input.script);
         set({ projectId: created.id, channelId: input.profile.id });
         last = { input, projectId: created.id };
         await execute(input, created.id);

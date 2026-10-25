@@ -11,7 +11,9 @@ import {
   UnreadableProjects,
   useProjectList,
 } from "../components/projects";
+import { useProfiles } from "../components/pipeline";
 import { Button } from "../components/ui";
+import { applyChannelProfile } from "../lib/pipeline/impl/applyProfile";
 import { toAppError } from "../lib/errors";
 import { filterAndSort, type ProjectSort } from "../lib/projectList";
 import { createProject, deleteProject, duplicateProject, renameProject } from "../lib/projects";
@@ -26,6 +28,7 @@ type Dialog =
 export function ProjectsPage() {
   const navigate = useNavigate();
   const { list, loading, error: loadError, reload } = useProjectList();
+  const profiles = useProfiles();
   const currentId = useProjectStore((state) => state.project?.id ?? null);
 
   const [query, setQuery] = useState("");
@@ -59,8 +62,17 @@ export function ProjectsPage() {
       await reload();
     }, "The project could not be copied.");
 
-  async function create(name: string) {
-    await createProject(name);
+  async function create(name: string, channelId: string) {
+    const made = await createProject(name);
+    const profile = profiles.profiles.find((p) => p.id === channelId);
+    if (profile) {
+      // The new video starts with the channel's settings and stays linked to it.
+      const store = useProjectStore.getState();
+      await store.flush();
+      await store.open(made.id);
+      applyChannelProfile(profile);
+      await store.flush();
+    }
     await reload();
     setDialog(null);
   }
@@ -111,6 +123,7 @@ export function ProjectsPage() {
               key={project.id}
               project={project}
               isCurrent={project.id === currentId}
+              channelName={profiles.profiles.find((p) => p.id === project.channelId)?.name ?? null}
               onOpen={() => void openProject(project.id)}
               onRename={() => setDialog({ kind: "rename", id: project.id, name: project.name })}
               onDuplicate={() => void duplicate(project.id)}
@@ -147,6 +160,8 @@ export function ProjectsPage() {
           title="New project"
           confirmLabel="Create"
           initialName="My new video"
+          channels={profiles.profiles}
+          initialChannelId={profiles.chosen?.id ?? ""}
           onSubmit={create}
           onClose={() => setDialog(null)}
         />

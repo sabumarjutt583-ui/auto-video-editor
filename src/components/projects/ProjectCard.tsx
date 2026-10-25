@@ -10,13 +10,15 @@ interface ProjectCardProps {
   project: ProjectSummary;
   /** True for the project that is open right now. */
   isCurrent: boolean;
+  /** Name of the channel the video belongs to, or null. */
+  channelName?: string | null;
   onOpen: () => void;
   onRename: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
 }
 
-export function ProjectCard({ project, isCurrent, onOpen, onRename, onDuplicate, onDelete }: ProjectCardProps) {
+export function ProjectCard({ project, isCurrent, channelName = null, onOpen, onRename, onDuplicate, onDelete }: ProjectCardProps) {
   return (
     <article
       className={cn(
@@ -26,7 +28,10 @@ export function ProjectCard({ project, isCurrent, onOpen, onRename, onDuplicate,
     >
       <div className="flex items-center justify-between gap-2">
         <ProjectStatusBadge status={project.status} />
-        {isCurrent && <span className="text-xs font-medium text-accent-fg">Open now</span>}
+        <span className="flex items-center gap-2">
+          {channelName && <span className="max-w-32 truncate rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-fg" title={`Channel: ${channelName}`}>{channelName}</span>}
+          {isCurrent && <span className="text-xs font-medium text-accent-fg">Open now</span>}
+        </span>
       </div>
 
       <button
