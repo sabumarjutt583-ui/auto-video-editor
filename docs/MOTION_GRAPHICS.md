@@ -1,6 +1,6 @@
 # Motion graphics: audit and plan (Phase 0)
 
-Status: Phase 0 of the master task "Professional motion graphics system". This file describes what exists today, what is wrong with it, and how the new system (GraphicSpec + a deterministic renderer) is built without breaking old projects. It is updated at the end of every phase; Phase 13 turns it into the final architecture reference.
+Status: COMPLETE — phases 0–13 are done (see the phase table at the end of this file and section 7, "Final architecture (after phase 13)"). This file is now the final architecture reference. The original Phase 0 audit text below is kept as a historical record of what existed before the new system; it does not describe the current system.
 
 ## 1. How it works today
 

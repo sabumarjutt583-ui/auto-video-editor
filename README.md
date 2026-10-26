@@ -5,7 +5,7 @@ A desktop app (Windows first; also builds for macOS and Linux) for creators of f
 1. **Prompt Generator**: add a voice-over and a script (or an SRT/JSON timing file). The app gets exact word timings, cuts the narration into scenes and writes style-locked image/video prompts. Every prompt starts with a timecode such as `S01_000.0-005.1`.
 2. **Auto Editor**: drop a folder of pictures/clips named with those timecodes. The app builds the timeline, adds captions, Ken Burns motion, transitions, music with ducking and sound effects, and renders the final MP4.
 
-Stack: Tauri 2, React 18 + TypeScript (strict) + Vite + Tailwind, Zustand, Rust (tokio, serde, reqwest, keyring), FFmpeg/FFprobe as bundled sidecars (LGPL build). No Python, no Electron. See `CLAUDE.md` for the project rules.
+Stack: Tauri 2, React 18 + TypeScript (strict) + Vite + Tailwind, Zustand, Rust (tokio, serde, reqwest, keyring), FFmpeg as the bundled sidecar (LGPL build). No FFprobe is bundled: files are read with `ffmpeg -i` (see `src-tauri/src/probe.rs`). No Python, no Electron. See `CLAUDE.md` for the project rules.
 
 ## Set up for development
 
@@ -21,7 +21,7 @@ You need:
 
 ```bash
 npm install
-npm run setup:ffmpeg      # downloads LGPL FFmpeg + FFprobe into src-tauri/binaries (checked with SHA-256)
+npm run setup:ffmpeg      # downloads LGPL FFmpeg into src-tauri/binaries (checked with SHA-256)
 npm run tauri dev         # starts the app with hot reload
 ```
 
@@ -58,7 +58,7 @@ src/                  React app: pages/, components/, store/, lib/ (pure logic +
 src-tauri/src/imagegen/ Image Generator: browser/ (own DevTools client), queue, scheduler, accounts, save, API engines (docs/IMAGE_ENGINE_DESIGN.md)
 src-tauri/src/        Rust: commands/, api/, audio/, captions/, media/, render/, library/ (updates), admin/ (feature "admin"),
                       jobs.rs, ffmpeg*.rs, keys.rs, settings.rs, logging.rs, styles.rs, sfx.rs, timing.rs, project/
-src-tauri/binaries/   FFmpeg and FFprobe sidecars (downloaded, not in git)
+src-tauri/binaries/   FFmpeg sidecar only (downloaded, not in git; no FFprobe sidecar)
 resources/image-engine/ settings of the free image engine (config.json, updated as a library package)
 resources/styles/     built-in style profiles (JSON)
 resources/sfx/        built-in sound effects + index.json + package.json (made by scripts/make-sfx.mjs)

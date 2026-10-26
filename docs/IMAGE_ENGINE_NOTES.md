@@ -87,7 +87,7 @@ Parses blocks `Prompt N: text` (multi-line allowed, optional quotes or bullets, 
 | Config | constants in JS | `resources/image-engine/config.json`, updated by the library package system |
 | Consent | none | one-time dialog before the free engine is used |
 | Google pages that need a human | `auth`/`access` messages | also captcha, "unusual traffic", terms pages: shown to the user, account paused, never worked around |
-| API fallback | none | Gemini image API and Cloudflare Workers AI |
+| API fallback | none | REMOVED: the Gemini image API and Cloudflare Workers AI fallback engines were removed — do not re-add them from this old row. Only Google-account web pages are used now (see `docs/IMAGE_ENGINE_DESIGN.md`). |
 
 ## 13. Hard rules we keep from the reference
 

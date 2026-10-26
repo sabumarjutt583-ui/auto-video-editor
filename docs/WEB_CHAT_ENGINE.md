@@ -59,7 +59,9 @@ copy-paste mode (6).
 
 ## Part 4: conversation design (done)
 - Code: src/lib/prompts/chat/{messages,parse,verify,runner,threadStore,tauriTransport}.ts (+chat.test.ts); Rust
-  `imagegen_chat_thread` (ops.rs `chat_thread`, chat.rs `ask_thread`).
+  chat thread path in `chat.rs` (`ask_thread`). Note (fix/remaining-gaps-phase1): the former
+  `imagegen_chat_thread` Tauri command (and its ops.rs `chat_thread` method) was removed because it had
+  no frontend caller; the low-level `chat.rs` thread path used by `ask_full`/`chat_ask` is still live.
 - One thread per project / quick session (address + account stored in localStorage `chatThreads`); a new thread only
   when none is stored, after a soft failure, after 15 batches, after a batch with more than 30% fixed rows, or when the
   stored account is busy/resting.
@@ -83,7 +85,9 @@ copy-paste mode (6).
 - Scenes shorter than `sceneSettings.minSeconds` (default 2.0, 0 = off) are joined to the previous scene (to the next
   if first) in all modes; ids and timecodes are renumbered (src/lib/scenes/short.ts, tests in short.test.ts).
 
-## Part 6: manual mode (done)
+## Part 6: manual mode (REMOVED — do not use)
+
+> Note (fix/remaining-gaps-phase1): Manual mode was removed. The files named below (`src/lib/prompts/chat/manual.ts`, `src/components/prompts/ManualPanel.tsx`) no longer exist in the repo, and prompts go through Gemini/Groq API keys only. The text below is kept only as a historical record of what was removed, not as current behaviour.
 - Engine choice (Prompt Generator, project and quick, and Settings > Text engine): API key / Gemini web chat
   (automatic) / Manual (copy & paste). Setting `textManual`.
 - src/lib/prompts/chat/manual.ts builds the same messages the web chat sends (`planManual`: Setup + batches with the

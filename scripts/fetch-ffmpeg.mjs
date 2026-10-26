@@ -1,4 +1,12 @@
 // Local developer shortcut: downloads a ready-made LGPL FFmpeg (full BtbN build) and installs it as the Tauri sidecar:
+//
+// Note (fix/remaining-gaps-phase1): macOS is intentionally NOT in BUILDS below.
+// hostTriple() already returns darwin triples, but no BtbN macOS asset exists for
+// them, so adding a macOS entry here would download a file that does not exist.
+// macOS developers use the source-built sidecar instead: scripts/ci/build-ffmpeg-macos.sh
+// (which states nobody publishes ready-made LGPL macOS builds with libass +
+// libopenh264 + libwebp), or place a compatible LGPL ffmpeg binary manually at
+// src-tauri/binaries/ffmpeg-<target-triple> as the fail() message below describes.
 //   src-tauri/binaries/ffmpeg-<target-triple>[.exe]
 //
 // Source: BtbN/FFmpeg-Builds (stable n8.1 branch, LGPL, static). The download is

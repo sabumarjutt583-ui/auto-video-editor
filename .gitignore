@@ -3,10 +3,6 @@ dist
 *.local
 *.log
 
-# Rust build output
-src-tauri/target
-src-tauri/gen/schemas
-
 # FFmpeg sidecars are downloaded by `npm run setup:ffmpeg` (large binaries)
 src-tauri/binaries/*
 !src-tauri/binaries/.gitkeep
@@ -25,7 +21,7 @@ dist-packages
 *.pem
 *.p12
 
-# Build output
+# Build output (this also covers the Rust build output: src-tauri/target and src-tauri/gen — the duplicate lines for those paths that used to appear above were removed in fix/remaining-gaps-phase1)
 dist/
 src-tauri/target/
 src-tauri/gen/

@@ -43,3 +43,7 @@ Notes:
 - The Linux AppImage is large because it carries the WebKit and GTK system libraries (about 242 MB unpacked). This is how AppImage works. Most Linux users can use the 43.8 MB `.deb` instead.
 - Fonts could not shrink: they are already separate regional files, Regular and Bold only.
 - Sound effects stay WAV (3.6 MB in total, a smaller format would save about 3 MB but changes the mixing path).
+
+## Version 0.6.1 sizes — NOT yet recorded (note added in fix/remaining-gaps-phase1, 2026-10-26)
+
+The tables above are historical data for version 0.1.1 only. Installer sizes for version 0.6.1 have NOT been recorded in this file yet — do not use the 0.1.1 numbers above as 0.6.1 sizes. A future update should record the real 0.6.1 installer sizes (Windows setup.exe, Windows .msi, macOS universal .dmg, Linux .AppImage, Linux .deb) from the published release in abubacker44235-bit/autoeditor-releases, with the same before/after breakdown format as above, and only then remove this note.
