@@ -36,6 +36,8 @@ FILTERS=(
   # video
   zoompan scale crop pad fps format setsar setdar xfade fade overlay gblur subtitles ass
   setpts trim tpad framerate hue split null nullsink
+  # ping-pong short clips (Phase 3, src-tauri/src/render/plan.rs): forward, then reversed, then repeated.
+  reverse loop
   # audio
   anull acopy atrim asetpts silencedetect silenceremove sidechaincompress loudnorm ebur128 volumedetect
   amix volume afade aresample apad aformat adelay asplit join pan amerge alimiter atempo anullsink

@@ -113,6 +113,7 @@ export function ProfileEditing({ profile, onChange }: Props) {
               <option value="smart">Slow down a little, then repeat</option>
               <option value="loop">Repeat from the start</option>
               <option value="hold">Hold the last picture</option>
+              <option value="ping_pong">Forward, then back (ping-pong)</option>
             </Select>
           </Field>
         </div>

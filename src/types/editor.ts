@@ -174,8 +174,8 @@ export type RenderFps = 24 | 30 | 60;
 export type TransitionMode = "cut" | "fade" | "mixed";
 
 /** The output choices of the final render (aspect ratio and quality are in `project.settings`). */
-/** What a video clip shorter than its scene does: slow down a little then play again, hold the last picture, or just play again. */
-export type ShortClipMode = "smart" | "hold" | "loop";
+/** What a video clip shorter than its scene does: slow down a little then play again, hold the last picture, just play again, or play forward then back (ping-pong). */
+export type ShortClipMode = "smart" | "hold" | "loop" | "ping_pong";
 
 export interface RenderData {
   fps: RenderFps;

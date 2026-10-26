@@ -25,6 +25,7 @@ test("readRender repairs damaged data", () => {
   assert.deepEqual(readRender({ fps: 25, transitions: "wild", kenBurns: false }), { fps: 30, transitions: "mixed", kenBurns: false, shortClip: "smart" });
   assert.equal(readRender({ fps: 60 }).fps, 60);
   assert.equal(readRender({ shortClip: "loop" }).shortClip, "loop");
+  assert.equal(readRender({ shortClip: "ping_pong" }).shortClip, "ping_pong");
   assert.equal(readRender({ shortClip: "nope" }).shortClip, "smart");
 });
 

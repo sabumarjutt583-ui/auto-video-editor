@@ -3,7 +3,7 @@ import type { RenderData, RenderFps, ShortClipMode, TransitionMode } from "../..
 export const DEFAULT_RENDER: RenderData = { fps: 30, transitions: "mixed", kenBurns: true, shortClip: "smart" };
 
 const FPS: readonly RenderFps[] = [24, 30, 60];
-const SHORT: readonly ShortClipMode[] = ["smart", "hold", "loop"];
+const SHORT: readonly ShortClipMode[] = ["smart", "hold", "loop", "ping_pong"];
 const MODES: readonly TransitionMode[] = ["cut", "fade", "mixed"];
 
 /** The render choices of a project, with every missing or damaged part replaced by its default. */

@@ -33,6 +33,7 @@ const SHORT: { value: ShortClipMode; label: string }[] = [
   { value: "smart", label: "Slow, then repeat" },
   { value: "loop", label: "Repeat" },
   { value: "hold", label: "Hold last picture" },
+  { value: "ping_pong", label: "Ping-pong (forward, then back)" },
 ];
 const MODES: { value: TransitionMode; label: string }[] = [
   { value: "cut", label: "Cut" },

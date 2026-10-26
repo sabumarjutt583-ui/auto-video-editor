@@ -27,7 +27,12 @@ const BY_SCRIPT: Record<CaptionScript, FontInfo["id"]> = {
   chinese: "noto_sc",
   devanagari: "noto_devanagari",
   arabic: "noto_arabic",
-  // Noto Nastaliq Urdu looks better but FFmpeg's caption renderer (libass) draws it as empty boxes, so Urdu uses Noto Sans Arabic.
+  // Urdu stays on Noto Sans Arabic on purpose. Verified 2026-10-26 with a real render (system FFmpeg 8.1.2 + libass):
+  // the word محبت in Noto Nastaliq Urdu came out as four empty boxes, while the same word in Noto Sans Arabic
+  // rendered correctly. The custom FFmpeg build does include HarfBuzz + FriBidi + libass, so the blocker is
+  // libass's Nastaliq shaping, not a missing shaping library — and no Nastaliq font is bundled in resources/fonts,
+  // so naming the family alone would not fix it either. A real Nastaliq fix needs a different caption renderer
+  // (for example pre-rendered picture captions), not a font swap; until then Urdu captions are readable Naskh.
   urdu: "noto_arabic",
 };
 

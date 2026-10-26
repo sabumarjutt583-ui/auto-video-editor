@@ -67,7 +67,7 @@ pub fn video_speed_for(clip_seconds: f64, scene_seconds: f64, user_speed: f64, f
     if user_speed.is_finite() && user_speed < 0.999 {
         return user_speed.clamp(0.25, 1.0);
     }
-    if fill == ShortFill::Loop {
+    if fill == ShortFill::Loop || fill == ShortFill::PingPong {
         return 1.0;
     }
     (clip_seconds / scene_seconds).clamp(MIN_AUTO_SPEED, 1.0)
@@ -75,7 +75,19 @@ pub fn video_speed_for(clip_seconds: f64, scene_seconds: f64, user_speed: f64, f
 
 /// True when the clip must play again from the start to cover the scene at this speed.
 pub fn needs_loop(clip_seconds: f64, scene_seconds: f64, speed: f64, fill: ShortFill) -> bool {
-    fill != ShortFill::Hold && clip_seconds > 0.0 && clip_seconds / speed < scene_seconds - 0.02
+    fill != ShortFill::Hold && fill != ShortFill::PingPong && clip_seconds > 0.0 && clip_seconds / speed < scene_seconds - 0.02
+}
+
+/// True when a clip plays forward then back for the whole scene. Ping-pong is not a loop: it uses
+/// the `reverse` + `loop` filters in `clip_args`, so it must never also get `-stream_loop`.
+pub fn needs_ping_pong(clip_seconds: f64, scene_seconds: f64, speed: f64, fill: ShortFill) -> bool {
+    fill == ShortFill::PingPong && clip_seconds > 0.0 && speed > 0.0 && clip_seconds / speed < scene_seconds - 0.02
+}
+
+/// Frames in one forward pass of a ping-pong cycle, after the pace (speed + output fps) is applied.
+pub fn ping_pong_cycle_frames(clip_seconds: f64, speed: f64, fps: u32) -> i64 {
+    let forward = ((clip_seconds / speed) * f64::from(fps)).round() as i64;
+    (forward.max(1) * 2).max(2)
 }
 
 fn esc_even(value: f64) -> u32 {
@@ -185,7 +197,25 @@ pub fn clip_args(scene: &RenderScene, source: &Path, frames: i64, width: u32, he
             let pace = format!("setpts=PTS/{speed:.4},fps={fps}");
             // Hold the last picture for as long as the clip is too short (the output is cut at `frames`).
             let hold = format!("tpad=stop_mode=clone:stop_duration={:.3}", scene_seconds + 1.0);
-            if scene.source.blur_all {
+            // Ping-pong: forward, then reversed, then the pair again forever. The output is cut at
+            // `frames`, so no hold is needed. The `loop` filter repeats the forward+reverse pair;
+            // its size is the pair's frame count, counted after the pace above.
+            let ping_pong = needs_ping_pong(scene.source.duration, scene_seconds, speed, scene.short_fill);
+            if ping_pong {
+                let cycle = ping_pong_cycle_frames(scene.source.duration, speed, fps);
+                let chain = format!("{pace},split=2[ppf][ppr];[ppr]reverse[pprev];[ppf][pprev]concat=n=2:v=1:a=0,loop=loop=-1:size={cycle}:start=0");
+                if scene.source.blur_all {
+                    args.extend([s("-filter_complex"), format!("[0:v]{chain},{},format=yuv420p[out]", blurred(width, height)), s("-map"), s("[out]")]);
+                } else if scene.fit == Fit::Blur {
+                    let graph = format!(
+                        "[0:v]{chain},split=2[a][b];[a]{}[bg];[b]scale={width}:{height}:force_original_aspect_ratio=decrease,setsar=1[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,format=yuv420p[out]",
+                        blurred(width, height)
+                    );
+                    args.extend([s("-filter_complex"), graph, s("-map"), s("[out]")]);
+                } else {
+                    args.extend([s("-filter_complex"), format!("[0:v]{chain},{},format=yuv420p[out]", cover(width, height)), s("-map"), s("[out]")]);
+                }
+            } else if scene.source.blur_all {
                 args.extend([s("-vf"), format!("{pace},{},{hold},format=yuv420p", blurred(width, height))]);
             } else if scene.fit == Fit::Blur {
                 let graph = format!(
@@ -456,6 +486,20 @@ mod tests {
         video.short_fill = ShortFill::Loop;
         let looped = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");
         assert!(looped.contains("-stream_loop -1") && looped.contains("setpts=PTS/1.0000"), "{looped}");
+        // Ping-pong: forward then reversed, repeated by the loop filter — never by -stream_loop,
+        // and with no hold (the loop is endless and the output is cut at `frames`).
+        assert!(!needs_loop(3.0, 5.0, 1.0, ShortFill::PingPong), "ping-pong is not a loop");
+        assert!(needs_ping_pong(3.0, 5.0, 1.0, ShortFill::PingPong));
+        assert!(!needs_ping_pong(9.0, 5.0, 1.0, ShortFill::PingPong), "a long clip is never ping-ponged");
+        assert_eq!(ping_pong_cycle_frames(3.0, 1.0, 30), 180, "90 frames forward + 90 back");
+        video.short_fill = ShortFill::PingPong;
+        let pong = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");
+        assert!(pong.contains("reverse") && pong.contains("concat=n=2") && pong.contains("loop=loop=-1:size=180:start=0"), "{pong}");
+        assert!(!pong.contains("-stream_loop") && !pong.contains("tpad="), "{pong}");
+        assert!(pong.contains("-filter_complex") && pong.contains("-map [out]"), "{pong}");
+        video.fit = Fit::Blur;
+        let pong_blur = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");
+        assert!(pong_blur.contains("reverse") && pong_blur.contains("overlay=(W-w)/2:(H-h)/2"), "{pong_blur}");
         // A long clip is never looped: it is cut at the end of the scene.
         video.source.duration = 9.0;
         let long = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");

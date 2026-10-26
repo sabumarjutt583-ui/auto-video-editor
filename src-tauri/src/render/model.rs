@@ -59,6 +59,9 @@ pub enum ShortFill {
     Hold,
     /// Normal speed, play again from the start.
     Loop,
+    /// Normal speed, play forward then back, again and again. Needs the `reverse` and `loop`
+    /// filters in the FFmpeg sidecar (scripts/ci/ffmpeg-components.sh, rebuilt with the next release).
+    PingPong,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
