@@ -28,6 +28,42 @@ export function fitZoom(duration: number, width: number): number {
   return duration > 0 ? clampZoom(width / duration) : 40;
 }
 
+/** The pointer-move threshold used by the timeline drag hook: a move counts
+ * as a drag only once it is strictly more than this many pixels. */
+export const DRAG_MOVE_THRESHOLD = 4;
+
+/** True once a timeline pointer has moved far enough to count as a drag. */
+export function dragMoved(originX: number, clientX: number, threshold: number = DRAG_MOVE_THRESHOLD): boolean {
+  return Math.abs(clientX - originX) > threshold;
+}
+
+export type ArrowTarget =
+  | { kind: "scene"; index: number; start: number }
+  | { kind: "seek"; time: number };
+
+/**
+ * The pure part of the editor arrow-key handling (see useEditorKeys):
+ * ArrowRight goes to the next scene, ArrowLeft goes back only when the
+ * playhead is more than 0.5 s into the current scene, otherwise to the
+ * previous scene. Past the ends it seeks to the end or to 0.
+ */
+export function arrowTarget(
+  scenes: readonly Scene[],
+  time: number,
+  voiceDuration: number,
+  key: "ArrowRight" | "ArrowLeft",
+): ArrowTarget {
+  const index = sceneIndexAt(scenes, time);
+  const next = key === "ArrowRight"
+    ? index + 1
+    : time - (scenes[index]?.start ?? 0) > 0.5
+      ? index
+      : index - 1;
+  const target = scenes[next];
+  if (target) return { kind: "scene", index: next, start: target.start };
+  return { kind: "seek", time: key === "ArrowRight" ? voiceDuration : 0 };
+}
+
 /** Swaps the media of two scenes (or moves it, when one of them has none). Returns the new files and map. */
 export function swapMedia(
   media: readonly MediaFile[],

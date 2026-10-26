@@ -5,10 +5,10 @@ import { useNavigate } from "react-router-dom";
 import { EditorStep } from "../components/editor/EditorStep";
 import { MediaStep } from "../components/media";
 import { Button, SegmentedControl } from "../components/ui";
+import { autoEditorGate } from "../lib/autoEditorGate";
 import { readEditor } from "../lib/editor/model";
 import { reconcile } from "../lib/media/place";
 import { applyEdit } from "../store/historyStore";
-import { QUICK_ID } from "../lib/quick/textScenes";
 import { useProjectStore } from "../store/projectStore";
 
 type StepId = "media" | "edit";
@@ -44,9 +44,11 @@ export function AutoEditorPage() {
     }
   }, [projectId, sceneKey]);
 
-  if (!project) return <NeedsScenes message="Open a project first. The Auto Editor builds the video from the scenes of a project." />;
-  if (project.id === QUICK_ID) return <NeedsScenes message="Quick prompts has no editor. Press 'Save as project' in the Prompt Generator first, then come back here." />;
-  if (project.scenes.length === 0) return <NeedsScenes message="This project has no scenes yet. Build the scenes in the Prompt Generator first, then come back here." />;
+  const gate = autoEditorGate(project);
+  if (!gate.ok) return <NeedsScenes message={gate.message} />;
+  // Unreachable in practice (gate already returned for a null project),
+  // but TypeScript cannot narrow `project` through the gate result alone.
+  if (!project) return null;
 
   return (
     <div className={step === "edit" ? "flex w-full flex-col gap-4" : "mx-auto flex w-full max-w-5xl flex-col gap-6"}>

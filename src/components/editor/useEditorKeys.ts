@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { sceneIndexAt } from "../../lib/editor/timeline";
+import { arrowTarget } from "../../lib/editor/timeline";
 import { redo, undo } from "../../store/historyStore";
 import { usePlaybackStore } from "../../store/playbackStore";
 import type { Scene } from "../../types";
@@ -31,14 +31,13 @@ export function useEditorKeys(scenes: readonly Scene[], controls: PlaybackContro
       } else if (!mod && (event.key === "ArrowRight" || event.key === "ArrowLeft")) {
         event.preventDefault();
         const time = usePlaybackStore.getState().time;
-        const index = sceneIndexAt(scenes, time);
-        const next = event.key === "ArrowRight" ? index + 1 : time - (scenes[index]?.start ?? 0) > 0.5 ? index : index - 1;
-        const target = scenes[next];
-        if (target) {
+        const target = arrowTarget(scenes, time, voiceDuration, event.key);
+        if (target.kind === "scene") {
           controls.seek(target.start);
-          onScene(next);
-        } else if (event.key === "ArrowRight") controls.seek(voiceDuration);
-        else controls.seek(0);
+          onScene(target.index);
+        } else {
+          controls.seek(target.time);
+        }
       }
     };
     window.addEventListener("keydown", onKey);

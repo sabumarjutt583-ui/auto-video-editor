@@ -149,6 +149,31 @@ export function buildRenderRequest(input: RenderInput): RenderRequest {
   };
 }
 
+/** The pure part of the Shorts button in useRender: a Shorts render is
+ * always 9:16 with the "shorts" suffix, a normal render keeps the project's
+ * aspect ratio and has no suffix. */
+export function shortsAspect(aspect: AspectRatio, shorts: boolean): { aspect: AspectRatio; suffix: string | null } {
+  return shorts ? { aspect: "9:16", suffix: "shorts" } : { aspect, suffix: null };
+}
+
+export interface EncoderChoice {
+  id: string;
+  label: string;
+  gpu: boolean;
+}
+
+/**
+ * The pure part of the encoder line in RenderModal: with CPU forced, the
+ * first CPU encoder wins (or none); otherwise the first GPU encoder wins,
+ * falling back to the first CPU encoder. A null list means encoders are
+ * still being checked, so there is no choice yet.
+ */
+export function selectBestEncoder(encoders: readonly EncoderChoice[] | null, forceCpu: boolean): EncoderChoice | null {
+  if (!encoders) return null;
+  if (forceCpu) return encoders.find((e) => !e.gpu) ?? null;
+  return encoders.find((e) => e.gpu) ?? encoders.find((e) => !e.gpu) ?? null;
+}
+
 /** What stops a render before it starts, in plain words (empty when it can start). */
 export function renderProblems(project: Pick<Project, "voicePath" | "voiceDuration" | "scenes">): string[] {
   const problems: string[] = [];

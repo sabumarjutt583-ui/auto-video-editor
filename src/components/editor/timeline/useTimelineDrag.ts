@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 
+import { dragMoved } from "../../../lib/editor/timeline";
+
 /** A drag that started on the timeline: which kind, and how far it went. */
 export interface DragState {
   kind: "boundary" | "clip";
@@ -48,7 +50,7 @@ export function useTimelineDrag({ timeAt, sceneAt, onDrop, onClick }: Handlers) 
       const state = current.current;
       if (!state) return;
       const time = timeAt(event.clientX);
-      const next: DragState = { ...state, time, over: sceneAt(time), moved: state.moved || Math.abs(event.clientX - origin.current) > MOVE_THRESHOLD };
+      const next: DragState = { ...state, time, over: sceneAt(time), moved: state.moved || dragMoved(origin.current, event.clientX, MOVE_THRESHOLD) };
       current.current = next;
       setDrag(next);
     },

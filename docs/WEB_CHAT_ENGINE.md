@@ -113,5 +113,9 @@ copy-paste mode (6).
 - Fake chat page tests (src-tauri/src/imagegen/browser_tests.rs, testdata/gemini_chat.html): slow answer with Stop
   visible (scaled: start window 4 s, answer element after 6 s), page loaded once and message sent once, soft failure,
   limit, no answer, pasted-text attachment wait, captcha, signed out.
-- TS: chat.test.ts, manual.test.ts, delete.test.ts, unlink.test.ts, short.test.ts.
+- TS: delete.test.ts, unlink.test.ts, short.test.ts.
+  Note (fix/remaining-gaps-phase2): chat.test.ts and manual.test.ts do not exist in
+  this branch — manual mode was removed in Phase 1 (see Part 6), and chat coverage
+  is the Rust fake-page tests above, not a TS test file. The old list naming
+  those two files was stale and has been corrected here.
 - Not testable here: the real Gemini page (selectors in config.json `chat` block can be updated without a new app).

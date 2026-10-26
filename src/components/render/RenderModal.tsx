@@ -1,6 +1,6 @@
 import { Clapperboard, Smartphone } from "lucide-react";
 
-import { timeLeft } from "../../lib/render/request";
+import { selectBestEncoder, timeLeft } from "../../lib/render/request";
 import { applyEdit } from "../../store/historyStore";
 import { useProjectStore } from "../../store/projectStore";
 import { useSettingsStore } from "../../store/settingsStore";
@@ -45,7 +45,7 @@ export function RenderModal({ project, editor, view, onClose }: { project: Proje
   const forceCpu = useSettingsStore((s) => s.settings?.forceCpuEncoding ?? false);
   const busy = view.job !== null;
   const size = outputSize(project.settings.aspectRatio, project.settings.quality);
-  const best = view.encoders ? (forceCpu ? view.encoders.find((e) => !e.gpu) : view.encoders.find((e) => e.gpu) ?? view.encoders.find((e) => !e.gpu)) : null;
+  const best = selectBestEncoder(view.encoders, forceCpu);
 
   const setRender = (patch: Partial<RenderData>) => {
     const current = useProjectStore.getState().project;

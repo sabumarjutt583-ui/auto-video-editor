@@ -119,8 +119,16 @@ const GOOD = (type: "text" | "counter" = "text") => type === "text"
   : { schemaVersion: 1, id: "x", duration: 3, layers: [{ type: "counter", id: "c", to: 45, box: { x: 0.1, y: 0.1, w: 0.4, h: 0.2 }, start: 0, duration: 3 }] };
 
 describe("AI answers", () => {
-  const s1 = scene("S01", "About 45% of people said yes to the plan today.", 10);
-  const s2 = scene("S02", "A calm sea.", 20, true, 1);
+  // Scenes must be built here, not at describe time: the top-level before()
+  // hook that loads `places` has not run yet when this describe block is
+  // evaluated, so building a scene here used to throw
+  // "Cannot read properties of undefined (reading 'byName')".
+  let s1: DirectorScene;
+  let s2: DirectorScene;
+  before(() => {
+    s1 = scene("S01", "About 45% of people said yes to the plan today.", 10);
+    s2 = scene("S02", "A calm sea.", 20, true, 1);
+  });
   const ans = (g: unknown) => JSON.stringify({ scenes: [{ id: "S01", trigger: 0, graphic: g }, { id: "S02", graphic: null }] });
 
   it("accepts a good graphic and fits it", () => {
@@ -170,7 +178,11 @@ describe("AI answers", () => {
     } });
     assert.equal(r.failed?.batch, 2);
     assert.ok(r.placed.length > 0 && r.placed.length <= 20);
-    await assert.rejects(directGraphics({ scenes: [s1], settings: SETTINGS, icons: async () => [], call: async () => { throw { message: "Cancelled", code: "cancelled" }; } }));
+    // A real cancel is a full AppError (message + details + code), as in
+    // src-tauri/src/commands/error.rs cancelled() and in prompts.test.ts.
+    // Throwing only { message, code } is not an AppError, so isCancelled
+    // correctly does not treat it as a cancel.
+    await assert.rejects(directGraphics({ scenes: [s1], settings: SETTINGS, icons: async () => [], call: async () => { throw { message: "Cancelled", details: "The job was cancelled by the user.", code: "cancelled" }; } }));
   });
   it("the prompt carries the density, triggers, icons and the variety summary", () => {
     assert.match(buildSystem(SETTINGS), /normal/);

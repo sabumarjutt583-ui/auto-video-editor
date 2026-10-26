@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { listEncoders, renderVideo, type EncoderInfo, type RenderResult } from "../../lib/render/api";
-import { buildRenderRequest, renderProblems, todayStamp } from "../../lib/render/request";
+import { buildRenderRequest, renderProblems, shortsAspect, todayStamp } from "../../lib/render/request";
 import { isCancelled, toAppError } from "../../lib/errors";
 import { useProjectStore } from "../../store/projectStore";
 import { runJob, selectJob, useJobStore, type JobInfo } from "../../store/jobStore";
@@ -66,8 +66,8 @@ export function useRender(inputs: Inputs): RenderView {
     setError(null);
     setResult(null);
     setCancelled(false);
-    const aspect = shorts ? "9:16" : project.settings.aspectRatio;
-    const request = buildRenderRequest({ ...inputs, aspect, quality: project.settings.quality, suffix: shorts ? "shorts" : null, date: todayStamp() });
+    const { aspect, suffix } = shortsAspect(project.settings.aspectRatio, shorts);
+    const request = buildRenderRequest({ ...inputs, aspect, quality: project.settings.quality, suffix, date: todayStamp() });
     startedAt.current = Date.now();
     setElapsed(0);
     try {
