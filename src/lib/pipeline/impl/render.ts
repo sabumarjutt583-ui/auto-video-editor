@@ -1,4 +1,5 @@
 import { renderVideo } from "../../render/api.ts";
+import { applyCaptionOverrides } from "../../captions/overrides.ts";
 import { buildRenderRequest, renderProblems, todayStamp } from "../../render/request.ts";
 import { runJob } from "../../../store/jobStore.ts";
 import { openProjectOf, patchProject, type StageContext } from "./context.ts";
@@ -16,7 +17,7 @@ export async function renderStage(ctx: StageContext): Promise<void> {
     exists: {},
     aspect: project.settings.aspectRatio,
     quality: project.settings.quality,
-    captionLines: state.captionLines,
+    captionLines: applyCaptionOverrides(state.captionLines, project.scenes, project.captionOverrides),
     captionStyle: state.captionStyle,
     font: state.font,
     cues: state.cues,
@@ -25,6 +26,6 @@ export async function renderStage(ctx: StageContext): Promise<void> {
   });
   ctx.say("Rendering the video");
   const done = await runJob("render", "Starting the render", (id) => renderVideo(ctx.projectId, request, id));
-  patchProject(ctx, { renderedAt: new Date().toISOString() });
+  patchProject(ctx, { renderedAt: new Date().toISOString(), exportDurationSeconds: done.duration, exportSizeBytes: done.sizeBytes });
   ctx.finished({ path: done.path, copyPath: done.copyPath, seconds: done.secondsTaken, sizeBytes: done.sizeBytes });
 }

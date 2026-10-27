@@ -4,6 +4,7 @@
 //! layer renderers that draw from that plan are still later phases.
 pub mod cache;
 pub mod director;
+pub mod draw;
 pub mod export;
 pub mod spec;
 

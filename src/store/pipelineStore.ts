@@ -51,6 +51,10 @@ interface PipelineState {
   scriptRecord: ScriptRecord | null;
   finished: Finished | null;
   running: boolean;
+  /** The running video is paused between steps (persisted on the project, so it survives a restart). */
+  paused: boolean;
+  pause: () => void;
+  resumeRun: () => void;
   start: (input: MakeVideoInput) => Promise<void>;
   /** Runs again on the same project: finished steps are skipped. */
   resume: () => Promise<void>;
@@ -63,6 +67,25 @@ interface PipelineState {
 
 // The run lives in this store (not in a page), so it goes on while the person looks at another page.
 let cancelFlag = false;
+let pauseFlag = false;
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
+/** Writes the run state into the open project and saves it now, so a crash cannot lose it. */
+function persistRun(projectId: string, status: string, currentStage: string | null, failedScenes: string[]): void {
+  const project = useProjectStore.getState().project;
+  if (!project || project.id !== projectId) return;
+  const completedStages = STAGE_IDS.filter((stage) => stageDone(project, stage));
+  useProjectStore.getState().update({
+    makeVideoRun: { status, currentStage: currentStage ?? "", completedStages, failedScenes, updatedAt: new Date().toISOString() },
+  });
+  void useProjectStore.getState().flush();
+}
+
+function failedSceneIds(projectId: string): string[] {
+  const project = useProjectStore.getState().project;
+  if (!project || project.id !== projectId) return [];
+  return project.scenes.filter((scene) => scene.prompt.trim() !== "" && !project.mediaMap[scene.id]).map((scene) => scene.id);
+}
 let answerFn: ((go: boolean) => void) | null = null;
 let last: { input: MakeVideoInput; projectId: string } | null = null;
 let currentStage: StageId | null = null;
@@ -70,7 +93,9 @@ let currentStage: StageId | null = null;
 export const usePipelineStore = create<PipelineState>((set, get) => {
   async function execute(input: MakeVideoInput, id: string): Promise<void> {
     cancelFlag = false;
-    set((s) => ({ running: true, error: null, finished: null, view: restart(s.view) }));
+    pauseFlag = false;
+    set((s) => ({ running: true, paused: false, error: null, finished: null, view: restart(s.view) }));
+    persistRun(id, "running", null, []);
     const ctx = {
       projectId: id,
       profile: input.profile,
@@ -91,6 +116,11 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
         },
         run: async (stage) => {
           currentStage = stage;
+          persistRun(id, pauseFlag ? "paused" : "running", stage, failedSceneIds(id));
+          // Pause takes effect between steps: wait here until resumed or cancelled.
+          while (pauseFlag && !cancelFlag) {
+            await sleep(500);
+          }
           if (stage === "images" && !(await input.ensureConsent())) throw new Error("The notice for the free picture engine was not accepted.");
           await runStage(stage, ctx);
         },
@@ -108,12 +138,18 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
         isCancel: isCancelled,
         onEvent: (event) => {
           if (event.type === "error") set({ error: toAppError(event.error, "A step of the video failed.") });
+          if (event.type === "done") persistRun(id, "running", event.stage, failedSceneIds(id));
+          if (event.type === "finished") persistRun(id, "finished", null, []);
+          if (event.type === "error") persistRun(id, "failed", currentStage, failedSceneIds(id));
+          if (event.type === "stopped") persistRun(id, "stopped", currentStage, failedSceneIds(id));
+          if (event.type === "cancelled") persistRun(id, "stopped", currentStage, failedSceneIds(id));
           set((s) => ({ view: reduceView(s.view, event) }));
         },
       });
     } finally {
       currentStage = null;
-      set({ running: false });
+      pauseFlag = false;
+      set({ running: false, paused: false });
       await useProjectStore.getState().flush();
     }
   }
@@ -125,6 +161,7 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
     waiting: null,
     error: null,
     problems: [],
+    paused: false,
     writing: false,
     scriptRecord: null,
     finished: null,
@@ -200,10 +237,24 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
 
     cancel: () => {
       cancelFlag = true;
+      pauseFlag = false;
       for (const job of Object.values(useJobStore.getState().jobs)) requestCancel(job.id);
       answerFn?.(false);
     },
 
+    pause: () => {
+      if (!get().running) return;
+      pauseFlag = true;
+      set({ paused: true });
+      const id = get().projectId;
+      if (id) persistRun(id, "paused", currentStage, failedSceneIds(id));
+    },
+    resumeRun: () => {
+      pauseFlag = false;
+      set({ paused: false });
+      const id = get().projectId;
+      if (id) persistRun(id, "running", currentStage, failedSceneIds(id));
+    },
     answer: (go) => answerFn?.(go),
 
     reset: () => {

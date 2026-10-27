@@ -8,6 +8,7 @@ import {
   scriptAccountCheck,
   scriptAccountConfirmSignedIn,
   scriptAccountDisconnect,
+  scriptAccountSetLimit,
   scriptAccountSignIn,
   scriptAccounts,
   scriptAddAccount,
@@ -15,6 +16,8 @@ import {
   type ScriptAccountStatus,
 } from "../../lib/script/api";
 import type { AppError } from "../../types";
+import { channelsUsingAccount } from "../../lib/script/channelAccounts";
+import { useProfiles } from "../pipeline/useProfiles";
 import { ErrorNotice } from "../ErrorNotice";
 import { Button, Card, Checkbox, Modal, TextInput } from "../ui";
 
@@ -30,6 +33,25 @@ export function ScriptWriterCard() {
   const [working, setWorking] = useState("");
   const [name, setName] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [backOnline, setBackOnline] = useState<Record<string, string>>({});
+  const { profiles } = useProfiles();
+
+  /** "YYYY-MM-DDTHH:mm" in local time for a datetime-local input. */
+  function toLocalInput(ms: number): string {
+    const d = new Date(ms);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  async function setLimit(account: ScriptAccountStatus, clear: boolean) {
+    const value = backOnline[account.id];
+    const untilMs = clear ? 0 : value ? new Date(value).getTime() : account.limitedUntil;
+    if (!clear && (!Number.isFinite(untilMs) || untilMs <= Date.now())) {
+      setError({ message: "Pick a future time for when this account is back online.", details: "" } as AppError);
+      return;
+    }
+    await run(`limit:${account.id}`, () => scriptAccountSetLimit(account.id, untilMs));
+  }
   const [asking, setAsking] = useState(false);
   const [understood, setUnderstood] = useState(false);
 
@@ -104,6 +126,30 @@ export function ScriptWriterCard() {
                     {limit ? ` · resting until ${limit} (usage limit)` : ""}
                   </p>
                   {!account.connected && account.lastError && <p className="text-xs text-muted">{account.lastError}</p>}
+                  <p className="text-xs text-muted">
+                    {(() => {
+                      const usedBy = channelsUsingAccount(profiles, account.id);
+                      return usedBy.length > 0 ? `Picked by channels: ${usedBy.join(", ")}` : "Not picked by any channel (used by automatic rotation)";
+                    })()}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-xs text-muted" htmlFor={`back-online-${account.id}`}>
+                      Back online at:
+                    </label>
+                    <input
+                      id={`back-online-${account.id}`}
+                      type="datetime-local"
+                      className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-xs"
+                      value={backOnline[account.id] ?? (account.limitedUntil > Date.now() ? toLocalInput(account.limitedUntil) : "")}
+                      onChange={(e) => setBackOnline((prev) => ({ ...prev, [account.id]: e.target.value }))}
+                    />
+                    <Button loading={working === `limit:${account.id}`} disabled={working !== ""} onClick={() => void setLimit(account, false)}>
+                      Set time
+                    </Button>
+                    <Button disabled={working !== "" || account.limitedUntil <= Date.now()} onClick={() => void setLimit(account, true)}>
+                      Clear rest
+                    </Button>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="primary" loading={working === `sign-in:${account.id}`} disabled={working !== ""} onClick={() => void run(`sign-in:${account.id}`, () => scriptAccountSignIn(account.id))}>
                       Sign in to Claude

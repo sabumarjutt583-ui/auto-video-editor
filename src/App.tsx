@@ -10,6 +10,8 @@ import {
   ChannelPage,
   ChannelsPage,
   DashboardPage,
+  ProjectImagesPage,
+  ProjectSubtitlesPage,
   ProjectsPage,
   PromptGeneratorPage,
   SettingsPage,
@@ -93,6 +95,8 @@ export function App() {
           <Route path="/prompt-generator" element={<PromptGeneratorPage />} />
           <Route path="/image-generator" element={<ImageGeneratorPage />} />
           <Route path="/auto-editor" element={<AutoEditorPage />} />
+          <Route path="/project-images" element={<ProjectImagesPage />} />
+          <Route path="/project-subtitles" element={<ProjectSubtitlesPage />} />
           <Route path="/sfx-library" element={<SfxLibraryPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           {AdminPage && (

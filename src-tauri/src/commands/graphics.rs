@@ -5,6 +5,7 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::graphics::cache::{self, CacheInfo};
 
+use crate::commands::blocking::run_blocking;
 use crate::commands::error::AppError;
 use crate::commands::projects::project_folder;
 use crate::graphics::export::{GraphicClip, GraphicExports};
@@ -75,4 +76,74 @@ pub async fn graphic_cache_info(app: AppHandle) -> Result<CacheInfo, AppError> {
 pub async fn graphic_cache_clear(app: AppHandle) -> Result<(), AppError> {
     let cache = cache_dir(&app)?;
     tauri::async_runtime::spawn_blocking(move || cache::clear(&cache)).await.map_err(|e| AppError::new("The graphic cache stopped.", e.to_string()))?
+}
+
+/// The first bundled font file, for drawtext. Returns an error when no font is installed.
+fn find_font(app: &AppHandle) -> Result<String, AppError> {
+    let fonts_dir = crate::commands::captions::fonts_folder(app);
+    let mut names: Vec<std::path::PathBuf> = std::fs::read_dir(&fonts_dir).ok().and_then(|entries| {
+        let mut names: Vec<std::path::PathBuf> = entries.flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|e| e == "ttf" || e == "otf")).collect();
+        names.sort();
+        Some(names)
+    }).unwrap_or_default();
+    let font = names.drain(..).next().ok_or_else(|| AppError::new("No font was found for the text, so the graphic could not be drawn.", format!("{}", fonts_dir.display())))?;
+    Ok(font.to_string_lossy().replace('\', "/").replace(':', "\:"))
+}
+
+/// Turns a graphic spec into FFmpeg filters (text + lower-third only; other layer types
+/// are listed as skipped). The filters are drawn over a video by `graphics_apply_overlay`.
+#[tauri::command]
+pub async fn graphics_filters(app: AppHandle, spec_json: String, width: u32, height: u32) -> Result<crate::graphics::draw::DrawResult, AppError> {
+    let fontfile = find_font(&app)?;
+    crate::graphics::draw::draw_filters(&spec_json, width, height, &fontfile).map_err(|e| AppError::new("The graphic could not be planned.", e))
+}
+
+/// Draws a graphic spec over a finished video of this project and saves a new MP4 next
+/// to it (`<name>-graphics.mp4`). The input must be inside the project's folder. Only
+/// text and lower-third layers are drawn; other layers are skipped and listed.
+#[tauri::command]
+pub async fn graphics_apply_overlay(app: AppHandle, project_id: String, input_path: String, spec_json: String) -> Result<crate::graphics::draw::DrawResult, AppError> {
+    use crate::commands::projects::project_folder;
+    use crate::ffmpeg::{command, Tool};
+    use crate::media::probe::probe;
+    use crate::render::encoder;
+    let project_dir = project_folder(&app, &project_id)?;
+    let input = std::path::Path::new(&input_path);
+    let canonical = input.canonicalize().map_err(|e| AppError::new("The finished video could not be found.", format!("{e} ({input_path})")))?;
+    let root = project_dir.canonicalize().unwrap_or(project_dir.clone());
+    if !canonical.starts_with(&root) {
+        return Err(AppError::new("That video is not inside this project.", format!("{input_path}")));
+    }
+    let info = probe(&canonical).await?;
+    let fontfile = find_font(&app)?;
+    let drawn = crate::graphics::draw::draw_filters(&spec_json, info.width, info.height, &fontfile).map_err(|e| AppError::new("The graphic could not be planned.", e))?;
+    if drawn.filters.is_empty() {
+        return Err(AppError::new("The graphic has nothing this overlay can draw (only text and lower-third layers are drawn).", "no drawable layers"));
+    }
+    let exports = project_dir.join("exports");
+    std::fs::create_dir_all(&exports).map_err(|e| AppError::new("The exports folder could not be made.", e.to_string()))?;
+    let stem = canonical.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "video".to_string());
+    let mut output = exports.join(format!("{stem}-graphics.mp4"));
+    let mut n = 2;
+    while output.exists() {
+        output = exports.join(format!("{stem}-graphics-{n}.mp4"));
+        n += 1;
+    }
+    let encoders = encoder::available().await;
+    let encoder_args = match encoders.first() {
+        Some(enc) => encoder::encoder_args(&enc.id, info.width, info.height, 30),
+        None => vec!["-c:v".into(), "libx264".into(), "-preset".into(), "medium".into(), "-crf".into(), "20".into(), "-pix_fmt".into(), "yuv420p".into()],
+    };
+    let filters_joined = drawn.filters.join(",");
+    let out = run_blocking(move || {
+        let mut cmd = command(Tool::Ffmpeg).map_err(|e| AppError::new("The video engine (FFmpeg) is missing or could not start.", e))?;
+        cmd.args(["-hide_banner", "-y", "-loglevel", "error", "-i"]).arg(&canonical).args(["-vf", &filters_joined]).args(&encoder_args).args(["-c:a", "copy"]).arg(&output);
+        let result = cmd.output().map_err(|e| AppError::new("The video engine (FFmpeg) could not start.", e.to_string()))?;
+        if !result.status.success() {
+            return Err(AppError::new("The graphic overlay failed.", String::from_utf8_lossy(&result.stderr).chars().take(600).collect()));
+        }
+        Ok::<_, AppError>(output)
+    }).await?;
+    crate::logging::info("graphics", &format!("Overlay saved: {} ({} filters, skipped: {})", out.display(), drawn.filters.len(), drawn.skipped.join(", ")));
+    Ok(crate::graphics::draw::DrawResult { filters: drawn.filters, skipped: drawn.skipped, plan: drawn.plan })
 }

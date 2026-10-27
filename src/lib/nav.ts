@@ -1,4 +1,4 @@
-import { AudioLines, Clapperboard, ImagePlus, FolderOpen, LayoutDashboard, Settings, ShieldCheck, Sparkles, Tv, type LucideIcon } from "lucide-react";
+import { AudioLines, Clapperboard, Image, ImagePlus, FolderOpen, LayoutDashboard, Settings, ShieldCheck, Sparkles, Subtitles, Tv, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   path: string;
@@ -13,6 +13,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: "/prompt-generator", label: "Prompt Generator", icon: Sparkles },
   { path: "/image-generator", label: "Image Generator", icon: ImagePlus },
   { path: "/auto-editor", label: "Auto Editor", icon: Clapperboard },
+  { path: "/project-images", label: "Project images", icon: Image },
+  { path: "/project-subtitles", label: "Project subtitles", icon: Subtitles },
   { path: "/sfx-library", label: "SFX Library", icon: AudioLines },
   { path: "/settings", label: "Settings", icon: Settings },
   // The Admin page exists only in the Admin Edition (the flag is fixed when the app is built).

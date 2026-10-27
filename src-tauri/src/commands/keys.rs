@@ -29,6 +29,8 @@ pub struct KeySlot {
     pub status: KeyStatus,
     /// Seconds the key still rests after a usage limit (0 = ready).
     pub resting_seconds: u64,
+    /// Epoch milliseconds when the key is back online (0 = ready).
+    pub resting_until_ms: u64,
 }
 
 /// All key places of a provider (1 to the most keys it can have) and whether each has a key.
@@ -40,11 +42,17 @@ pub async fn get_key_slots(provider: Provider) -> Result<Vec<KeySlot>, AppError>
             .enumerate()
             .map(|(i, status)| {
                 let slot = (i + 1) as u8;
-                KeySlot { slot, status, resting_seconds: keys::resting_seconds(provider, slot) }
+                KeySlot { slot, status, resting_seconds: keys::resting_seconds(provider, slot), resting_until_ms: keys::resting_until_ms(provider, slot) }
             })
             .collect())
     })
     .await
+}
+
+/// Sets when a key is back online after a usage limit (epoch ms, 0 = ready now). Saved to disk.
+#[tauri::command]
+pub async fn set_key_rest_until(provider: Provider, slot: u8, until_ms: u64) -> Result<(), AppError> {
+    run_blocking(move || keys::set_rest_until(provider, slot, until_ms)).await
 }
 
 #[tauri::command]

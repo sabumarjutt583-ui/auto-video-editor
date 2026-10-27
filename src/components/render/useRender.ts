@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { listEncoders, renderVideo, type EncoderInfo, type RenderResult } from "../../lib/render/api";
 import { buildRenderRequest, renderProblems, shortsAspect, todayStamp } from "../../lib/render/request";
+import { applyCaptionOverrides } from "../../lib/captions/overrides";
 import { isCancelled, toAppError } from "../../lib/errors";
 import { useProjectStore } from "../../store/projectStore";
 import { runJob, selectJob, useJobStore, type JobInfo } from "../../store/jobStore";
@@ -67,14 +68,14 @@ export function useRender(inputs: Inputs): RenderView {
     setResult(null);
     setCancelled(false);
     const { aspect, suffix } = shortsAspect(project.settings.aspectRatio, shorts);
-    const request = buildRenderRequest({ ...inputs, aspect, quality: project.settings.quality, suffix, date: todayStamp() });
+    const request = buildRenderRequest({ ...inputs, captionLines: applyCaptionOverrides(inputs.captionLines, project.scenes, project.captionOverrides), aspect, quality: project.settings.quality, suffix, date: todayStamp() });
     startedAt.current = Date.now();
     setElapsed(0);
     try {
       const done = await runJob("render", "Starting the render", (id) => renderVideo(project.id, request, id));
       setResult(done);
       // Not an edit (no Undo step): the project only remembers when it was last rendered.
-      useProjectStore.getState().update({ renderedAt: new Date().toISOString() });
+      useProjectStore.getState().update({ renderedAt: new Date().toISOString(), exportDurationSeconds: done.duration, exportSizeBytes: done.sizeBytes });
     } catch (e) {
       if (isCancelled(e)) setCancelled(true);
       else setError(toAppError(e, "The video could not be rendered."));

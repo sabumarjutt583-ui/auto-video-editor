@@ -7,3 +7,5 @@ export { SfxLibraryPage } from "./SfxLibraryPage";
 export { ChannelPage } from "./ChannelPage";
 export { DashboardPage } from "./DashboardPage";
 export { ChannelsPage } from "./ChannelsPage";
+export { ProjectImagesPage } from "./ProjectImagesPage";
+export { ProjectSubtitlesPage } from "./ProjectSubtitlesPage";

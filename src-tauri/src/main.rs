@@ -40,6 +40,8 @@ macro_rules! handler {
             commands::keys::save_key,
             commands::keys::get_key_status,
             commands::keys::get_key_slots,
+            commands::keys::set_key_rest_until,
+            commands::monitor::api_monitor_list,
             commands::keys::delete_key,
             commands::keys::test_key,
             commands::settings::load_settings,
@@ -134,6 +136,8 @@ macro_rules! handler {
             commands::script::script_account_confirm_signed_in,
             commands::script::script_account_check,
             commands::script::script_account_disconnect,
+            commands::script::script_account_set_limit,
+            commands::script::script_open_live,
             commands::imagegen::imagegen_make_video,
             commands::imagegen::imagegen_video_status,
             commands::imagegen::imagegen_delete_images,
@@ -146,6 +150,8 @@ macro_rules! handler {
             commands::graphics::graphic_cache_store,
             commands::graphics::graphic_cache_info,
             commands::graphics::graphic_cache_clear,
+            commands::graphics::graphics_filters,
+            commands::graphics::graphics_apply_overlay,
             commands::imagegen::imagegen_background_snapshot,
             commands::imagegen::imagegen_show_browser,
             commands::imagegen::imagegen_start,
@@ -169,6 +175,8 @@ macro_rules! handler {
             commands::keys::save_key,
             commands::keys::get_key_status,
             commands::keys::get_key_slots,
+            commands::keys::set_key_rest_until,
+            commands::monitor::api_monitor_list,
             commands::keys::delete_key,
             commands::keys::test_key,
             commands::settings::load_settings,
@@ -263,6 +271,8 @@ macro_rules! handler {
             commands::script::script_account_confirm_signed_in,
             commands::script::script_account_check,
             commands::script::script_account_disconnect,
+            commands::script::script_account_set_limit,
+            commands::script::script_open_live,
             commands::imagegen::imagegen_make_video,
             commands::imagegen::imagegen_video_status,
             commands::imagegen::imagegen_delete_images,
@@ -275,6 +285,8 @@ macro_rules! handler {
             commands::graphics::graphic_cache_store,
             commands::graphics::graphic_cache_info,
             commands::graphics::graphic_cache_clear,
+            commands::graphics::graphics_filters,
+            commands::graphics::graphics_apply_overlay,
             commands::imagegen::imagegen_background_snapshot,
             commands::imagegen::imagegen_show_browser,
             commands::imagegen::imagegen_start,
@@ -332,6 +344,9 @@ fn main() {
         .setup(|app| {
             use tauri::Manager;
             start_logging(app.handle());
+            if let Ok(folder) = app.path().app_data_dir() {
+                crate::keys::init_rest_file(folder.join("key-rests.json"));
+            }
             // Find out which encoders work while the app starts, so the first render does not wait.
             tauri::async_runtime::spawn(async {
                 let _ = render::encoder::available().await;

@@ -13,6 +13,7 @@ pub mod library;
 pub mod logs;
 pub mod links;
 pub mod mix;
+pub mod monitor;
 pub mod media;
 pub mod graphics;
 pub mod motion;

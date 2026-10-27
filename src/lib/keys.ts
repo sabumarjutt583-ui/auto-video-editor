@@ -20,6 +20,10 @@ export function getKeySlots(provider: Provider): Promise<KeySlotInfo[]> {
   return invoke<KeySlotInfo[]>("get_key_slots", { provider });
 }
 
+export function setKeyRestUntil(provider: Provider, slot: number, untilMs: number): Promise<void> {
+  return invoke<void>("set_key_rest_until", { provider, slot, untilMs });
+}
+
 export function deleteKey(provider: Provider, slot = 1): Promise<void> {
   return invoke<void>("delete_key", { provider, slot });
 }

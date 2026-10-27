@@ -192,6 +192,16 @@ impl ScriptAccounts {
             .ok_or_else(|| AppError::new("That Claude account was not found. It may have been deleted.", format!("account {id}")))
     }
 
+    /// The browser profile folder of one account, for the live view.
+    pub fn profile_dir_for(&self, id: &str) -> Result<std::path::PathBuf, AppError> {
+        let inner = lock(&self.inner);
+        if inner.accounts.iter().any(|a| a.id == id) {
+            Ok(chat_dir(&self.root, id))
+        } else {
+            Err(AppError::new("That Claude account was not found. It may have been deleted.", format!("account {id}")))
+        }
+    }
+
     /// The old single-account status: the first account, with the shared consent flag.
     pub fn combined_status(&self) -> ScriptStatus {
         let inner = lock(&self.inner);
@@ -226,12 +236,28 @@ impl ScriptAccounts {
     }
 
     /// Tries the accounts in order, skipping resting ones. A usage limit or a signed-out account
-    /// moves on to the next account; any other error returns at once.
+    /// moves on to the next account; any other error returns at once. When a channel picked an
+    /// account, that account is tried first and the others only follow if it cannot write.
     pub async fn ask_rotating(&self, browser: &BrowserChoice, config: &crate::imagegen::config::EngineConfig, prompt: &str, timeout: std::time::Duration, progress: chat::Progress<'_>) -> Result<ChatReply, GenError> {
+        self.ask_preferred(None, browser, config, prompt, timeout, progress).await
+    }
+
+    pub async fn ask_preferred(&self, preferred: Option<&str>, browser: &BrowserChoice, config: &crate::imagegen::config::EngineConfig, prompt: &str, timeout: std::time::Duration, progress: chat::Progress<'_>) -> Result<ChatReply, GenError> {
         if !self.consent() {
             return Err(GenError::new(ErrorKind::BadRequest, "Please read and accept the notice about the script writer first (Settings, Script writer)."));
         }
-        let chats: Vec<std::sync::Arc<ScriptChat>> = lock(&self.inner).accounts.iter().map(|a| a.chat.clone()).collect();
+        let entries: Vec<(String, std::sync::Arc<ScriptChat>)> = lock(&self.inner).accounts.iter().map(|a| (a.id.clone(), a.chat.clone())).collect();
+        let mut chats: Vec<std::sync::Arc<ScriptChat>> = Vec::with_capacity(entries.len());
+        if let Some(wanted) = preferred {
+            if let Some((_, chat)) = entries.iter().find(|(id, _)| id.as_str() == wanted) {
+                chats.push(chat.clone());
+            }
+        }
+        for (id, chat) in &entries {
+            if Some(id.as_str()) != preferred {
+                chats.push(chat.clone());
+            }
+        }
         if chats.is_empty() {
             return Err(GenError::new(ErrorKind::BadRequest, "No Claude account has been added yet. Add one in Settings, Script writer, then sign in."));
         }
@@ -366,6 +392,33 @@ pub async fn script_account_disconnect(script: Script<'_>, id: String) -> Result
     script.disconnect(&id)
 }
 
+/// Sets when a Claude account is back online after a usage limit (epoch ms, 0 = ready now).
+/// The time is saved in the account's own state file, so it survives a restart.
+/// Opens the Claude chat page of one account in the person's own browser window, so the
+/// person can watch it live. View-only: nothing is typed or clicked by the tool, and the
+/// window stays open for the person to close. Uses the account's own browser profile.
+#[tauri::command]
+pub async fn script_open_live(script: Script<'_>, ig: State<'_, std::sync::Arc<ImageGen>>, account_id: Option<String>) -> Result<(), AppError> {
+    let browser = browser_of(&ig).map_err(|e| to_app_error(&e))?;
+    let config = ig.engine.config();
+    let id = match account_id {
+        Some(id) => id,
+        None => lock(&script.inner).accounts.first().map(|a| a.id.clone()).ok_or_else(|| AppError::new("No Claude account has been added yet. Add one in Settings, Script writer.", "no Claude accounts"))?,
+    };
+    let profile = script.profile_dir_for(&id)?;
+    let window = crate::imagegen::browser::signin::PlainWindow::open(&browser.exe, &profile, &config.script.url).await.map_err(|e| AppError::new("The Claude page could not be opened.", e))?;
+    // The window is left open for the person (dropping the handle does not close the browser).
+    drop(window);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn script_account_set_limit(script: Script<'_>, id: String, until_ms: u64) -> Result<ScriptAccountStatus, AppError> {
+    let chat = script.get(&id)?;
+    chat.set_limited_until(until_ms);
+    script.account_status(&id)
+}
+
 /// The old single-account commands, kept working as aliases to the first account, so Step 0
 /// and any other caller keeps working unchanged.
 #[tauri::command]
@@ -436,7 +489,7 @@ pub struct ScriptAnswer {
 /// Writes one script: the prompt goes into a fresh Claude chat and the finished answer comes back. Can be cancelled.
 /// The accounts are tried in order, moving on when one is limited or signed out.
 #[tauri::command]
-pub async fn script_ask(app: AppHandle, jobs: State<'_, JobRegistry>, script: Script<'_>, ig: State<'_, std::sync::Arc<ImageGen>>, prompt: String, job_id: String) -> Result<ScriptAnswer, AppError> {
+pub async fn script_ask(app: AppHandle, jobs: State<'_, JobRegistry>, script: Script<'_>, ig: State<'_, std::sync::Arc<ImageGen>>, prompt: String, job_id: String, account_id: Option<String>) -> Result<ScriptAnswer, AppError> {
     let job = jobs.begin(&job_id, "script", event_sink(app))?;
     let browser = browser_of(&ig).map_err(|e| to_app_error(&e))?;
     let config = ig.engine.config();
@@ -445,7 +498,7 @@ pub async fn script_ask(app: AppHandle, jobs: State<'_, JobRegistry>, script: Sc
     let timeout = std::time::Duration::from_secs(MIN_ANSWER_WAIT_SECS);
     let reply = tokio::select! {
         () = job.cancelled() => return Err(AppError::cancelled()),
-        reply = script.ask_rotating(&browser, &config, &prompt, timeout, Some(&report)) => reply.map_err(|e| to_app_error(&e))?,
+        reply = script.ask_preferred(account_id.as_deref(), &browser, &config, &prompt, timeout, Some(&report)) => reply.map_err(|e| to_app_error(&e))?,
     };
     Ok(ScriptAnswer { text: reply.text })
 }

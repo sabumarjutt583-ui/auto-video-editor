@@ -4,6 +4,7 @@
 use std::future::Future;
 
 use crate::api::error::ApiError;
+use crate::api::monitor;
 use crate::commands::blocking::run_blocking;
 use crate::commands::error::AppError;
 use crate::keys::{self, Candidate, Provider};
@@ -57,9 +58,15 @@ where
 {
     let count = candidates.len();
     let mut first_problem: Option<ApiError> = None;
+    let provider_name = match provider {
+        crate::keys::Provider::Groq => "groq",
+        crate::keys::Provider::Gemini => "gemini",
+        crate::keys::Provider::OpenAi => "openai",
+    };
     for Candidate { slot, key } in candidates {
         match call(key.clone()).await {
             Ok(value) => {
+                monitor::record(provider_name, slot, "ok", "");
                 keys::worked(provider, slot);
                 return Ok(value);
             }
@@ -67,10 +74,17 @@ where
                 let error = error.redact(&key);
                 match &error {
                     ApiError::RateLimited(_) => {
+                        monitor::record(provider_name, slot, "rate_limited", "usage limit");
                         keys::rest(provider, slot);
                     }
-                    ApiError::InvalidKey(_) => keys::rest_long(provider, slot),
-                    _ => return Err(with_key_number(error, slot, count)),
+                    ApiError::InvalidKey(_) => {
+                        monitor::record(provider_name, slot, "invalid_key", "key refused");
+                        keys::rest_long(provider, slot);
+                    }
+                    _ => {
+                        monitor::record(provider_name, slot, "error", "other error");
+                        return Err(with_key_number(error, slot, count));
+                    }
                 }
                 first_problem.get_or_insert_with(|| with_key_number(error, slot, count));
             }

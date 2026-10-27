@@ -49,6 +49,8 @@ export type ScriptWriter = "off" | "claude";
 /** How this channel's scripts are written. */
 export interface ProfileScript {
   writer: ScriptWriter;
+  /** Claude account id chosen for this channel, or null = automatic rotation over all accounts. */
+  claudeAccountId?: string | null;
   /** The channel's master prompt: its style, structure, tone and rules. The topic is added to it for every video. */
   masterPrompt: string;
 }
@@ -109,7 +111,7 @@ export function defaultProfile(id: string, name = "My channel"): ChannelProfile 
     language: "",
     aspect: "16:9",
     quality: "1080p",
-    script: { writer: "off", masterPrompt: "" },
+    script: { writer: "off", masterPrompt: "", claudeAccountId: null },
     voice: { model: "", voice: "", style: "", cutSilence: true },
     scenes: { ...DEFAULT_SCENES },
     look: { styleId: "", detail: "medium", tool: "dalle_gemini", outputType: "image" },
@@ -157,7 +159,7 @@ export function readProfile(value: unknown, fallbackId = "channel"): ChannelProf
     language: str(o.language, 12).toLowerCase().replace(/[^a-z-]/g, ""),
     aspect: pick(o.aspect, ASPECTS, base.aspect),
     quality: pick(o.quality, QUALITIES, base.quality),
-    script: { writer: pick(script.writer, WRITERS, base.script.writer), masterPrompt: str(script.masterPrompt, MAX_MASTER_PROMPT) },
+    script: { writer: pick(script.writer, WRITERS, base.script.writer), masterPrompt: str(script.masterPrompt, MAX_MASTER_PROMPT), claudeAccountId: typeof script.claudeAccountId === "string" && script.claudeAccountId.trim() !== "" ? script.claudeAccountId.trim().slice(0, 40) : null },
     voice: {
       model: str(voice.model, 80),
       voice: str(voice.voice, 40),

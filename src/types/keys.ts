@@ -9,4 +9,6 @@ export interface KeySlotInfo {
   status: KeyStatus;
   /** Seconds the key still rests after a usage limit (0 = ready). */
   restingSeconds: number;
+  /** Epoch milliseconds when the key is back online (0 = ready). Older builds leave this out. */
+  restingUntilMs?: number;
 }

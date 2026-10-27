@@ -2,7 +2,7 @@ import { CircleCheck, ExternalLink as ExternalLinkIcon, FlaskConical, KeyRound, 
 import { useId, useState } from "react";
 
 import { toAppError } from "../../lib/errors";
-import { restText, slotForNewKey, slotsFull, testKey } from "../../lib/keys";
+import { restText, setKeyRestUntil, slotForNewKey, slotsFull, testKey } from "../../lib/keys";
 import { openExternalLink, type ExternalLink } from "../../lib/links";
 import { useKeyStore } from "../../store/keyStore";
 import type { AppError, KeySlotInfo, Provider } from "../../types";
@@ -105,6 +105,7 @@ export function ApiKeyCard({ provider, title, description, linkLabel, link, test
             <KeyRow
               key={entry.slot}
               entry={entry}
+              provider={provider}
               numbered={several}
               busy={busy}
               confirming={confirmingDelete === entry.slot}
@@ -153,6 +154,7 @@ export function ApiKeyCard({ provider, title, description, linkLabel, link, test
 
 interface KeyRowProps {
   entry: KeySlotInfo;
+  provider: Provider;
   numbered: boolean;
   busy: string | null;
   confirming: boolean;
@@ -162,8 +164,28 @@ interface KeyRowProps {
   onDelete: () => void;
 }
 
-function KeyRow({ entry, numbered, busy, confirming, onTest, onAskDelete, onCancelDelete, onDelete }: KeyRowProps) {
+function KeyRow({ entry, provider, numbered, busy, confirming, onTest, onAskDelete, onCancelDelete, onDelete }: KeyRowProps) {
   const name = numbered ? `Key ${entry.slot}` : "Saved key";
+  const refresh = useKeyStore((state) => state.refresh);
+  const [backOnline, setBackOnline] = useState("");
+  const [setting, setSetting] = useState(false);
+  const toLocalInput = (ms: number) => {
+    const d = new Date(ms);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const setLimit = async (clear: boolean) => {
+    const untilMs = clear ? 0 : backOnline ? new Date(backOnline).getTime() : 0;
+    if (!clear && (!Number.isFinite(untilMs) || untilMs <= Date.now())) return;
+    setSetting(true);
+    try {
+      await setKeyRestUntil(provider, entry.slot, untilMs);
+      await refresh(provider);
+      setBackOnline("");
+    } finally {
+      setSetting(false);
+    }
+  };
   return (
     <li className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2">
       <span className="text-sm font-medium">{name}</span>
@@ -172,6 +194,26 @@ function KeyRow({ entry, numbered, busy, confirming, onTest, onAskDelete, onCanc
       ) : (
         <KeyStatusBadge status="set" />
       )}
+      <span className="flex flex-wrap items-center gap-2 text-xs">
+        <label htmlFor={`key-back-${provider}-${entry.slot}`} className="text-muted">
+          Back online at:
+        </label>
+        <input
+          id={`key-back-${provider}-${entry.slot}`}
+          type="datetime-local"
+          className="rounded-lg border border-line bg-surface-2 px-2 py-1 text-xs"
+          value={backOnline || (entry.restingUntilMs && entry.restingUntilMs > Date.now() ? toLocalInput(entry.restingUntilMs) : "")}
+          onChange={(e) => setBackOnline(e.target.value)}
+        />
+        <Button disabled={setting || busy !== null} onClick={() => void setLimit(false)}>
+          Set time
+        </Button>
+        {entry.restingSeconds > 0 && (
+          <Button disabled={setting || busy !== null} onClick={() => void setLimit(true)}>
+            Clear rest
+          </Button>
+        )}
+      </span>
       <span className="ml-auto inline-flex flex-wrap items-center gap-2">
         {confirming ? (
           <>

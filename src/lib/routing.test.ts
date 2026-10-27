@@ -24,16 +24,16 @@ test("DEFAULT_PATH stays /projects even though Dashboard is now first in the sid
   assert.equal(NAV_ITEMS[0]?.path, "/dashboard");
 });
 
-test("NAV_ITEMS lists the eight main pages in sidebar order, without Admin in a user build", () => {
+test("NAV_ITEMS lists the main pages in sidebar order, without Admin in a user build", () => {
   // In node --test, import.meta.env is undefined, so the Admin item is
   // absent — exactly as in a user build, where VITE_ADMIN is not "true".
   assert.deepEqual(
     NAV_ITEMS.map((item) => item.path),
-    ["/dashboard", "/projects", "/channels", "/prompt-generator", "/image-generator", "/auto-editor", "/sfx-library", "/settings"],
+    ["/dashboard", "/projects", "/channels", "/prompt-generator", "/image-generator", "/auto-editor", "/project-images", "/project-subtitles", "/sfx-library", "/settings"],
   );
   assert.deepEqual(
     NAV_ITEMS.map((item) => item.label),
-    ["Dashboard", "Projects", "Channels", "Prompt Generator", "Image Generator", "Auto Editor", "SFX Library", "Settings"],
+    ["Dashboard", "Projects", "Channels", "Prompt Generator", "Image Generator", "Auto Editor", "Project images", "Project subtitles", "SFX Library", "Settings"],
   );
   assert.ok(NAV_ITEMS.every((item) => item.path.startsWith("/")));
   assert.equal(new Set(NAV_ITEMS.map((item) => item.path)).size, NAV_ITEMS.length, "no duplicate nav paths");

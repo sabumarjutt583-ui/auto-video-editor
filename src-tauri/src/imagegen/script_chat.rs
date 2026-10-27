@@ -120,6 +120,12 @@ impl ScriptChat {
         self.update(|s| s.consent = true);
     }
 
+    /// Sets the time until which this account rests after a usage limit (0 = ready again).
+    /// Used by the person to say when the account is back online; persisted in state.json.
+    pub fn set_limited_until(&self, until_ms: u64) {
+        self.update(|s| s.limited_until = until_ms);
+    }
+
     fn require_consent(&self) -> Result<(), GenError> {
         if lock(&self.saved).consent {
             Ok(())

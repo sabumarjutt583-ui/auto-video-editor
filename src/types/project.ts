@@ -118,6 +118,15 @@ export interface ProjectSettings {
  * Mirrors src-tauri/src/project/model.rs.
  * Paths are relative to the project folder (e.g. "audio/voice.wav") or absolute.
  */
+export interface MakeVideoRun {
+  /** "running" | "paused" | "stopped" | "failed" | "finished" — "running" after a restart means the run was interrupted (crash/close). */
+  status: string;
+  currentStage: string;
+  completedStages: string[];
+  failedScenes: string[];
+  updatedAt: string;
+}
+
 export interface Project {
   schemaVersion: number;
   id: string;
@@ -172,6 +181,14 @@ export interface Project {
   mediaMap: Record<string, string>;
   /** When the final video was last rendered; null until the first render. */
   renderedAt: string | null;
+  /** Measured length of the last finished video in seconds (null until a render saves it; never guessed). */
+  exportDurationSeconds?: number | null;
+  /** File size of the last finished video in bytes (null until a render saves it; never guessed). */
+  exportSizeBytes?: number | null;
+  /** Per-scene caption text overrides, keyed by scene id, used by the next render. */
+  captionOverrides?: Record<string, string>;
+  /** Last Make Video run state, updated as the run progresses (crash resume). */
+  makeVideoRun?: MakeVideoRun | null;
   /** What the Auto Editor adds. May be null or partly filled in older projects: read it with `readEditor`. */
   editor: Partial<EditorData> | null;
   /** Id of the part being worked on ("" = the only part, "Part 1"). */
@@ -220,6 +237,9 @@ export interface ProjectSummary {
   pictures: number;
   audioMixed: boolean;
   rendered: boolean;
+  exportDurationSeconds?: number | null;
+  exportSizeBytes?: number | null;
+  makeVideoRun?: MakeVideoRun | null;
 }
 
 /** A project folder that could not be read (damaged file, newer app version, ...). */

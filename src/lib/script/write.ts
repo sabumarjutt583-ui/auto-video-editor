@@ -21,7 +21,7 @@ export async function writeScriptForStep0(
   const title = input.title.trim();
   const topic = input.topic.trim();
   if (title === "" && topic === "") fail("Write a title or topic for the script writer first.", "empty title and topic");
-  const answer = await scriptAsk(buildStep0Question(profile.script.masterPrompt, title, topic, input.wordCount));
+  const answer = await scriptAsk(buildStep0Question(profile.script.masterPrompt, title, topic, input.wordCount), profile.script.claudeAccountId ?? null);
   const script = cleanScript(answer);
   const problem = scriptProblem(script);
   if (problem) fail(problem, `script words: ${script.split(/\s+/).length}`);
@@ -32,7 +32,7 @@ export async function writeScriptForStep0(
 export async function writeScript(profile: ChannelProfile, topic: string): Promise<string> {
   if (!canWriteScript(profile)) fail("This channel has no script writer or no master prompt. Open the channel Settings to set them.", "script writer not set");
   if (topic.trim() === "") fail("Write the topic of the video first.", "empty topic");
-  const answer = await scriptAsk(buildScriptQuestion(profile.script.masterPrompt, topic));
+  const answer = await scriptAsk(buildScriptQuestion(profile.script.masterPrompt, topic), profile.script.claudeAccountId ?? null);
   const script = cleanScript(answer);
   const problem = scriptProblem(script);
   if (problem) fail(problem, `script words: ${script.split(/\s+/).length}`);

@@ -174,6 +174,75 @@ struct Rest {
 
 static RESTS: Mutex<Option<HashMap<(Provider, u8), Rest>>> = Mutex::new(None);
 
+/// File the rest state is saved to (set once at startup from the app data folder).
+/// Saved rests survive an app restart; expired rests are ignored when loaded.
+static REST_FILE: Mutex<Option<std::path::PathBuf>> = Mutex::new(None);
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
+
+fn provider_name(provider: Provider) -> &'static str {
+    match provider {
+        Provider::Groq => "groq",
+        Provider::Gemini => "gemini",
+        Provider::OpenAi => "openai",
+    }
+}
+
+fn provider_from_name(name: &str) -> Option<Provider> {
+    match name {
+        "groq" => Some(Provider::Groq),
+        "gemini" => Some(Provider::Gemini),
+        "openai" => Some(Provider::OpenAi),
+        _ => None,
+    }
+}
+
+/// Sets the file rests are saved to and loads any rests saved earlier.
+pub fn init_rest_file(path: std::path::PathBuf) {
+    if let Ok(mut guard) = REST_FILE.lock() {
+        *guard = Some(path.clone());
+    }
+    if let Ok(text) = std::fs::read_to_string(&path) {
+        if let Ok(saved) = serde_json::from_str::<Vec<serde_json::Value>>(&text) {
+            let now = now_ms();
+            with_rests(|rests| {
+                for entry in saved {
+                    let Some(provider) = entry.get("provider").and_then(|v| v.as_str()).and_then(provider_from_name) else { continue };
+                    let Some(slot) = entry.get("slot").and_then(|v| v.as_u64()).and_then(|v| u8::try_from(v).ok()) else { continue };
+                    let Some(until_ms) = entry.get("untilMs").and_then(|v| v.as_u64()) else { continue };
+                    let strikes = entry.get("strikes").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                    if until_ms > now {
+                        rests.insert((provider, slot), Rest { until: std::time::Instant::now() + std::time::Duration::from_millis(until_ms - now), strikes });
+                    }
+                }
+            });
+        }
+    }
+}
+
+fn save_rests() {
+    let path = match REST_FILE.lock() {
+        Ok(guard) => guard.clone(),
+        Err(_) => None,
+    };
+    let Some(path) = path else { return };
+    let now = now_ms();
+    let entries: Vec<serde_json::Value> = with_rests(|rests| {
+        rests.iter().map(|((provider, slot), rest)| {
+            let remaining_ms = rest.until.saturating_duration_since(std::time::Instant::now()).as_millis() as u64;
+            serde_json::json!({ "provider": provider_name(*provider), "slot": slot, "untilMs": now + remaining_ms, "strikes": rest.strikes })
+        }).collect()
+    });
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(text) = serde_json::to_string_pretty(&entries) {
+        let _ = std::fs::write(&path, text);
+    }
+}
+
 fn with_rests<T>(change: impl FnOnce(&mut HashMap<(Provider, u8), Rest>) -> T) -> T {
     let mut guard = RESTS.lock().unwrap_or_else(|e| e.into_inner());
     change(guard.get_or_insert_with(HashMap::new))
@@ -183,6 +252,7 @@ fn forget_rest(provider: Provider, slot: u8) {
     with_rests(|rests| {
         rests.remove(&(provider, slot));
     });
+    save_rests();
 }
 
 /// How long a key rests after its n-th limit in a row: 2 min, 4 min, 8 min ... at most 1 hour.
@@ -192,12 +262,14 @@ pub fn rest_for(strikes: u32) -> Duration {
 
 /// Puts a key to rest after a usage limit. Returns how long.
 pub fn rest(provider: Provider, slot: u8) -> Duration {
-    with_rests(|rests| {
+    let wait = with_rests(|rests| {
         let strikes = rests.get(&(provider, slot)).map_or(0, |r| r.strikes);
         let wait = rest_for(strikes);
         rests.insert((provider, slot), Rest { until: Instant::now() + wait, strikes: strikes + 1 });
         wait
-    })
+    });
+    save_rests();
+    wait
 }
 
 /// A key that was refused (wrong or removed) rests for an hour.
@@ -205,6 +277,7 @@ pub fn rest_long(provider: Provider, slot: u8) {
     with_rests(|rests| {
         rests.insert((provider, slot), Rest { until: Instant::now() + Duration::from_secs(3600), strikes: 5 });
     });
+    save_rests();
 }
 
 /// A call worked: the key's strikes are forgotten.
@@ -212,6 +285,27 @@ pub fn worked(provider: Provider, slot: u8) {
     with_rests(|rests| {
         rests.remove(&(provider, slot));
     });
+    save_rests();
+}
+
+/// Sets when a key is back online (epoch ms, 0 = ready now). Saved to disk, so it survives a restart.
+pub fn set_rest_until(provider: Provider, slot: u8, until_ms: u64) {
+    let now = now_ms();
+    if until_ms == 0 || until_ms <= now {
+        forget_rest(provider, slot);
+        return;
+    }
+    with_rests(|rests| {
+        let strikes = rests.get(&(provider, slot)).map_or(0, |r| r.strikes);
+        rests.insert((provider, slot), Rest { until: Instant::now() + Duration::from_millis(until_ms - now), strikes });
+    });
+    save_rests();
+}
+
+/// Epoch milliseconds when a resting key is back online (0 = ready).
+pub fn resting_until_ms(provider: Provider, slot: u8) -> u64 {
+    let remaining = with_rests(|rests| rests.get(&(provider, slot)).map(|r| r.until.saturating_duration_since(Instant::now()).as_millis() as u64)).unwrap_or(0);
+    if remaining == 0 { 0 } else { now_ms() + remaining }
 }
 
 /// Seconds until the key can be used again (0 = ready).

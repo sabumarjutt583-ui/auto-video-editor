@@ -245,6 +245,17 @@ pub struct VoicePart {
     pub snapshot: serde_json::Value,
 }
 
+/// Last Make Video run state, updated as the run progresses (crash resume).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct MakeVideoRun {
+    pub status: String,
+    pub current_stage: String,
+    pub completed_stages: Vec<String>,
+    pub failed_scenes: Vec<String>,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Project {
@@ -302,6 +313,14 @@ pub struct Project {
     pub media_map: BTreeMap<String, String>,
     /// When the final video was last rendered. Empty until the first render.
     pub rendered_at: Option<String>,
+    /// Measured length of the last finished video in seconds (None until a render saves it; never guessed).
+    pub export_duration_seconds: Option<f64>,
+    /// File size of the last finished video in bytes (None until a render saves it; never guessed).
+    pub export_size_bytes: Option<u64>,
+    /// Per-scene caption text overrides, keyed by scene id, used by the next render.
+    pub caption_overrides: BTreeMap<String, String>,
+    /// Last Make Video run state, updated as the run progresses (crash resume).
+    pub make_video_run: Option<MakeVideoRun>,
     /// Everything the Auto Editor adds (imported media, per-scene overrides, captions, audio mix).
     /// The shape is owned by src/types/editor.ts; it is kept as JSON here so nothing is lost on save.
     pub editor: serde_json::Value,
@@ -353,6 +372,10 @@ impl Default for Project {
             prompt_settings: PromptSettings::default(),
             media_map: BTreeMap::new(),
             rendered_at: None,
+            export_duration_seconds: None,
+            export_size_bytes: None,
+            caption_overrides: BTreeMap::new(),
+            make_video_run: None,
             editor: serde_json::Value::Null,
             active_part_id: String::new(),
             part_name: String::new(),
@@ -425,6 +448,9 @@ pub struct ProjectSummary {
     pub pictures: usize,
     pub audio_mixed: bool,
     pub rendered: bool,
+    pub export_duration_seconds: Option<f64>,
+    pub export_size_bytes: Option<u64>,
+    pub make_video_run: Option<MakeVideoRun>,
 }
 
 impl From<&Project> for ProjectSummary {
@@ -452,6 +478,9 @@ impl From<&Project> for ProjectSummary {
                 .count(),
             audio_mixed: project.editor.pointer("/audio/mix").is_some_and(|mix| mix.is_object()),
             rendered: project.rendered_at.is_some(),
+            export_duration_seconds: project.export_duration_seconds,
+            export_size_bytes: project.export_size_bytes,
+            make_video_run: project.make_video_run.clone(),
         }
     }
 }
