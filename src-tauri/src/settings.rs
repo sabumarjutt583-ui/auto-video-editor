@@ -18,7 +18,7 @@ const MAX_PATH_LENGTH: usize = 1024;
 
 pub const DEFAULT_GEMINI_MODEL: &str = "gemini-3.8-flash";
 pub const DEFAULT_WHISPER_MODEL: &str = "whisper-large-v3-turbo";
-pub const DEFAULT_GROQ_TEXT_MODEL: &str = "llama-3.3-70b-versatile";
+pub const DEFAULT_GROQ_TEXT_MODEL: &str = "openai/gpt-oss-120b";
 pub const DEFAULT_OPENAI_MODEL: &str = "gpt-4.1-mini";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -172,6 +172,16 @@ impl Settings {
             .ok_or_else(|| invalid("The Groq Whisper model name is not valid."))?;
         let groq_text_model = clean_model_name(&self.groq_text_model, true)
             .ok_or_else(|| invalid("The Groq text model name is not valid."))?;
+        // Groq stopped serving llama-3.3-70b-versatile to free/developer tiers on
+        // 16 Aug 2026 (it now answers HTTP 404 model_not_found, seen in the user's
+        // Oct 2026 logs). Changing only the default would leave every existing
+        // saved settings file on the dead model, so a saved copy of it is moved
+        // to the replacement here. Any other model the user typed stays untouched.
+        let groq_text_model = if groq_text_model == "llama-3.3-70b-versatile" {
+            DEFAULT_GROQ_TEXT_MODEL.to_string()
+        } else {
+            groq_text_model
+        };
 
         let openai_model = clean_model_name(&self.openai_model, false).ok_or_else(|| invalid("The OpenAI model name is not valid."))?;
 
@@ -409,6 +419,18 @@ mod tests {
         assert_eq!(settings.default_aspect_ratio, AspectRatio::Landscape);
         assert_eq!(settings.default_quality, Quality::P1080);
         assert_eq!(settings.export_folder, "");
+    }
+
+    #[test]
+    fn the_retired_groq_text_model_is_replaced_and_other_models_are_kept() {
+        // New installs get the replacement.
+        assert_eq!(Settings::default().groq_text_model, "openai/gpt-oss-120b");
+        // Existing saved settings carrying the retired model are migrated.
+        let retired = Settings { groq_text_model: "llama-3.3-70b-versatile".into(), ..Settings::default() };
+        assert_eq!(retired.validated().unwrap().groq_text_model, "openai/gpt-oss-120b");
+        // A model the user chose themselves is never rewritten.
+        let chosen = Settings { groq_text_model: "openai/gpt-oss-20b".into(), ..Settings::default() };
+        assert_eq!(chosen.validated().unwrap().groq_text_model, "openai/gpt-oss-20b");
     }
 
     #[test]
