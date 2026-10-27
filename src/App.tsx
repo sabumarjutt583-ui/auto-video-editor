@@ -9,6 +9,7 @@ import {
   ImageGeneratorPage,
   ChannelPage,
   ChannelsPage,
+  DashboardPage,
   ProjectsPage,
   PromptGeneratorPage,
   SettingsPage,
@@ -84,6 +85,7 @@ export function App() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<Navigate to={DEFAULT_PATH} replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/channels" element={<ChannelsPage />} />
           <Route path="/channels/:id" element={<ChannelPage />} />

@@ -17,21 +17,23 @@ import { QUICK_ID } from "./quick/textScenes.ts";
 
 // --- Navigation data (nav.ts, used by the sidebar and App.tsx) ---
 
-test("DEFAULT_PATH is /projects, the first sidebar page", () => {
+test("DEFAULT_PATH stays /projects even though Dashboard is now first in the sidebar", () => {
+  // The default route is deliberately unchanged: opening the app still lands on Projects,
+  // Dashboard is reached from the sidebar. So NAV_ITEMS[0] is no longer DEFAULT_PATH.
   assert.equal(DEFAULT_PATH, "/projects");
-  assert.equal(NAV_ITEMS[0]?.path, "/projects");
+  assert.equal(NAV_ITEMS[0]?.path, "/dashboard");
 });
 
-test("NAV_ITEMS lists the seven main pages in sidebar order, without Admin in a user build", () => {
+test("NAV_ITEMS lists the eight main pages in sidebar order, without Admin in a user build", () => {
   // In node --test, import.meta.env is undefined, so the Admin item is
   // absent — exactly as in a user build, where VITE_ADMIN is not "true".
   assert.deepEqual(
     NAV_ITEMS.map((item) => item.path),
-    ["/projects", "/channels", "/prompt-generator", "/image-generator", "/auto-editor", "/sfx-library", "/settings"],
+    ["/dashboard", "/projects", "/channels", "/prompt-generator", "/image-generator", "/auto-editor", "/sfx-library", "/settings"],
   );
   assert.deepEqual(
     NAV_ITEMS.map((item) => item.label),
-    ["Projects", "Channels", "Prompt Generator", "Image Generator", "Auto Editor", "SFX Library", "Settings"],
+    ["Dashboard", "Projects", "Channels", "Prompt Generator", "Image Generator", "Auto Editor", "SFX Library", "Settings"],
   );
   assert.ok(NAV_ITEMS.every((item) => item.path.startsWith("/")));
   assert.equal(new Set(NAV_ITEMS.map((item) => item.path)).size, NAV_ITEMS.length, "no duplicate nav paths");

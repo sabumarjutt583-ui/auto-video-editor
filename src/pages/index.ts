@@ -5,4 +5,5 @@ export { PromptGeneratorPage } from "./PromptGeneratorPage";
 export { SettingsPage } from "./SettingsPage";
 export { SfxLibraryPage } from "./SfxLibraryPage";
 export { ChannelPage } from "./ChannelPage";
+export { DashboardPage } from "./DashboardPage";
 export { ChannelsPage } from "./ChannelsPage";
