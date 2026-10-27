@@ -13,7 +13,7 @@ import { writeTextFile } from "../lib/files";
 import { countVideos, videosOf } from "../lib/pipeline/dashboard";
 import { NO_CHANNEL } from "../lib/pipeline/channels";
 import { canWriteScript, exportProfile, profileProblems } from "../lib/pipeline/profile";
-import { writeScript } from "../lib/script/write";
+import { writeScript, writeScriptForStep0 } from "../lib/script/write";
 import type { AppError } from "../types";
 
 type Tab = "videos" | "new" | "queue" | "settings";
@@ -29,6 +29,7 @@ export function ChannelPage() {
   const [name, setName] = useState("");
   const [script, setScript] = useState("");
   const [topic, setTopic] = useState("");
+  const [wordCount, setWordCount] = useState<number | null>(null);
   const [writing, setWriting] = useState(false);
   const [voiceFile, setVoiceFile] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -68,11 +69,12 @@ export function ChannelPage() {
   function start() {
     if (!profile) return;
     // The run goes on in the store while the person watches the list, so it is not awaited here.
-    void data.run.start({ profile, name: name || topic, script, topic, voiceFile, ensureConsent: ensure });
+    void data.run.start({ profile, name: name || topic, script, topic, wordCount: wordCount ?? undefined, voiceFile, ensureConsent: ensure });
     if (profileProblems(profile, { script, voiceFile, topic }).length === 0) {
       setName("");
       setTopic("");
       setScript("");
+      setWordCount(null);
       setVoiceFile(null);
       setTab("videos");
     }
@@ -83,7 +85,14 @@ export function ChannelPage() {
     setError(null);
     setWriting(true);
     try {
-      setScript(await writeScript(profile, topic));
+      // Step 0: with a word count, the question carries the title, topic and
+      // word count; without one, the older topic-only question is used.
+      if (wordCount !== null) {
+        const written = await writeScriptForStep0(profile, { title: name, topic, wordCount });
+        setScript(written.script);
+      } else {
+        setScript(await writeScript(profile, topic));
+      }
     } catch (caught) {
       setError(toAppError(caught, "The script could not be written."));
     } finally {
@@ -133,6 +142,8 @@ export function ChannelPage() {
           onVoiceFile={setVoiceFile}
           onStart={start}
           writer={canWriteScript(profile) ? { topic, writing, onTopic: setTopic, onWrite: () => void writeNow() } : undefined}
+          wordCount={wordCount}
+          onWordCount={setWordCount}
         />
       )}
 

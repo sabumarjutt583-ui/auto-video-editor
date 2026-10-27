@@ -13,7 +13,7 @@ import {
   sevenStepsFromSummary,
   sevenStepsFromView,
 } from "./sevenSteps.ts";
-import { initialView, reduceView, type RunView } from "./view.ts";
+import { initialView, reduceView, restart, type RunView } from "./view.ts";
 
 function video(id: string, patch: Partial<ProjectSummary> = {}): ProjectSummary {
   return {
@@ -53,9 +53,22 @@ test("a new video is 0% and a finished one is 100%", () => {
   const fresh = sevenStepsFromSummary(video("n"));
   assert.equal(sevenStepPercent(fresh), 0);
   assert.equal(sevenStepCurrent(fresh), "script");
-  const done = video("f", { voiceLocked: true, hasWords: true, sceneCount: 4, bibleLocked: true, promptsWritten: 4, pictureScenes: 4, pictures: 4, audioMixed: true, rendered: true });
+  const done = video("f", { hasScript: true, voiceLocked: true, hasWords: true, sceneCount: 4, bibleLocked: true, promptsWritten: 4, pictureScenes: 4, pictures: 4, audioMixed: true, rendered: true });
   assert.equal(sevenStepPercent(sevenStepsFromSummary(done)), 100);
   assert.equal(sevenStepCurrent(sevenStepsFromSummary(done)), null);
+});
+
+test("Script Writing is its own step, not folded into Scenes", () => {
+  const scenesOnly = byId(sevenStepsFromSummary(video("s", { sceneCount: 10 })));
+  assert.equal(scenesOnly.script?.done, false, "scenes alone do not finish Script Writing");
+  const scriptOnly = byId(sevenStepsFromSummary(video("s", { hasScript: true })));
+  assert.equal(scriptOnly.script?.done, true, "a saved script finishes Script Writing before any scene exists");
+  assert.equal(scriptOnly.script?.detail, "Script saved");
+  const idle = byId(sevenStepsFromView(initialView()));
+  assert.equal(idle.script?.state, "pending", "an idle run has no script step yet");
+  const started = byId(sevenStepsFromView(restart(initialView())));
+  assert.equal(started.script?.state, "done", "a started run already has its script");
+  assert.equal(started.script?.done, true);
 });
 
 test("the bible is folded into Image Prompts and audio into Video Editing", () => {

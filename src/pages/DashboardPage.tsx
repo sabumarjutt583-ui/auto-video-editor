@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import { Counters, useChannelData } from "../components/channels";
 import { ApprovalPanel, DashboardVideoCard } from "../components/dashboard";
+import { Step0Card } from "../components/script/Step0Card";
 import { ErrorNotice } from "../components/ErrorNotice";
 import { useConsent } from "../components/imagegen/useConsent";
 import { useProfiles } from "../components/pipeline";
@@ -40,6 +41,10 @@ export function DashboardPage() {
       {data.error && <ErrorNotice error={data.error} />}
       {data.run.error && <ErrorNotice error={data.run.error} />}
       <Counters counts={totals} />
+
+      <section aria-label="Step 0 — Script Writing">
+        <Step0Card profiles={profiles.profiles} busy={data.run.running} onMakeVideo={(input) => void data.run.start(input)} ensureConsent={ensure} />
+      </section>
 
       {data.run.projectId !== null && (
         <section aria-label="Pause for my review">

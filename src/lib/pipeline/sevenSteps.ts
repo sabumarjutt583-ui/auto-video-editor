@@ -1,19 +1,24 @@
-/** The brother tool's 7-step display, mapped onto this tool's 8 "Make video" steps (pure).
+/** The brother tool's 7-step display, mapped onto this tool's steps (pure).
 
 The brother tool shows: Script Writing, Voice Generation, SRT Generation, Image Prompts,
-Image Generation, Video Editing, Export & Verify. This tool runs 8 steps, so two of them are
-folded in, and none is dropped silently:
+Image Generation, Video Editing, Export & Verify. Script Writing is Step 0 here: it is
+its own step, written before the runner starts (typed in, or written by Claude from the
+channel's master prompt), and it is NOT folded into Scenes any more. Its row is driven
+by whether the project has a saved script (`hasScript` on the summary, or a run that
+has started, since a run cannot start without a script or an own voice file):
 
-- Script Writing = Scenes. The script itself is written before the run (or typed in), so the
-  first visible proof of it inside a run is the narration cut into scenes.
+- Script Writing = the saved script itself (Step 0).
 - Voice Generation = Voice, SRT Generation = Word timing (the word times become the captions).
 - Image Prompts = Characters and places AND Prompts. The character/place bible has to be
   locked before a prompt can be written in the channel's style, so both count for this step.
 - Image Generation = Pictures, Video Editing = Music and sounds (the mix is the last editing
   assembly), Export & Verify = Final video (the finished MP4 exists).
 
-The pause-for-review toggles use the same folding: "Approve Image Prompts" covers both the
-bible and the prompts, so ticking it pauses both and unticking it pauses neither. */
+The pause-for-review toggles use the same folding for the runner steps: "Approve Image
+Prompts" covers both the bible and the prompts, so ticking it pauses both and unticking
+it pauses neither. "Approve Script" still pauses the Scenes runner step — the first
+runner step that uses the script — while the script itself is reviewed in Step 0 before
+"Make video" is pressed at all, so the script is always seen before it is used. */
 
 import type { ProjectSummary } from "../../types/project.ts";
 import { stageProgress } from "./dashboard.ts";
@@ -79,12 +84,15 @@ function row(id: SevenStepId, done: boolean, state: SevenStepState, detail = "")
   return { id, label: sevenStepLabel(id), done, state, detail };
 }
 
-/** The 7 display steps for a project, from its finished-step flags. */
+/** The 7 display steps for a project, from its finished-step flags. Step 0 is
+driven by the saved script alone: scenes do not finish it, and a saved script
+finishes it even before any scene exists. */
 export function sevenStepsFromSummary(project: ProjectSummary): SevenStepRow[] {
   const by = Object.fromEntries(stageProgress(project).map((step) => [step.id, step]));
   const imagePromptsDone = by.cast.done && by.prompts.done;
+  const scriptDone = project.hasScript === true;
   return [
-    row("script", by.scenes.done, by.scenes.done ? "done" : "pending", by.scenes.detail),
+    row("script", scriptDone, scriptDone ? "done" : "pending", scriptDone ? "Script saved" : ""),
     row("voice", by.voice.done, by.voice.done ? "done" : "pending"),
     row("srt", by.timing.done, by.timing.done ? "done" : "pending"),
     row("imagePrompts", imagePromptsDone, imagePromptsDone ? "done" : "pending", by.prompts.detail),
@@ -108,7 +116,10 @@ function combineDetail(details: readonly string[]): string {
   return details.filter((detail) => detail !== "").join(" · ");
 }
 
-/** The 7 display steps for a live run, from its row states. */
+/** The 7 display steps for a live run, from its row states. Step 0 is not a
+runner row: a run that has started already has its script (typed, or written
+by Claude, or an own voice file), so a started run counts Step 0 as done and
+an idle run counts it as pending. It is never read from the Scenes row. */
 export function sevenStepsFromView(view: RunView): SevenStepRow[] {
   const by = Object.fromEntries(view.rows.map((step) => [step.id, step]));
   const pick = (stages: readonly StageId[]): { state: SevenStepState; detail: string } => {
@@ -119,8 +130,9 @@ export function sevenStepsFromView(view: RunView): SevenStepRow[] {
     const combined = pick(stages);
     return row(id, combined.state === "done", combined.state, combined.detail);
   };
+  const scriptRow: SevenStepRow = view.status === "idle" ? row("script", false, "pending") : row("script", true, "done", "Script saved");
   return [
-    make("script", ["scenes"]),
+    scriptRow,
     make("voice", ["voice"]),
     make("srt", ["timing"]),
     make("imagePrompts", ["cast", "prompts"]),

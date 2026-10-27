@@ -16,10 +16,13 @@ interface Props {
   onStart: () => void;
   /** The script writer: shown when the channel has one. */
   writer?: { topic: string; writing: boolean; onTopic: (value: string) => void; onWrite: () => void };
+  /** Step 0 word count asked for from Claude, or null when none was asked. */
+  wordCount?: number | null;
+  onWordCount?: (value: number | null) => void;
 }
 
 /** The only things that change from video to video: its name and its script (or your own voice file). */
-export function StartCard({ name, script, voiceFile, disabled, problems, onName, onScript, onVoiceFile, onStart, writer }: Props) {
+export function StartCard({ name, script, voiceFile, disabled, problems, onName, onScript, onVoiceFile, onStart, writer, wordCount, onWordCount }: Props) {
   async function chooseVoice() {
     const path = await pickFile("Choose your voice-over", "Audio", AUDIO_EXTENSIONS);
     if (path) onVoiceFile(path);
@@ -29,6 +32,25 @@ export function StartCard({ name, script, voiceFile, disabled, problems, onName,
       <Field label="Video name" htmlFor="mv-name" hint="Empty = the channel name.">
         <TextInput id="mv-name" value={name} maxLength={80} disabled={disabled} onChange={(e) => onName(e.target.value)} />
       </Field>
+      {writer && onWordCount && (
+        <Field label="Word count (optional)" htmlFor="mv-words" hint="How long the script from Claude should be, in words (50 to 20000). Empty = let the master prompt decide. This is an instruction to Claude, not an exact cut.">
+          <TextInput
+            id="mv-words"
+            inputMode="numeric"
+            value={wordCount === null || wordCount === undefined ? "" : String(wordCount)}
+            disabled={disabled || writer.writing}
+            onChange={(e) => {
+              const text = e.target.value.trim();
+              if (text === "") {
+                onWordCount(null);
+                return;
+              }
+              const parsed = Number(text);
+              onWordCount(Number.isFinite(parsed) ? Math.round(parsed) : null);
+            }}
+          />
+        </Field>
+      )}
       {writer && (
         <Field label="Topic" htmlFor="mv-topic" hint="What the video is about. Press 'Write the script' to read the script before the video is made, or leave the script empty and press Make video: the script is then written first.">
           <div className="flex flex-wrap gap-2">

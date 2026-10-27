@@ -151,6 +151,15 @@ export interface Project {
   cutMap: TimeRange[];
   /** The exact script the user pasted (may be empty). */
   script: string;
+  /** Step 0 audit record for the script, when it was made with Step 0 (older projects leave these empty). */
+  /** Where the script came from: "claude" or "typed". Empty = unknown (older project). */
+  scriptSource?: string;
+  /** The title/topic given to Claude, or "" for a typed script. */
+  scriptTopic?: string;
+  /** The word count asked for, or 0 when none was asked (the project file stores a number, never null). */
+  scriptWordsRequested?: number;
+  /** The fingerprint of the master prompt used (see lib/script/step0.ts). */
+  scriptMasterPromptVersion?: string;
   /** True when word times were estimated from line-level times (SRT/VTT). */
   timingEstimated: boolean;
   /** How well the script matched the timed words, 0 to 100. */
@@ -200,6 +209,8 @@ export interface ProjectSummary {
   /** The channel this video belongs to ("" = none). */
   channelId: string;
   /** What is finished so far (the steps of "Make video"), for the Channels dashboard. */
+  /** True when the project has a saved script (Step 0). Missing on older summaries = unknown. */
+  hasScript?: boolean;
   voiceLocked: boolean;
   hasWords: boolean;
   bibleLocked: boolean;

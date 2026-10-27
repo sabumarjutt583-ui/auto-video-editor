@@ -280,6 +280,16 @@ pub struct Project {
     pub cut_map: Vec<TimeRange>,
     /// The exact script the user pasted (may be empty).
     pub script: String,
+    /// Step 0 audit record for the script. Empty/zero on older projects, which
+    /// predate Step 0 records; their script source is unknown, not guessed.
+    /// Where the script came from: "claude" or "typed".
+    pub script_source: String,
+    /// The title/topic given to Claude, or "" for a typed script.
+    pub script_topic: String,
+    /// The word count asked for, or 0 when none was asked.
+    pub script_words_requested: u32,
+    /// The fingerprint of the master prompt used (see src/lib/script/step0.ts).
+    pub script_master_prompt_version: String,
     /// True when word times were estimated from line-level times (SRT/VTT).
     pub timing_estimated: bool,
     /// How well the script matched the timed words, 0 to 100.
@@ -332,6 +342,10 @@ impl Default for Project {
             voice_cleanup: VoiceCleanup::default(),
             cut_map: Vec::new(),
             script: String::new(),
+            script_source: String::new(),
+            script_topic: String::new(),
+            script_words_requested: 0,
+            script_master_prompt_version: String::new(),
             timing_estimated: false,
             alignment_quality: None,
             unmatched_words: Vec::new(),
@@ -400,6 +414,8 @@ pub struct ProjectSummary {
     /// The channel this video belongs to ("" = none).
     pub channel_id: String,
     /// What is finished so far, for the Channels dashboard (the steps of "Make video").
+    /// True when the project has a saved script (Step 0).
+    pub has_script: bool,
     pub voice_locked: bool,
     pub has_words: bool,
     pub bible_locked: bool,
@@ -422,6 +438,7 @@ impl From<&Project> for ProjectSummary {
             scene_count: project.scenes.len(),
             status: derive_status(project),
             channel_id: project.channel_id.clone(),
+            has_script: !project.script.trim().is_empty(),
             voice_locked: project.voice_locked && project.voice_path.is_some() && project.voice_duration > 0.0,
             has_words: !project.words.is_empty(),
             bible_locked: project.bible_locked,
@@ -514,6 +531,9 @@ mod tests {
         project.editor = serde_json::json!({ "audio": { "mix": { "path": "exports/audio_mix.wav" } } });
         let summary = ProjectSummary::from(&project);
         assert_eq!(summary.channel_id, "korean-senior");
+        assert!(!summary.has_script, "no script text yet, so Step 0 is not done");
+        project.script = "Hello world.".into();
+        assert!(ProjectSummary::from(&project).has_script, "a saved script finishes Step 0");
         assert!(summary.voice_locked && summary.has_words && summary.audio_mixed && !summary.rendered);
         assert_eq!((summary.prompts_written, summary.picture_scenes, summary.pictures), (2, 2, 1));
         let json = serde_json::to_value(&summary).unwrap();
