@@ -20,6 +20,20 @@ export const scriptConfirmSignedIn = (): Promise<void> => invoke<void>("script_c
 export const scriptCheck = (): Promise<ScriptStatus> => invoke<ScriptStatus>("script_check");
 export const scriptDisconnect = (): Promise<ScriptStatus> => invoke<ScriptStatus>("script_disconnect");
 
+/** One Claude account in the Settings list. The first account is the original single sign-in. */
+export interface ScriptAccountStatus extends ScriptStatus {
+  id: string;
+  name: string;
+}
+
+export const scriptAccounts = (): Promise<ScriptAccountStatus[]> => invoke<ScriptAccountStatus[]>("script_accounts");
+export const scriptAddAccount = (name?: string): Promise<ScriptAccountStatus> => invoke<ScriptAccountStatus>("script_add_account", { name: name ?? null });
+export const scriptDeleteAccount = (id: string): Promise<ScriptAccountStatus[]> => invoke<ScriptAccountStatus[]>("script_delete_account", { id });
+export const scriptAccountSignIn = (id: string): Promise<ScriptAccountStatus> => invoke<ScriptAccountStatus>("script_account_sign_in", { id });
+export const scriptAccountConfirmSignedIn = (id: string): Promise<void> => invoke<void>("script_account_confirm_signed_in", { id });
+export const scriptAccountCheck = (id: string): Promise<ScriptAccountStatus> => invoke<ScriptAccountStatus>("script_account_check", { id });
+export const scriptAccountDisconnect = (id: string): Promise<ScriptAccountStatus> => invoke<ScriptAccountStatus>("script_account_disconnect", { id });
+
 /** Claude's answer to one question, in a fresh chat. Can be cancelled like other jobs. */
 export async function scriptAsk(prompt: string): Promise<string> {
   const answer = await runJob("script", "Writing the script", (jobId) => invoke<{ text: string }>("script_ask", { prompt, jobId }));
