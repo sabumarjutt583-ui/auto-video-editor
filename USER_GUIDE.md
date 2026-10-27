@@ -169,7 +169,7 @@ If the web chat shows a captcha or "unusual activity" page, the account is pause
 
 **Who writes the texts.** Scene groups, characters and prompts are written by Gemini or Groq (API keys). Choose one in Settings.
 
-- **API keys**: paste, **Save**, **Test Key**, **Delete**. Gemini and Groq take up to 10 keys each (**Add another key**); when one reaches its limit the next is used. Keys are kept only in your computer's secure keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service). They are never written to files or logs.
+- **API keys**: paste, **Save**, **Test Key**, **Delete**. Gemini and Groq take up to 50 keys each (**Add another key**); when one reaches its limit the next is used. Keys are kept only in your computer's secure keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service). They are never written to files or logs.
 - **OpenAI key** (optional): only used to let an OpenAI model look at pictures when you make a custom style.
 - **Models**, **defaults** (aspect ratio, quality, export folder), **Video encoding**, **Library updates**, **Updates**, **Help and logs**.
 

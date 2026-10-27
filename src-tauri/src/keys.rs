@@ -13,8 +13,8 @@ use crate::commands::error::AppError;
 
 const SERVICE: &str = "com.autovideoeditor.app";
 const MAX_KEY_LENGTH: usize = 512;
-/// Most keys of one provider (Gemini and Groq). OpenAI keeps one.
-pub const MAX_SLOTS: u8 = 10;
+/// Most keys of one provider (Gemini and Groq: 50 each). OpenAI keeps one.
+pub const MAX_SLOTS: u8 = 50;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -282,7 +282,8 @@ mod tests {
         assert_eq!(slot_account(Provider::Gemini, 2), "gemini-api-key-2");
         assert_eq!(slot_account(Provider::Groq, 10), "groq-api-key-10");
         assert!(check_slot(Provider::Gemini, 10).is_ok());
-        assert!(check_slot(Provider::Gemini, 11).is_err());
+        assert!(check_slot(Provider::Gemini, 50).is_ok());
+        assert!(check_slot(Provider::Gemini, 51).is_err());
         assert!(check_slot(Provider::Gemini, 0).is_err());
         assert!(check_slot(Provider::OpenAi, 2).is_err());
     }

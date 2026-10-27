@@ -15,7 +15,7 @@ export function getKeyStatus(provider: Provider): Promise<KeyStatus> {
   return invoke<KeyStatus>("get_key_status", { provider });
 }
 
-/** All key places of the provider (Gemini and Groq: 10, OpenAI: 1) and whether each has a key. */
+/** All key places of the provider (Gemini and Groq: 50, OpenAI: 1) and whether each has a key. */
 export function getKeySlots(provider: Provider): Promise<KeySlotInfo[]> {
   return invoke<KeySlotInfo[]>("get_key_slots", { provider });
 }
