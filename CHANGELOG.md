@@ -3,6 +3,11 @@
 All notable changes to Auto Video Editor are written here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-10-28
+
+### Fixed
+- Graphics font path escapes in src-tauri/src/commands/graphics.rs (find_font): the backslash character literal and the escaped colon string were written with single backslashes, which Rust rejected as error E0762 unterminated character literal and stopped the v0.7.0 Windows release build. The line now uses '\\' for the backslash and "\\:" for the colon, so Windows font paths are converted to slashes and the colon is escaped for FFmpeg drawtext as intended.
+
 ## [0.7.0] - 2026-10-28
 
 ### Added
