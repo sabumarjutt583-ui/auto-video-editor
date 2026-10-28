@@ -185,6 +185,12 @@ export function FlowBatchPanel() {
         &quot;Korean&quot; in a prompt is also auto-detected as an identity token. Configure the characters in the Flow
         tool itself if only one character is wanted — this app never sets Jin Kun.
       </p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="primary" onClick={() => void openExternalLink("flow_batch")}>
+          Open Batch Flow Studio
+        </Button>
+        <Button onClick={() => void (async () => { setInfo(await flowBatchConfig()); })()}>Show defaults</Button>
+      </div>
       {!project ? (
         <p className="text-sm text-muted">Open a project first to run a batch for its scenes.</p>
       ) : (
@@ -230,10 +236,6 @@ export function FlowBatchPanel() {
             </div>
           )}
           <div className="flex flex-wrap gap-2">
-            <Button variant="primary" onClick={() => void openExternalLink("flow_batch")}>
-              Open Batch Flow Studio
-            </Button>
-            <Button onClick={() => void (async () => { setInfo(await flowBatchConfig()); })()}>Show defaults</Button>
             <Button onClick={() => void prepare()} disabled={busy}>Prepare batch</Button>
             <Button variant="primary" onClick={() => void run()} disabled={busy || (generation === "videos" && perVideo === null)}>
               Run batch ({scenes.length} scenes)
