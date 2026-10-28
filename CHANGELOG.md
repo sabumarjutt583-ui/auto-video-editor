@@ -3,6 +3,12 @@
 All notable changes to Auto Video Editor are written here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [0.7.2] - 2026-10-28
+
+### Fixed
+- Rust compile errors that stopped the v0.7.1 Windows release build (9 errors, no feature or logic change): Edge TTS now uses std::process::Stdio instead of the private tokio::process::Stdio (api/edge_tts.rs); ChatGPT custom style now wraps to_app_error in a closure at both call sites, as script.rs and chatgpt.rs already do (commands/custom_style.rs); key rest now wraps set_rest_until in Ok(...) for run_blocking (commands/keys.rs); graphics overlay now runs the tokio FFmpeg command directly in the async function with .await instead of inside a synchronous run_blocking closure (commands/graphics.rs); Flow Batch queue progress now reads snapshot["done"] and snapshot["total"] with as_u64() directly, since serde_json::Value has no and_then (imagegen/flow_batch_run.rs); API Monitor now calls VecDeque::new() with parentheses (api/monitor.rs); jobs test now clones the Arc sink before its first use so it is not moved before the second use (jobs.rs)
+- Removed a duplicated #[test] attribute warning (imagegen/config.rs)
+
 ## [0.7.1] - 2026-10-28
 
 ### Fixed
