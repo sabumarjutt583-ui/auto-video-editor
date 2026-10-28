@@ -28,6 +28,7 @@
         "enable": true,
         "scope": [
           "$APPDATA/projects/**",
+          "$APPDATA/quick/**",
           "$RESOURCE/resources/fonts/**",
           "$RESOURCE/resources/sfx/**",
           "$APPDATA/library/**",

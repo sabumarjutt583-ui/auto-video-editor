@@ -37,6 +37,8 @@ Open **Prompt Generator**. The first choice, **Quick prompts**, needs no project
 
 **Copy all / Export TXT** leave empty lines between prompts (1, 2 or 3, you choose), and **Include IDs** switches the ID before each prompt on or off. To make pictures from copied prompts, paste them into Image Generator > Only images.
 
+If the voice in a Quick session will not play and shows "This computer could not play the audio file (HTTP 403)", the voice file itself is fine — the player was blocked from reaching the Quick-session folder. Until the fixed version is installed, use **Save as project** and play the voice from that project instead. (This play error does not appear in the exported log file, because it is shown only on screen.)
+
 ## Part 1: Prompt Generator
 
 Open **Projects → New project**, give it a name and choose the language. Then go through the five steps at the top of the Prompt Generator. A step opens when the one before it is done.

@@ -176,6 +176,9 @@ resources/fonts/: Noto Sans, Noto Sans CJK, Noto Sans Devanagari, Noto Sans Arab
 - "Export logs" adds the newest 5 web chat failure reports (`webchat-fail-*.txt`, keys hidden, cut at 2000 chars; the .jpg screenshots stay in the logs folder).
 - API timeout text no longer names a fixed number of seconds (calls have 60 s or 150 s limits).
 
+## Quick-session voice playback (asset scope fix)
+- The Quick session lives in `app_data/quick/quick-session`, not in `projects/`, so its voice (`audio/original.wav`, `audio/processed.wav`) was outside `security.assetProtocol.scope` in `src-tauri/tauri.conf.json` and the player (`components/voice/WaveformPlayer.tsx`, `convertFileSrc` URL + fetch-to-blob fallback) got HTTP 403 — shown in the UI as "This computer could not play the audio file (HTTP 403)" or, on the Cleaned view, as NotSupportedError (network 3, ready 0, error 4). The file itself was fine (the waveform draws because FFmpeg decodes it for peaks). The fix adds only `"$APPDATA/quick/**"` to that scope; no other folder was widened. Until this reaches a release, the workaround is Save as project, then play from Projects (which is already in scope). Note: this frontend play error is UI-only and is NOT written to the Rust log file, so the log cannot be used to diagnose it.
+
 ## Slow or lost chats, polite pace, faster API prompts
 - Chat (style analysis, script writer, pictures) waits at least 15 min (`chat::MIN_ANSWER_WAIT_SECS`, used by `chat_ask_progress` and the chat thread path in `chat.rs`); the wait never interrupts Gemini.
 - A lost page ("Session with given id not found", -32001) is a `Session` error now (errors.rs), and `Worker::forget_if_lost` closes only the browser that call used, so the next try opens a fresh one (chat, thread, video, Flow, pictures).
