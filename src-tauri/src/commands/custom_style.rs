@@ -122,12 +122,12 @@ pub async fn analyze_style(
             let prompt = chat_question(Some(analyze::SYSTEM), &format!("{question}\nThe reference pictures are attached to this message."), true);
             // Same rule as the Gemini web chat: pick pictures spread over the whole set.
             let chosen = spread(&paths, crate::imagegen::chat::MAX_IMAGES);
-            let browser = chatgpt_browser_of(&ig).map_err(crate::imagegen::ops::to_app_error)?;
+            let browser = chatgpt_browser_of(&ig).map_err(|e| crate::imagegen::ops::to_app_error(&e))?;
             let config = ig.engine.config();
             let timeout = std::time::Duration::from_secs(crate::imagegen::chat::MIN_ANSWER_WAIT_SECS);
             let reply = tokio::select! {
                 () = job.cancelled() => return Err(AppError::cancelled()),
-                reply = chatgpt.ask_rotating(&browser, &config, &prompt, &chosen, timeout, None) => reply.map_err(crate::imagegen::ops::to_app_error)?,
+                reply = chatgpt.ask_rotating(&browser, &config, &prompt, &chosen, timeout, None) => reply.map_err(|e| crate::imagegen::ops::to_app_error(&e))?,
             };
             json_from_reply(&reply).unwrap_or(reply.text)
         }

@@ -37,7 +37,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
 use tokio::io::AsyncWriteExt;
-use tokio::process::Stdio;
+use std::process::Stdio;
 use tokio_tungstenite::tungstenite::protocol::Message;
 
 use super::client::{http, read_json, send};

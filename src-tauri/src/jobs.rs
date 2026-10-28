@@ -199,7 +199,7 @@ mod tests {
         assert!(!first.is_cancelled() && !second.is_cancelled());
         // Bad ids are still refused.
         assert!(registry.begin("", "test", sink.clone()).is_err());
-        assert!(registry.begin("../x", "test", sink).is_err());
+        assert!(registry.begin("../x", "test", sink.clone()).is_err());
         assert!(registry.begin(&"x".repeat(65), "test", sink).is_err());
     }
 

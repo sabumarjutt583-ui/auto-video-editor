@@ -5,7 +5,6 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::graphics::cache::{self, CacheInfo};
 
-use crate::commands::blocking::run_blocking;
 use crate::commands::error::AppError;
 use crate::commands::projects::project_folder;
 use crate::graphics::export::{GraphicClip, GraphicExports};
@@ -135,15 +134,17 @@ pub async fn graphics_apply_overlay(app: AppHandle, project_id: String, input_pa
         None => vec!["-c:v".into(), "libx264".into(), "-preset".into(), "medium".into(), "-crf".into(), "20".into(), "-pix_fmt".into(), "yuv420p".into()],
     };
     let filters_joined = drawn.filters.join(",");
-    let out = run_blocking(move || {
-        let mut cmd = command(Tool::Ffmpeg).map_err(|e| AppError::new("The video engine (FFmpeg) is missing or could not start.", e))?;
-        cmd.args(["-hide_banner", "-y", "-loglevel", "error", "-i"]).arg(&canonical).args(["-vf", &filters_joined]).args(&encoder_args).args(["-c:a", "copy"]).arg(&output);
-        let result = cmd.output().map_err(|e| AppError::new("The video engine (FFmpeg) could not start.", e.to_string()))?;
-        if !result.status.success() {
-            return Err(AppError::new("The graphic overlay failed.", String::from_utf8_lossy(&result.stderr).chars().take(600).collect()));
-        }
-        Ok::<_, AppError>(output)
-    }).await?;
+    // Note: this block used to run inside run_blocking, but that closure is
+    // synchronous, so `.await` on the tokio FFmpeg command was illegal there.
+    // The surrounding function is async, so the command now runs directly
+    // here with `.await` — same args, same errors, same output naming.
+    let mut cmd = command(Tool::Ffmpeg).map_err(|e| AppError::new("The video engine (FFmpeg) is missing or could not start.", e))?;
+    cmd.args(["-hide_banner", "-y", "-loglevel", "error", "-i"]).arg(&canonical).args(["-vf", &filters_joined]).args(&encoder_args).args(["-c:a", "copy"]).arg(&output);
+    let result = cmd.output().await.map_err(|e| AppError::new("The video engine (FFmpeg) could not start.", e.to_string()))?;
+    if !result.status.success() {
+        return Err(AppError::new("The graphic overlay failed.", String::from_utf8_lossy(&result.stderr).chars().take(600).collect()));
+    }
+    let out = output;
     crate::logging::info("graphics", &format!("Overlay saved: {} ({} filters, skipped: {})", out.display(), drawn.filters.len(), drawn.skipped.join(", ")));
     Ok(crate::graphics::draw::DrawResult { filters: drawn.filters, skipped: drawn.skipped, plan: drawn.plan })
 }

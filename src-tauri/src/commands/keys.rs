@@ -52,7 +52,7 @@ pub async fn get_key_slots(provider: Provider) -> Result<Vec<KeySlot>, AppError>
 /// Sets when a key is back online after a usage limit (epoch ms, 0 = ready now). Saved to disk.
 #[tauri::command]
 pub async fn set_key_rest_until(provider: Provider, slot: u8, until_ms: u64) -> Result<(), AppError> {
-    run_blocking(move || keys::set_rest_until(provider, slot, until_ms)).await
+    run_blocking(move || Ok(keys::set_rest_until(provider, slot, until_ms))).await
 }
 
 #[tauri::command]

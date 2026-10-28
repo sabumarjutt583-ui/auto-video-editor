@@ -669,7 +669,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn the_flow_batch_settings_use_only_the_new_shared_link() {
         let config = EngineConfig::bundled();
         assert_eq!(

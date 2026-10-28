@@ -21,7 +21,7 @@ pub struct ApiCall {
     pub detail: String,
 }
 
-static CALLS: Mutex<VecDeque<ApiCall>> = Mutex::new(VecDeque::new);
+static CALLS: Mutex<VecDeque<ApiCall>> = Mutex::new(VecDeque::new());
 const MAX_CALLS: usize = 200;
 
 fn now_ms() -> u64 {

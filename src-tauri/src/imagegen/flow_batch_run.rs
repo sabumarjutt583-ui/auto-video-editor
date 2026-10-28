@@ -289,8 +289,8 @@ pub async fn run_batch(
                     .map(|(id, _)| id)
             })
             .collect();
-        let done = snapshot["done"].and_then(|v| v.as_u64()).map(|d| d as usize).unwrap_or(ready.len());
-        let total = snapshot["total"].and_then(|v| v.as_u64()).map(|t| t as usize).unwrap_or(request.scene_ids.len());
+        let done = snapshot["done"].as_u64().map(|d| d as usize).unwrap_or(ready.len());
+        let total = snapshot["total"].as_u64().map(|t| t as usize).unwrap_or(request.scene_ids.len());
         progress = queue_progress(&request.scene_ids, &ready, done, total, snapshot["saysFailed"].as_bool().unwrap_or(false));
         if progress.ready_ids.len() == request.scene_ids.len() {
             break;
