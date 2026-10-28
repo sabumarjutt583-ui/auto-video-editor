@@ -1,5 +1,8 @@
 //! Asking an AI to study reference pictures and write a style profile. This file holds the instructions and the
-//! reading of the answer; the commands send the question to Gemini, OpenAI or Gemini's web chat.
+//! reading of the answer; the commands send the question to Gemini, ChatGPT's web chat or Gemini's web chat.
+//! The OpenAI key option was removed (the person has no OpenAI key): `Openai` stays only so a
+//! style saved earlier with that engine still loads; it is never offered as a choice and asking
+//! with it returns a friendly error telling the person to pick ChatGPT web chat instead.
 
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -13,10 +16,12 @@ use crate::styles::{self, StyleProfile};
 pub enum Engine {
     /// Gemini through the person's Gemini API key.
     Gemini,
-    /// An OpenAI vision model through the person's OpenAI key.
+    /// Legacy only: an OpenAI vision model through the person's OpenAI key. Not offered any more.
     Openai,
     /// Gemini's web chat through the Google accounts.
     Chat,
+    /// ChatGPT's web chat through the ChatGPT accounts. No API key needed.
+    Chatgpt,
 }
 
 /// The fields the AI writes (the app adds id, name, category and version).
@@ -165,8 +170,9 @@ mod tests {
 
     #[test]
     fn engines_use_lowercase_names_on_the_wire() {
-        assert_eq!(serde_json::from_str::<Engine>("\"openai\"").unwrap(), Engine::Openai);
+        assert_eq!(serde_json::from_str::<Engine>("\"openai\"").unwrap(), Engine::Openai, "an old saved style still loads");
         assert_eq!(serde_json::from_str::<Engine>("\"chat\"").unwrap(), Engine::Chat);
+        assert_eq!(serde_json::from_str::<Engine>("\"chatgpt\"").unwrap(), Engine::Chatgpt, "the new web-chat choice");
         assert!(serde_json::from_str::<Engine>("\"claude\"").is_err());
     }
 }

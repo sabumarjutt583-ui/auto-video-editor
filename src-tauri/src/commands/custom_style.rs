@@ -7,7 +7,8 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
-use crate::api::{gemini, openai};
+use crate::api::gemini;
+use crate::commands::chatgpt::{browser_of as chatgpt_browser_of, ChatGpt};
 use crate::commands::ai::chat_question;
 use crate::commands::blocking::run_blocking;
 use crate::commands::error::AppError;
@@ -92,6 +93,7 @@ pub async fn analyze_style(
     app: AppHandle,
     jobs: State<'_, JobRegistry>,
     ig: State<'_, Arc<ImageGen>>,
+    chatgpt: ChatGpt<'_>,
     job_id: String,
     request: AnalyzeRequest,
 ) -> Result<AnalyzeAnswer, AppError> {
@@ -115,7 +117,29 @@ pub async fn analyze_style(
             };
             json_from_reply(&reply).unwrap_or(reply.text)
         }
-        engine => {
+        Engine::Chatgpt => {
+            job.progress("Asking ChatGPT in the web chat (this can take a minute)", 20.0);
+            let prompt = chat_question(Some(analyze::SYSTEM), &format!("{question}\nThe reference pictures are attached to this message."), true);
+            // Same rule as the Gemini web chat: pick pictures spread over the whole set.
+            let chosen = spread(&paths, crate::imagegen::chat::MAX_IMAGES);
+            let browser = chatgpt_browser_of(&ig).map_err(crate::imagegen::ops::to_app_error)?;
+            let config = ig.engine.config();
+            let timeout = std::time::Duration::from_secs(crate::imagegen::chat::MIN_ANSWER_WAIT_SECS);
+            let reply = tokio::select! {
+                () = job.cancelled() => return Err(AppError::cancelled()),
+                reply = chatgpt.ask_rotating(&browser, &config, &prompt, &chosen, timeout, None) => reply.map_err(crate::imagegen::ops::to_app_error)?,
+            };
+            json_from_reply(&reply).unwrap_or(reply.text)
+        }
+        Engine::Openai => {
+            // The OpenAI key option was removed: a request with it can only come from an old
+            // saved choice. Tell the person to pick ChatGPT web chat instead of failing silently.
+            return Err(AppError::new(
+                "The OpenAI key option for custom styles was removed. Please choose ChatGPT web chat (ChatGPT accounts) instead — no key is needed for it.",
+                "engine openai removed",
+            ));
+        }
+        Engine::Gemini => {
             let bytes = run_blocking({
                 let paths = paths.clone();
                 move || {
@@ -125,23 +149,13 @@ pub async fn analyze_style(
             .await?;
             let settings_app = app.clone();
             let settings = run_blocking(move || settings::load(&settings_app)).await?;
-            if engine == Engine::Gemini {
-                let key = run_blocking(|| keys::require(Provider::Gemini)).await?;
-                job.progress("Asking Gemini", 20.0);
-                let mut parts = vec![serde_json::json!({ "text": question })];
-                parts.extend(bytes.iter().map(|b| gemini::image_part("image/jpeg", b)));
-                tokio::select! {
-                    () = job.cancelled() => return Err(AppError::cancelled()),
-                    answer = gemini::generate_parts(&key, &settings.gemini_model, Some(analyze::SYSTEM), parts, true) => answer?,
-                }
-            } else {
-                let key = run_blocking(|| keys::require(Provider::OpenAi)).await?;
-                job.progress("Asking OpenAI", 20.0);
-                let images: Vec<(&str, &[u8])> = bytes.iter().map(|b| ("image/jpeg", b.as_slice())).collect();
-                tokio::select! {
-                    () = job.cancelled() => return Err(AppError::cancelled()),
-                    answer = openai::vision(&key, &settings.openai_model, Some(analyze::SYSTEM), &question, &images, true) => answer?,
-                }
+            let key = run_blocking(|| keys::require(Provider::Gemini)).await?;
+            job.progress("Asking Gemini", 20.0);
+            let mut parts = vec![serde_json::json!({ "text": question })];
+            parts.extend(bytes.iter().map(|b| gemini::image_part("image/jpeg", b)));
+            tokio::select! {
+                () = job.cancelled() => return Err(AppError::cancelled()),
+                answer = gemini::generate_parts(&key, &settings.gemini_model, Some(analyze::SYSTEM), parts, true) => answer?,
             }
         }
     };
@@ -156,7 +170,7 @@ pub struct SaveRequest {
     pub style: StyleProfile,
     pub images: Vec<String>,
     pub description: String,
-    /// "gemini", "openai" or "chat" (or "" for a style written by hand).
+    /// "gemini", "chatgpt" or "chat" (or "" for a style written by hand; "openai" only on old saved styles).
     pub engine: String,
 }
 

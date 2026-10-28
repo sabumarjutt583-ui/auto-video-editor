@@ -157,7 +157,7 @@ Open the **Style Gallery**, go to **My Styles** and press **Create style** (or u
 1. Type a **name** and choose a **category** (My Styles is the default).
 2. Add **3 to 20 pictures** (the web chat looks at up to 10 of them, spread over the set) that share one look: drop them on the window or click the dashed card. PNG, JPG or WebP, up to 10 MB each. Remove one with the X.
 3. Write a few words about the look, the mood or what to keep (**Description**, recommended).
-4. Choose what studies the pictures: **Gemini** or **OpenAI** (they need a key in Settings) or the **Gemini web chat** (your Google accounts, no key).
+4. Choose what studies the pictures: **Gemini** (needs a key in Settings), the **Gemini web chat** (your Google accounts, no key) or the **ChatGPT web chat** (your ChatGPT accounts in Settings, no key). The old OpenAI key option was removed: if you ever saved an OpenAI key it stays in your keychain, unused.
 5. Press **Analyze with AI**. The AI describes only the look the pictures have in common, not what is in them. If its first answer breaks a writing rule, it is asked once more automatically.
 6. **Review**: every field can be changed. **Regenerate** asks the AI again. **Test style** writes 3 sample prompts so you can see the style at work. Then **Save style**.
 
@@ -170,7 +170,7 @@ If the web chat shows a captcha or "unusual activity" page, the account is pause
 **Who writes the texts.** Scene groups, characters and prompts are written by Gemini or Groq (API keys). Choose one in Settings.
 
 - **API keys**: paste, **Save**, **Test Key**, **Delete**. Gemini and Groq take up to 50 keys each (**Add another key**); when one reaches its limit the next is used. A resting key stays resting after you close and reopen the app, and you can set its **Back online at** time (or **Clear rest**) on its row in Settings. Keys are kept only in your computer's secure keychain (Windows Credential Manager, macOS Keychain, Linux Secret Service). They are never written to files or logs.
-- **OpenAI key** (optional): only used to let an OpenAI model look at pictures when you make a custom style.
+- **ChatGPT accounts** (optional): for custom styles only. Add an account in Settings, press **Sign in** and sign in to ChatGPT yourself in your own browser window (the app never sees your password), then **Check** should say Connected. A free ChatGPT account can be slow and can hit a daily limit; when one account rests, the next connected account is used. If ChatGPT's page changes, style analysis can stop until the app's settings are updated — send the error details and the log if that happens.
 - **Models**, **defaults** (aspect ratio, quality, export folder), **Video encoding**, **Library updates**, **Updates**, **Help and logs**.
 
 ### Updating the app

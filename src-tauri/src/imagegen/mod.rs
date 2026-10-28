@@ -6,6 +6,7 @@
 pub mod accounts;
 pub mod browser;
 pub mod chat;
+pub mod chatgpt;
 pub mod config;
 pub mod delete;
 pub mod engine;

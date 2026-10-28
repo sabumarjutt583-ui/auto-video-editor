@@ -193,6 +193,38 @@ impl ChatConfig {
             soft_failure_texts: words(&[]),
         }
     }
+
+    /// The defaults for ChatGPT's chat page (UNVERIFIED against a live signed-in session as of
+    /// 2026-10-28: ChatGPT's DOM changes often, so these are best-known identifiers only, and
+    /// a page change is fixed by a settings/config update, not a new app version). The prompt
+    /// box is the composer's textarea, the send/stop buttons are the composer's test-id buttons,
+    /// an assistant turn is a `[data-message-author-role="assistant"]` element whose markdown
+    /// is in `.markdown`, and pictures are handed to the composer's file input.
+    pub fn chatgpt() -> Self {
+        let words = |list: &[&str]| list.iter().map(|w| (*w).to_string()).collect();
+        Self {
+            url: "https://chatgpt.com/".into(),
+            login_url: "https://chatgpt.com/auth/login".into(),
+            selectors: ChatSelectors {
+                input: "#prompt-textarea".into(),
+                send: "button[data-testid=\"send-button\"]".into(),
+                response: "[data-message-author-role=\"assistant\"]".into(),
+                response_text: ".markdown".into(),
+                code_block: "pre".into(),
+                done: "button[data-testid=\"copy-turn-action-button\"]".into(),
+                stop: "button[data-testid=\"stop-button\"]".into(),
+                thinking: String::new(),
+                attach: "button[data-testid=\"composer-plus-btn\"]".into(),
+                upload_item: "button[data-testid=\"composer-upload-file\"]".into(),
+                file_input: "input[type=\"file\"]".into(),
+                attachment: String::new(),
+            },
+            timing: ChatTiming::default(),
+            limit_texts: words(&["usage limit", "reached your limit", "you've reached your limit", "limit reached", "message limit", "out of messages", "free plan limit", "try again later", "come back later", "resets at"]),
+            error_texts: words(&["something went wrong", "an error occurred", "couldn't complete", "failed to generate"]),
+            soft_failure_texts: words(&["encountering an error", "having a hard time fulfilling", "something else instead", "can't help with that", "cannot help with that"]),
+        }
+    }
 }
 
 /// Where things are for making a video in Gemini's chat ("Create video" mode). Defaults are the page as seen on 2026-10-24.
@@ -371,6 +403,9 @@ pub struct EngineConfig {
     /// The script writer's chat page (a Claude account the person signs in to).
     #[serde(default = "ChatConfig::script_writer")]
     pub script: ChatConfig,
+    /// ChatGPT's chat page (a ChatGPT account the person signs in to, for custom styles).
+    #[serde(default = "ChatConfig::chatgpt")]
+    pub chatgpt: ChatConfig,
     #[serde(default)]
     pub video: VideoConfig,
     #[serde(default)]
@@ -415,6 +450,9 @@ impl EngineConfig {
         }
         if !self.chat.url.starts_with("https://") || self.chat.timing.poll_ms < 200 {
             return Err(bad("The image engine settings are not valid, so they were not used.", "chat.url must start with https:// and chat.timing.pollMs must be at least 200"));
+        }
+        if !self.chatgpt.url.starts_with("https://") || self.chatgpt.timing.poll_ms < 200 {
+            return Err(bad("The image engine settings are not valid, so they were not used.", "chatgpt.url must start with https:// and chatgpt.timing.pollMs must be at least 200"));
         }
         if self.timing.poll_ms < 200 || self.timing.page_load_timeout_ms < 5_000 {
             return Err(bad("The image engine settings are not valid, so they were not used.", "timing values are too small"));
@@ -510,6 +548,24 @@ mod tests {
         assert!(EngineConfig::parse(&no_ratio).is_err());
         let bad_version = BUNDLED_JSON.replace("\"configVersion\": \"1.7\"", "\"configVersion\": \"x\"");
         assert!(EngineConfig::parse(&bad_version).is_err());
+    }
+
+    #[test]
+    fn the_chatgpt_settings_have_defaults_and_must_be_https() {
+        let config = EngineConfig::bundled();
+        assert_eq!(config.chatgpt, ChatConfig::chatgpt(), "the bundled file and the built-in ChatGPT defaults agree");
+        assert_eq!(config.chatgpt.url, "https://chatgpt.com/");
+        assert_eq!(config.chatgpt.login_url, "https://chatgpt.com/auth/login");
+        assert_eq!(config.chatgpt.selectors.input, "#prompt-textarea");
+        assert_eq!(config.chatgpt.selectors.send, "button[data-testid=\"send-button\"]");
+        let without_chatgpt = {
+            let mut value: serde_json::Value = serde_json::from_str(BUNDLED_JSON).unwrap();
+            value.as_object_mut().unwrap().remove("chatgpt");
+            value.to_string()
+        };
+        assert_eq!(EngineConfig::parse(&without_chatgpt).unwrap().chatgpt, ChatConfig::chatgpt(), "an older settings package still works");
+        let http = BUNDLED_JSON.replace("https://chatgpt.com/\",", "http://chatgpt.com/\",");
+        assert!(EngineConfig::parse(&http).is_err());
     }
 
     #[test]

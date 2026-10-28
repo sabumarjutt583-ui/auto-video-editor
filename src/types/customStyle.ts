@@ -1,7 +1,7 @@
 import type { StyleProfile } from "./style.ts";
 
-/** What studies the reference pictures: Gemini or OpenAI with an API key, or Gemini's web chat. */
-export type AnalyzeEngine = "gemini" | "openai" | "chat";
+/** What studies the reference pictures: Gemini with an API key, or a web chat (Gemini's Google accounts, or ChatGPT's ChatGPT accounts). */
+export type AnalyzeEngine = "gemini" | "chat" | "chatgpt";
 
 /** A reference picture that was checked and shrunk (a JPEG of at most 1024 px). */
 export interface PreparedImage {
@@ -14,7 +14,7 @@ export interface PreparedImage {
 export interface StyleRefs {
   images: PreparedImage[];
   description: string;
-  /** "gemini", "openai" or "chat" ("" when unknown). */
+  /** "gemini", "chatgpt" or "chat" ("" when unknown; "openai" only on old saved styles). */
   engine: string;
 }
 

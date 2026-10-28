@@ -1,5 +1,6 @@
 pub mod app_update;
 pub mod ai;
+pub mod chatgpt;
 pub mod audio;
 pub mod blocking;
 pub mod captions;

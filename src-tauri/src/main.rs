@@ -140,6 +140,16 @@ macro_rules! handler {
             commands::script::script_account_disconnect,
             commands::script::script_account_set_limit,
             commands::script::script_open_live,
+            commands::chatgpt::chatgpt_accounts,
+            commands::chatgpt::chatgpt_add_account,
+            commands::chatgpt::chatgpt_delete_account,
+            commands::chatgpt::chatgpt_account_sign_in,
+            commands::chatgpt::chatgpt_account_confirm_signed_in,
+            commands::chatgpt::chatgpt_account_check,
+            commands::chatgpt::chatgpt_account_disconnect,
+            commands::chatgpt::chatgpt_account_set_limit,
+            commands::chatgpt::chatgpt_accept_consent,
+            commands::chatgpt::chatgpt_open_live,
             commands::imagegen::imagegen_make_video,
             commands::imagegen::imagegen_video_status,
             commands::imagegen::imagegen_delete_images,
@@ -277,6 +287,16 @@ macro_rules! handler {
             commands::script::script_account_disconnect,
             commands::script::script_account_set_limit,
             commands::script::script_open_live,
+            commands::chatgpt::chatgpt_accounts,
+            commands::chatgpt::chatgpt_add_account,
+            commands::chatgpt::chatgpt_delete_account,
+            commands::chatgpt::chatgpt_account_sign_in,
+            commands::chatgpt::chatgpt_account_confirm_signed_in,
+            commands::chatgpt::chatgpt_account_check,
+            commands::chatgpt::chatgpt_account_disconnect,
+            commands::chatgpt::chatgpt_account_set_limit,
+            commands::chatgpt::chatgpt_accept_consent,
+            commands::chatgpt::chatgpt_open_live,
             commands::imagegen::imagegen_make_video,
             commands::imagegen::imagegen_video_status,
             commands::imagegen::imagegen_delete_images,
@@ -355,6 +375,12 @@ fn main() {
             tauri::async_runtime::spawn(async {
                 let _ = render::encoder::available().await;
             });
+            match commands::chatgpt::create(app.handle()) {
+                Ok(chatgpt) => {
+                    app.manage(chatgpt);
+                }
+                Err(error) => logging::error("chatgpt", &error.details),
+            }
             match commands::script::create(app.handle()) {
                 Ok(script) => {
                     app.manage(script);

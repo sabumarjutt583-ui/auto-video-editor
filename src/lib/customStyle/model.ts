@@ -92,19 +92,23 @@ export interface EngineChoice {
   unavailable: string | null;
 }
 
-/** The engines to choose from, with the reason when one needs a key first. */
-export function engineChoices(keys: { gemini: boolean; openai: boolean }): EngineChoice[] {
+/** The engines to choose from, with the reason when one needs a key or an account first. */
+export function engineChoices(keys: { gemini: boolean }, chatgpt: { ready: boolean; signedIn: boolean }): EngineChoice[] {
   return [
     { value: "gemini", label: "Gemini (API key)", unavailable: keys.gemini ? null : "Add your Gemini key in Settings first." },
-    { value: "openai", label: "OpenAI (API key)", unavailable: keys.openai ? null : "Add your OpenAI key in Settings first." },
     { value: "chat", label: "Gemini web chat (Google accounts)", unavailable: null },
+    {
+      value: "chatgpt",
+      label: "ChatGPT web chat (ChatGPT accounts)",
+      unavailable: !chatgpt.ready ? "Add your ChatGPT account in Settings first." : !chatgpt.signedIn ? "Sign in to a ChatGPT account in Settings first." : null,
+    },
   ];
 }
 
-/** The engine to start with: a key that is set, else the web chat. */
-export function defaultEngine(keys: { gemini: boolean; openai: boolean }): AnalyzeEngine {
+/** The engine to start with: a key that is set, else a ready ChatGPT account, else the Gemini web chat. */
+export function defaultEngine(keys: { gemini: boolean }, chatgpt?: { ready: boolean; signedIn: boolean }): AnalyzeEngine {
   if (keys.gemini) return "gemini";
-  if (keys.openai) return "openai";
+  if (chatgpt?.ready && chatgpt?.signedIn) return "chatgpt";
   return "chat";
 }
 

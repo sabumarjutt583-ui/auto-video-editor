@@ -185,5 +185,58 @@
       "couldn't complete"
     ],
     "softFailureTexts": []
+  },
+  "chatgpt": {
+    "url": "https://chatgpt.com/",
+    "loginUrl": "https://chatgpt.com/auth/login",
+    "selectors": {
+      "input": "#prompt-textarea",
+      "send": "button[data-testid=\"send-button\"]",
+      "response": "[data-message-author-role=\"assistant\"]",
+      "responseText": ".markdown",
+      "codeBlock": "pre",
+      "done": "button[data-testid=\"copy-turn-action-button\"]",
+      "stop": "button[data-testid=\"stop-button\"]",
+      "thinking": "",
+      "attach": "button[data-testid=\"composer-plus-btn\"]",
+      "uploadItem": "button[data-testid=\"composer-upload-file\"]",
+      "fileInput": "input[type=\"file\"]",
+      "attachment": ""
+    },
+    "timing": {
+      "pageReadyMs": 30000,
+      "sendEnableMs": 30000,
+      "replyStartMs": 180000,
+      "pollMs": 700,
+      "stableMs": 9000,
+      "uploadMs": 45000,
+      "thinkMaxMs": 300000,
+      "finishStableMs": 2000
+    },
+    "limitTexts": [
+      "usage limit",
+      "reached your limit",
+      "you've reached your limit",
+      "limit reached",
+      "message limit",
+      "out of messages",
+      "free plan limit",
+      "try again later",
+      "come back later",
+      "resets at"
+    ],
+    "errorTexts": [
+      "something went wrong",
+      "an error occurred",
+      "couldn't complete",
+      "failed to generate"
+    ],
+    "softFailureTexts": [
+      "encountering an error",
+      "having a hard time fulfilling",
+      "something else instead",
+      "can't help with that",
+      "cannot help with that"
+    ]
   }
 }

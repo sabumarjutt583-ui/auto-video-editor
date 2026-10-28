@@ -66,7 +66,7 @@ export function AnalyzeForm({ creator, onManual, onCancel }: AnalyzeFormProps) {
         <textarea id={ids.description} value={creator.description} rows={2} maxLength={500} disabled={creator.busy} onChange={(e) => creator.setDescription(e.target.value)} className={AREA_CLASSES} />
       </Field>
 
-      <Field label="Analyze with" htmlFor={ids.engine} hint="Gemini and OpenAI use your own key (Settings). The web chat uses your Google accounts (Settings, Google accounts) and no key.">
+      <Field label="Analyze with" htmlFor={ids.engine} hint="Gemini uses your own key (Settings). The Gemini web chat uses your Google accounts (Settings, Google accounts) and the ChatGPT web chat uses your ChatGPT accounts (Settings, ChatGPT accounts); neither web chat needs a key.">
         <Select id={ids.engine} value={creator.engine} disabled={creator.busy} onChange={(e) => creator.setEngine(e.target.value as typeof creator.engine)}>
           {creator.choices.map((choice) => (
             <option key={choice.value} value={choice.value} disabled={choice.unavailable !== null}>

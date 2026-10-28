@@ -1,4 +1,5 @@
 export { ApiKeyCard } from "./ApiKeyCard";
+export { ChatGptCard } from "./ChatGptCard";
 export { DefaultsCard } from "./DefaultsCard";
 export { EncodingCard } from "./EncodingCard";
 export { FallbackCard } from "./FallbackCard";

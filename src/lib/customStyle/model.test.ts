@@ -111,14 +111,17 @@ test("an error from the AI is passed on", async () => {
   await assert.rejects(analyzeWithRetry(async () => { throw new Error("401"); }, (d) => d), /401/);
 });
 
-test("engines that need a key say so, and the start engine follows the settings", () => {
-  const choices = engineChoices({ gemini: false, openai: true });
+test("engines that need a key or an account say so, and the start engine follows the settings", () => {
+  const choices = engineChoices({ gemini: false }, { ready: false, signedIn: false });
   assert.match(choices.find((c) => c.value === "gemini")?.unavailable ?? "", /Gemini key/);
-  assert.equal(choices.find((c) => c.value === "openai")?.unavailable, null);
+  assert.match(choices.find((c) => c.value === "chatgpt")?.unavailable ?? "", /ChatGPT account/);
   assert.equal(choices.find((c) => c.value === "chat")?.unavailable, null);
-  assert.equal(defaultEngine({ gemini: true, openai: true }), "gemini");
-  assert.equal(defaultEngine({ gemini: false, openai: true }), "openai");
-  assert.equal(defaultEngine({ gemini: false, openai: false }), "chat");
+  assert.equal(engineChoices({ gemini: true }, { ready: true, signedIn: false }).find((c) => c.value === "chatgpt")?.unavailable, "Sign in to a ChatGPT account in Settings first.");
+  assert.equal(engineChoices({ gemini: true }, { ready: true, signedIn: true }).find((c) => c.value === "chatgpt")?.unavailable, null);
+  assert.equal(defaultEngine({ gemini: true }, { ready: true, signedIn: true }), "gemini");
+  assert.equal(defaultEngine({ gemini: false }, { ready: true, signedIn: true }), "chatgpt");
+  assert.equal(defaultEngine({ gemini: false }, { ready: false, signedIn: false }), "chat");
+  assert.equal(defaultEngine({ gemini: false }), "chat");
 });
 
 test("a prompt must end with the style lock", () => {

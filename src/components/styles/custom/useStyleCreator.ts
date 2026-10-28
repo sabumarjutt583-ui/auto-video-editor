@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { analyzeStyle, prepareStyleImage, saveStyleWithRefs } from "../../../lib/customStyle/api";
+import { chatgptAccounts, type ChatGptAccountStatus } from "../../../lib/chatgpt/api";
 import { analyzeBlocker, analyzeWithRetry, checkDraft, defaultEngine, engineChoices, fileName, finishDraft, splitPictures, MAX_IMAGES } from "../../../lib/customStyle/model";
 import { isCancelled, toAppError } from "../../../lib/errors";
 import { MY_STYLES, newCustomId } from "../../../lib/styleModel";
@@ -23,16 +24,23 @@ export function useStyleCreator(start: CreatorStart, onSaved: (style: StyleProfi
   const styles = useStyleStore((state) => state.styles);
   const loadStyles = useStyleStore((state) => state.load);
 
-  const keysSet = useMemo(() => ({ gemini: keys.gemini === "set", openai: keys.openai === "set" }), [keys]);
+  const keysSet = useMemo(() => ({ gemini: keys.gemini === "set" }), [keys]);
+  const [chatgptList, setChatgptList] = useState<ChatGptAccountStatus[] | null>(null);
+  const chatgptState = useMemo(
+    () => ({ ready: (chatgptList?.length ?? 0) > 0, signedIn: (chatgptList ?? []).some((a) => a.connected) }),
+    [chatgptList],
+  );
   const [step, setStep] = useState<Step>(start.mode === "edit" ? start.step : "form");
   const [name, setName] = useState(editing?.name ?? "");
   const [category, setCategory] = useState(editing?.category ?? MY_STYLES);
   const [description, setDescription] = useState(start.mode === "edit" ? (start.refs?.description ?? "") : "");
   const savedEngine = start.mode === "edit" ? start.refs?.engine : undefined;
-  const hadEngine = savedEngine === "gemini" || savedEngine === "openai" || savedEngine === "chat";
+  // An old saved style may still say "openai"; that choice no longer exists, so it falls
+  // back to the default engine instead of being offered.
+  const hadEngine = savedEngine === "gemini" || savedEngine === "chat" || savedEngine === "chatgpt";
   const [chosenEngine, setChosenEngine] = useState<AnalyzeEngine | null>(hadEngine ? (savedEngine as AnalyzeEngine) : null);
   // Until the person picks one, the engine follows what is set up (keys and Settings), which is only known a moment after opening.
-  const engine = chosenEngine ?? defaultEngine(keysSet);
+  const engine = chosenEngine ?? defaultEngine(keysSet, chatgptState);
   const setEngine = setChosenEngine;
   const [images, setImages] = useState<PreparedImage[]>(start.mode === "edit" ? (start.refs?.images ?? []) : []);
   const [draft, setDraft] = useState<StyleProfile | null>(start.mode === "edit" && start.step === "review" ? start.style : null);
@@ -45,9 +53,10 @@ export function useStyleCreator(start: CreatorStart, onSaved: (style: StyleProfi
 
   useEffect(() => {
     void refreshKeys();
+    chatgptAccounts().then(setChatgptList).catch(() => setChatgptList([]));
   }, [refreshKeys]);
 
-  const choices = useMemo(() => engineChoices(keysSet), [keysSet]);
+  const choices = useMemo(() => engineChoices(keysSet, chatgptState), [keysSet, chatgptState]);
   const problems = useMemo(() => (draft ? checkDraft(draft) : []), [draft]);
   const blocker = analyzeBlocker(name, images.length);
   const busy = analyzing || saving || adding;

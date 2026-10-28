@@ -1,7 +1,7 @@
 import { Cpu } from "lucide-react";
 import { useId } from "react";
 
-import { GEMINI_MODEL_OPTIONS, OPENAI_MODEL_OPTIONS, WHISPER_MODEL_OPTIONS } from "../../lib/models";
+import { GEMINI_MODEL_OPTIONS, WHISPER_MODEL_OPTIONS } from "../../lib/models";
 import type { AppSettings } from "../../types";
 import { Card, Field, Select } from "../ui";
 import { ModelPicker } from "./ModelPicker";
@@ -14,7 +14,6 @@ interface ModelsCardProps {
 export function ModelsCard({ settings, onChange }: ModelsCardProps) {
   const geminiId = useId();
   const whisperId = useId();
-  const openaiId = useId();
 
   // Keep a model that was typed by hand (or set by a newer version) selectable.
   const whisperOptions = WHISPER_MODEL_OPTIONS.some((option) => option.value === settings.groqWhisperModel)
@@ -34,10 +33,6 @@ export function ModelsCard({ settings, onChange }: ModelsCardProps) {
           options={GEMINI_MODEL_OPTIONS}
           onChange={(geminiModel) => onChange({ geminiModel })}
         />
-      </Field>
-
-      <Field label="OpenAI model" htmlFor={openaiId} hint="Used only to look at reference pictures when you make a custom style with your OpenAI key. It must be able to see pictures.">
-        <ModelPicker id={openaiId} value={settings.openaiModel} options={OPENAI_MODEL_OPTIONS} onChange={(openaiModel) => onChange({ openaiModel })} />
       </Field>
 
       <Field label="Groq Whisper model" htmlFor={whisperId} hint="Used to find the exact time of every spoken word.">
