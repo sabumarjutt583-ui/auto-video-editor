@@ -1,6 +1,6 @@
 [package]
 name = "auto-video-editor"
-version = "0.7.2"
+version = "0.7.3"
 description = "Auto Video Editor: prompt generator and automatic video editor for faceless YouTube creators"
 edition = "2021"
 rust-version = "1.77"

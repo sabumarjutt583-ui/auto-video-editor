@@ -3,6 +3,11 @@
 All notable changes to Auto Video Editor are written here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [0.7.3] - 2026-10-28
+
+### Fixed
+- Rust compile error E0283 in the graphics overlay (commands/graphics.rs, graphics_apply_overlay): the FFmpeg error text was built with `.chars().take(600).collect()`, whose type the compiler could not infer, since AppError::new takes `impl Into<String>`. The line now uses `.collect::<String>()` explicitly. This is a side-effect of the 0.7.2 restructure, which removed the run_blocking wrapper whose final `Ok::<_, AppError>(output)` had given the compiler a type hint; no feature or logic change.
+
 ## [0.7.2] - 2026-10-28
 
 ### Fixed
