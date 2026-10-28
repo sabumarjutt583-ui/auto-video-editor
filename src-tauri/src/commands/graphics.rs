@@ -142,7 +142,7 @@ pub async fn graphics_apply_overlay(app: AppHandle, project_id: String, input_pa
     cmd.args(["-hide_banner", "-y", "-loglevel", "error", "-i"]).arg(&canonical).args(["-vf", &filters_joined]).args(&encoder_args).args(["-c:a", "copy"]).arg(&output);
     let result = cmd.output().await.map_err(|e| AppError::new("The video engine (FFmpeg) could not start.", e.to_string()))?;
     if !result.status.success() {
-        return Err(AppError::new("The graphic overlay failed.", String::from_utf8_lossy(&result.stderr).chars().take(600).collect()));
+        return Err(AppError::new("The graphic overlay failed.", String::from_utf8_lossy(&result.stderr).chars().take(600).collect::<String>()));
     }
     let out = output;
     crate::logging::info("graphics", &format!("Overlay saved: {} ({} filters, skipped: {})", out.display(), drawn.filters.len(), drawn.skipped.join(", ")));
