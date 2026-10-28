@@ -8,6 +8,7 @@ pub mod custom_style;
 pub mod engine;
 pub mod error;
 pub mod files;
+pub mod flow_batch;
 pub mod imagegen;
 pub mod keys;
 pub mod library;

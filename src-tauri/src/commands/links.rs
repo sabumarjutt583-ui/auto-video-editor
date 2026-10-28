@@ -14,6 +14,8 @@ pub enum ExternalLink {
     GroqKeys,
     GeminiKeys,
     OpenaiKeys,
+    /// Batch Flow Studio (the user's own batch tool, shared tool link only).
+    FlowBatch,
 }
 
 impl ExternalLink {
@@ -22,6 +24,7 @@ impl ExternalLink {
             ExternalLink::GroqKeys => "https://console.groq.com/keys",
             ExternalLink::GeminiKeys => "https://aistudio.google.com/apikey",
             ExternalLink::OpenaiKeys => "https://platform.openai.com/api-keys",
+            ExternalLink::FlowBatch => crate::imagegen::flow_batch::SHARED_TOOL_URL,
         }
     }
 }

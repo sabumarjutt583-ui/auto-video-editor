@@ -24,6 +24,7 @@ pub mod settings;
 pub mod tool_page;
 pub mod video;
 pub mod flow;
+pub mod flow_batch;
 pub mod worker;
 #[cfg(test)]
 mod browser_tests;

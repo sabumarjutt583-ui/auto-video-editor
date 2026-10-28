@@ -57,6 +57,45 @@ export interface ChatAnswer {
 /** One question to Gemini's web chat (Google accounts, no API key). */
 export const imagegenChatAsk = (prompt: string) => invoke<ChatAnswer>("imagegen_chat_ask", { prompt });
 
+export interface FlowBatchInfo {
+  url: string;
+  imagesModel: string;
+  videosModel: string;
+  aspect: string;
+  videoSeconds: number;
+  videoResolution: string;
+  videoCreditsPerVideo: number;
+  maxCreditsPerVideo: number;
+  batchSize: number;
+}
+
+/** Batch Flow Studio defaults (the shared tool link only). */
+export const flowBatchConfig = () => invoke<FlowBatchInfo>("flow_batch_config");
+
+export interface FlowBatchRenamePreview {
+  flowName: string;
+  timecodeName: string;
+  sceneId: string;
+}
+
+export interface FlowBatchPrepared {
+  text: string;
+  paragraphCount: number;
+  sceneIds: string[];
+  estimatedCredits: number;
+  perVideoCredits: number;
+  maxCreditsPerVideo: number;
+  renamePreview: FlowBatchRenamePreview[];
+}
+
+/** Validates jobs, formats them as paragraphs, checks the credit guard, and returns the rename preview. */
+export const flowBatchPrepare = (jobs: NewImageJob[], generationType: "images" | "videos") =>
+  invoke<FlowBatchPrepared>("flow_batch_prepare", { request: { jobs, generationType } });
+
+/** Builds the timecode name for one Flow file from the project scene record. */
+export const flowBatchRename = (flowName: string, sceneId: string, start: number, end: number, generationType: "images" | "videos") =>
+  invoke<string>("flow_batch_rename", { request: { flowName, sceneId, start, end, generationType } });
+
 /** One video from a prompt (and, with `image`, from that picture of the project's media folder), made by the next Google account that has videos left. */
 export const imagegenMakeVideo = (projectId: string, prompt: string, image: string | null, fileName: string, jobId: string, source: VideoSource = "gemini") =>
   invoke<VideoResult>("imagegen_make_video", { projectId, prompt, image, fileName, jobId, source });

@@ -128,6 +128,45 @@
       "pollMs": 1500,
       "downloadMs": 120000
   },
+  "flowBatch": {
+      "url": "https://flow.google.com/shared/tool/74a00ce5-db5d-4ac4-8ae8-96e3e9b3b099",
+      "imagesModel": "Nano Banana 2.1",
+      "videosModel": "Veo 3.1 Flash",
+      "aspect": "16:9",
+      "videoSeconds": 4,
+      "videoResolution": "720p",
+      "videoCreditsPerVideo": 7,
+      "maxCreditsPerVideo": 20,
+      "batchSize": 8,
+      "pollMs": 1500,
+      "promptBox": "textarea[placeholder*=\"Enter prompts\"]",
+      "generateImagesText": "Generate All as Images",
+      "generateVideosText": "Generate All as Videos",
+      "queueText": "Batch Media Queue",
+      "downloadTextPrefix": "Download S",
+      "readyText": "Ready",
+      "limitTexts": [
+          "not enough credits",
+          "out of credits",
+          "insufficient credits",
+          "no credits left",
+          "run out of credits"
+      ],
+      "errorTexts": [
+          "something went wrong",
+          "couldn't generate",
+          "could not generate",
+          "unable to generate",
+          "generation failed"
+      ],
+      "blockTexts": [
+          "unusual activity",
+          "unusual traffic",
+          "not a robot",
+          "verify it's you",
+          "verify it’s you"
+      ]
+  },
   "errorPatterns": [
     { "contains": ["API Error 429"], "kind": "rate_limit", "message": "Usage limit reached for this Google account." },
     { "contains": ["API Error 401", "API Error 403"], "kind": "auth", "message": "Google refused the request: the account is signed out." },

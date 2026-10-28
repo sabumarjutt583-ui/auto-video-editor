@@ -227,6 +227,86 @@ impl ChatConfig {
     }
 }
 
+/// Batch Flow Studio: the user's own batch tool inside Google Flow, at one
+/// shared tool address. Defaults are the user's screenshots of 2026-10-28
+/// (UNVERIFIED against a live signed-in session: the custom tool's DOM has no
+/// stable ids visible in a screenshot, so the prompt box and buttons are
+/// found by their visible texts, like the old Flow path does; a page change
+/// is fixed by a config update, not a new app version).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct FlowBatchConfig {
+    /// The ONLY Batch Flow Studio address this engine uses. Earlier Flow
+    /// project links are superseded and must not be added back.
+    pub url: String,
+    pub images_model: String,
+    pub videos_model: String,
+    pub aspect: String,
+    pub video_seconds: u32,
+    pub video_resolution: String,
+    pub video_credits_per_video: u32,
+    pub max_credits_per_video: u32,
+    pub batch_size: u32,
+    pub poll_ms: u64,
+    /// The Batch Prompt Box (a textarea whose placeholder says "Enter prompts").
+    pub prompt_box: String,
+    /// Button texts on the tool's own panel.
+    pub generate_images_text: String,
+    pub generate_videos_text: String,
+    pub queue_text: String,
+    /// Prefix of a per-card download button, e.g. "Download S01.png".
+    pub download_text_prefix: String,
+    pub ready_text: String,
+    pub limit_texts: Vec<String>,
+    pub error_texts: Vec<String>,
+    pub block_texts: Vec<String>,
+}
+
+impl Default for FlowBatchConfig {
+    fn default() -> Self {
+        let words = |list: &[&str]| list.iter().map(|w| (*w).to_string()).collect();
+        Self {
+            url: super::flow_batch::SHARED_TOOL_URL.into(),
+            images_model: super::flow_batch::IMAGES_MODEL.into(),
+            videos_model: super::flow_batch::VIDEOS_MODEL.into(),
+            aspect: "16:9".into(),
+            video_seconds: super::flow_batch::DEFAULT_VIDEO_SECONDS,
+            video_resolution: "720p".into(),
+            video_credits_per_video: super::flow_batch::DEFAULT_VIDEO_CREDITS_PER_VIDEO,
+            max_credits_per_video: super::flow_batch::DEFAULT_MAX_CREDITS_PER_VIDEO,
+            batch_size: super::flow_batch::DEFAULT_BATCH_SIZE,
+            poll_ms: 1_500,
+            prompt_box: "textarea[placeholder*=\"Enter prompts\"]".into(),
+            generate_images_text: "Generate All as Images".into(),
+            generate_videos_text: "Generate All as Videos".into(),
+            queue_text: "Batch Media Queue".into(),
+            download_text_prefix: "Download S".into(),
+            ready_text: "Ready".into(),
+            limit_texts: words(&[
+                "not enough credits",
+                "out of credits",
+                "insufficient credits",
+                "no credits left",
+                "run out of credits",
+            ]),
+            error_texts: words(&[
+                "something went wrong",
+                "couldn't generate",
+                "could not generate",
+                "unable to generate",
+                "generation failed",
+            ]),
+            block_texts: words(&[
+                "unusual activity",
+                "unusual traffic",
+                "not a robot",
+                "verify it's you",
+                "verify it’s you",
+            ]),
+        }
+    }
+}
+
 /// Where things are for making a video in Gemini's chat ("Create video" mode). Defaults are the page as seen on 2026-10-24.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -410,6 +490,9 @@ pub struct EngineConfig {
     pub video: VideoConfig,
     #[serde(default)]
     pub flow: FlowConfig,
+    /// Batch Flow Studio (the shared tool link only).
+    #[serde(default)]
+    pub flow_batch: FlowBatchConfig,
 }
 
 fn bad(message: &str, details: impl Into<String>) -> AppError {
@@ -453,6 +536,14 @@ impl EngineConfig {
         }
         if !self.chatgpt.url.starts_with("https://") || self.chatgpt.timing.poll_ms < 200 {
             return Err(bad("The image engine settings are not valid, so they were not used.", "chatgpt.url must start with https:// and chatgpt.timing.pollMs must be at least 200"));
+        }
+        if !self.flow_batch.url.starts_with("https://")
+            || self.flow_batch.batch_size == 0
+            || self.flow_batch.batch_size > 16
+            || self.flow_batch.poll_ms < 200
+            || self.flow_batch.max_credits_per_video == 0
+        {
+            return Err(bad("The image engine settings are not valid, so they were not used.", "flowBatch.url must start with https://, batchSize must be 1-16, pollMs at least 200 and maxCreditsPerVideo above 0"));
         }
         if self.timing.poll_ms < 200 || self.timing.page_load_timeout_ms < 5_000 {
             return Err(bad("The image engine settings are not valid, so they were not used.", "timing values are too small"));
@@ -548,6 +639,26 @@ mod tests {
         assert!(EngineConfig::parse(&no_ratio).is_err());
         let bad_version = BUNDLED_JSON.replace("\"configVersion\": \"1.7\"", "\"configVersion\": \"x\"");
         assert!(EngineConfig::parse(&bad_version).is_err());
+    }
+
+    #[test]
+    #[test]
+    fn the_flow_batch_settings_use_only_the_new_shared_link() {
+        let config = EngineConfig::bundled();
+        assert_eq!(
+            config.flow_batch,
+            FlowBatchConfig::default(),
+            "the bundled file and the built-in Batch Flow Studio defaults agree"
+        );
+        assert_eq!(
+            config.flow_batch.url,
+            "https://flow.google.com/shared/tool/74a00ce5-db5d-4ac4-8ae8-96e3e9b3b099"
+        );
+        assert_eq!(config.flow_batch.batch_size, 8);
+        assert_eq!(config.flow_batch.video_credits_per_video, 7);
+        assert_eq!(config.flow_batch.max_credits_per_video, 20);
+        assert_eq!(config.flow_batch.images_model, "Nano Banana 2.1");
+        assert_eq!(config.flow_batch.videos_model, "Veo 3.1 Flash");
     }
 
     #[test]
