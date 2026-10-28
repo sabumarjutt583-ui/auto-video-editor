@@ -87,7 +87,7 @@ fn find_font(app: &AppHandle) -> Result<String, AppError> {
         Some(names)
     }).unwrap_or_default();
     let font = names.drain(..).next().ok_or_else(|| AppError::new("No font was found for the text, so the graphic could not be drawn.", format!("{}", fonts_dir.display())))?;
-    Ok(font.to_string_lossy().replace('\', "/").replace(':', "\:"))
+    Ok(font.to_string_lossy().replace('\\', "/").replace(':', "\\:"))
 }
 
 /// Turns a graphic spec into FFmpeg filters (text + lower-third only; other layer types
