@@ -29,23 +29,30 @@
 //!    arrive out of order; per-card downloads in card order are still the
 //!    intended behaviour, and `Download All` must be used in batch order.
 //!
-//! Character-consistency warning (from the tool's own screenshots, not fixed
-//! here): the Batch tool auto-detects character names from prompts and
-//! auto-injects consistency, and a prompt with no character name defaults to
-//! locking "Jin Kun" in every image/video. That name is the example project's
-//! character, NOT a universal character, and it is never hardcoded here: the
-//! defence is that every prompt sent to this engine already carries its
-//! scene's character name (the assembled prompt does), and the docs warn that
-//! a name-less prompt will get Jin Kun locked in by the Flow tool.
+//! Character-consistency warning (verified live in the 20-image test, not
+//! fixed here): the Batch tool auto-detects character names from prompts
+//! and auto-injects consistency, and a prompt with no character name
+//! defaults to locking "Jin Kun" in every image/video. That name is the
+//! example project's character, NOT a universal character, and it is never
+//! hardcoded here. The live test also showed the tool detecting "Korean"
+//! (from "Korean man/home/webtoon" wording) as a third identity token
+//! alongside Kim and Jin Kun, so prompts that always say "Korean" will
+//! always pull that token in unless the characters are configured in the
+//! Flow tool itself. The defence here is that every prompt sent to this
+//! engine already carries its scene's character name (the assembled prompt
+//! does), and the docs warn about both the Jin Kun default and the
+//! "Korean" token.
 //!
-//! The browser selectors for this custom tool are taken from the user's
-//! screenshots only (button texts such as "Generate All as Images" and
-//! "Batch Media Queue") and are UNVERIFIED against a live signed-in session.
-//! They live in `FlowBatchConfig` in `config.rs` / `resources/image-engine/
-//! config.json` so a page change can be fixed by a config update, not a new
-//! app version. A page that needs a person (captcha, terms, sign-in) or a
-//! credit/limit error is never worked around: it stops the batch with a
-//! clear error.
+//! The browser selectors for this custom tool were first taken from the
+//! user's screenshots and then checked against a live signed-in session
+//! (Batch Prompt Box, Generation Type, Batch Media Queue, Download
+//! buttons). The run loop in `flow_batch_run.rs` is built on those live
+//! observations, but the automated loop itself has NOT been live-run yet
+//! (it needs the user's account and, for video, credits), so a page change
+//! is still fixed by a config update in `FlowBatchConfig` /
+//! `resources/image-engine/config.json`, not a new app version. A page
+//! that needs a person (captcha, terms, sign-in) or a credit/limit error
+//! is never worked around: it stops the batch with a clear error.
 
 use serde::{Deserialize, Serialize};
 
@@ -54,16 +61,101 @@ use serde::{Deserialize, Serialize};
 pub const SHARED_TOOL_URL: &str =
     "https://flow.google.com/shared/tool/74a00ce5-db5d-4ac4-8ae8-96e3e9b3b099";
 
-/// Batch Size shown in the screenshots ("8 at a time (Default)").
+/// Batch Size shown live ("8 at a time (Default)"); the tool also offers
+/// 6, 10, 12 and 20 ("Fast 500+").
 pub const DEFAULT_BATCH_SIZE: u32 = 8;
-/// Videos mode: Veo 3.1 Flash, Text to Video, 4s @ 720p, 7 credits per video.
+/// Videos mode default, verified live on 2026-10-28: Omni 1.1 Flash,
+/// Text to Video, 4s @ 720p, 7 credits per video. The earlier screenshot's
+/// "Veo 3.1 Flash" is NOT a model the live tool offers and must not be
+/// offered here.
 pub const DEFAULT_VIDEO_CREDITS_PER_VIDEO: u32 = 7;
 /// Credit guard, reusing the existing Flow idea (default 20): a video batch
 /// whose per-video cost exceeds this is never started.
 pub const DEFAULT_MAX_CREDITS_PER_VIDEO: u32 = 20;
 pub const DEFAULT_VIDEO_SECONDS: u32 = 4;
 pub const IMAGES_MODEL: &str = "Nano Banana 2.1";
-pub const VIDEOS_MODEL: &str = "Veo 3.1 Flash";
+pub const VIDEOS_MODEL: &str = "Omni 1.1 Flash";
+pub const VEO_SERIES_MODEL: &str = "Veo 3.1 Series";
+
+/// A video model choice in Batch Flow Studio, as verified live.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VideoModel {
+    OmniFlash,
+    VeoLite,
+    VeoFast,
+    VeoQuality,
+}
+
+impl VideoModel {
+    pub fn display(self) -> &'static str {
+        match self {
+            VideoModel::OmniFlash => "Omni 1.1 Flash",
+            VideoModel::VeoLite => "Veo 3.1 Series (Lite)",
+            VideoModel::VeoFast => "Veo 3.1 Series (Fast)",
+            VideoModel::VeoQuality => "Veo 3.1 Series (Quality)",
+        }
+    }
+
+    pub fn from_display(value: &str) -> Option<Self> {
+        match value {
+            "Omni 1.1 Flash" => Some(VideoModel::OmniFlash),
+            "Veo 3.1 Series (Lite)" | "Veo 3.1 Series Lite" => Some(VideoModel::VeoLite),
+            "Veo 3.1 Series (Fast)" | "Veo 3.1 Series Fast" => Some(VideoModel::VeoFast),
+            "Veo 3.1 Series (Quality)" | "Veo 3.1 Series Quality" => {
+                Some(VideoModel::VeoQuality)
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Live credit table (2026-10-28). Omni 1.1 Flash has a full
+/// duration/resolution table; for Veo 3.1 Series only the 8s @ 720p rate
+/// was verified, so any other Veo duration/resolution returns `None`
+/// (unknown cost — never guessed) and the batch must be refused.
+pub fn video_credits_per_video(
+    model: VideoModel,
+    seconds: u32,
+    resolution: &str,
+) -> Option<u32> {
+    match model {
+        VideoModel::OmniFlash => match (seconds, resolution) {
+            (4, "360p") => Some(4),
+            (4, "720p") => Some(7),
+            (6, "360p") => Some(5),
+            (6, "720p") => Some(10),
+            (8, "360p") => Some(6),
+            (8, "720p") => Some(12),
+            (10, "360p") => Some(7),
+            (10, "720p") => Some(15),
+            _ => None,
+        },
+        VideoModel::VeoLite if seconds == 8 && resolution == "720p" => Some(10),
+        VideoModel::VeoFast if seconds == 8 && resolution == "720p" => Some(20),
+        VideoModel::VeoQuality if seconds == 8 && resolution == "720p" => Some(100),
+        _ => None,
+    }
+}
+
+/// Credit guard by model + duration: unknown cost, or cost over the cap,
+/// refuses the batch. Returns the estimated total for display.
+pub fn check_video_credits_for(
+    model: VideoModel,
+    seconds: u32,
+    resolution: &str,
+    videos: u32,
+    max_credits_per_video: u32,
+) -> Result<u32, String> {
+    let Some(per_video) = video_credits_per_video(model, seconds, resolution) else {
+        return Err(format!(
+            "The credit cost for {} at {}s @ {} is not known, so the batch was not started.",
+            model.display(),
+            seconds,
+            resolution
+        ));
+    };
+    check_video_credits(videos, per_video, max_credits_per_video)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -221,9 +313,113 @@ pub fn check_video_credits(
     Ok(videos.saturating_mul(per_video_credits))
 }
 
-/// Veo clips from this tool are 4 seconds long. A longer scene is NOT filled
-/// automatically: the caller must make more than one clip or loop the clip.
-/// This helper only states how many clips a scene needs, rounded up.
+/// Queue progress for the Batch Media Queue. `ready_ids` are the scene
+/// ids whose card has a Download button, in card order. A failed scene
+/// keeps its own number: it is listed in `failed_ids` and no other scene
+/// is renumbered to fill its place.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QueueProgress {
+    pub total: usize,
+    pub done: usize,
+    pub remaining: usize,
+    pub completed_percent: usize,
+    pub ready_ids: Vec<String>,
+    pub failed_ids: Vec<String>,
+}
+
+pub fn queue_progress(
+    scene_ids: &[String],
+    ready_ids: &[String],
+    done: usize,
+    total: usize,
+    page_says_failed: bool,
+) -> QueueProgress {
+    let total = if total > 0 { total } else { scene_ids.len() };
+    let done = done.min(total);
+    let ready: Vec<String> = ready_ids
+        .iter()
+        .filter(|id| scene_ids.iter().any(|s| s == *id))
+        .cloned()
+        .collect();
+    let failed = if page_says_failed {
+        scene_ids
+            .iter()
+            .filter(|id| !ready.contains(id))
+            .cloned()
+            .collect()
+    } else {
+        Vec::new()
+    };
+    QueueProgress {
+        total,
+        done,
+        remaining: total - done,
+        completed_percent: if total == 0 { 0 } else { done * 100 / total },
+        ready_ids: ready,
+        failed_ids: failed,
+    }
+}
+
+/// Validates a Batch batch's jobs for the run loop. Unlike the image
+/// engine's `check_jobs`, which only allows `.png` timecode names, this
+/// allows the generation's own extension: `.png` for images, `.mp4` for
+/// videos. Scene id, timecode shape, prompt and aspect are checked the
+/// same way, and one bad entry refuses the whole list.
+pub fn check_flow_batch_jobs(
+    jobs: &[(String, String, String, String)],
+    generation: GenerationType,
+) -> Result<(), String> {
+    if jobs.is_empty() {
+        return Err("There is nothing to make in Batch Flow Studio.".into());
+    }
+    let mut seen: Vec<&str> = Vec::new();
+    for (scene_id, file_name, prompt, aspect) in jobs {
+        if seen.contains(&scene_id.as_str()) {
+            return Err(format!("The same scene appears twice: {scene_id}."));
+        }
+        seen.push(scene_id.as_str());
+        let Some(rest) = file_name
+            .strip_prefix(scene_id.as_str())
+            .and_then(|r| r.strip_prefix('_'))
+        else {
+            return Err(format!("The file name {file_name} does not start with its scene {scene_id}."));
+        };
+        let Some(times) = rest.strip_suffix(&format!(".{}", generation.extension())) else {
+            return Err(format!(
+                "The file name {file_name} does not end with .{} for this generation type.",
+                generation.extension()
+            ));
+        };
+        let Some((start, end)) = times.split_once('-') else {
+            return Err(format!("The file name {file_name} has no start-end times."));
+        };
+        if !digits_dot_one(start) || !digits_dot_one(end) {
+            return Err(format!("The times in {file_name} are not in the 000.0-000.0 shape."));
+        }
+        if prompt.trim().is_empty() {
+            return Err(format!("The prompt for {scene_id} is empty."));
+        }
+        if !["16:9", "1:1", "9:16"].contains(&aspect.as_str()) {
+            return Err(format!("The aspect {aspect} for {scene_id} is not 16:9, 1:1 or 9:16."));
+        }
+    }
+    Ok(())
+}
+
+fn digits_dot_one(value: &str) -> bool {
+    let Some((whole, frac)) = value.split_once('.') else {
+        return false;
+    };
+    whole.len() >= 3
+        && whole.chars().all(|c| c.is_ascii_digit())
+        && frac.len() == 1
+        && frac.chars().all(|c| c.is_ascii_digit())
+}
+
+/// Batch video clips last the chosen duration (4s-10s). A longer scene is
+/// NOT filled automatically: the caller must make more than one clip or
+/// loop the clip. This helper only states how many clips a scene needs,
+/// rounded up.
 pub fn clips_needed(scene_seconds: f64, clip_seconds: u32) -> u32 {
     if scene_seconds <= 0.0 || clip_seconds == 0 {
         return 0;
@@ -316,15 +512,67 @@ mod tests {
     }
 
     #[test]
-    fn defaults_match_the_screenshots() {
+    fn defaults_match_the_live_tool() {
         assert_eq!(SHARED_TOOL_URL, "https://flow.google.com/shared/tool/74a00ce5-db5d-4ac4-8ae8-96e3e9b3b099");
         assert_eq!(DEFAULT_BATCH_SIZE, 8);
         assert_eq!(DEFAULT_VIDEO_CREDITS_PER_VIDEO, 7);
         assert_eq!(GenerationType::Images.model(), "Nano Banana 2.1");
-        assert_eq!(GenerationType::Videos.model(), "Veo 3.1 Flash");
+        // Live default is Omni 1.1 Flash, not the earlier screenshot's Veo 3.1 Flash.
+        assert_eq!(GenerationType::Videos.model(), "Omni 1.1 Flash");
         assert_eq!(
             GenerationType::Videos.generate_button_text(),
             "Generate All as Videos"
         );
+    }
+
+    #[test]
+    fn live_credit_table_and_veo_quality_refusal() {
+        assert_eq!(video_credits_per_video(VideoModel::OmniFlash, 4, "720p"), Some(7));
+        assert_eq!(video_credits_per_video(VideoModel::OmniFlash, 4, "360p"), Some(4));
+        assert_eq!(video_credits_per_video(VideoModel::OmniFlash, 6, "720p"), Some(10));
+        assert_eq!(video_credits_per_video(VideoModel::OmniFlash, 8, "720p"), Some(12));
+        assert_eq!(video_credits_per_video(VideoModel::OmniFlash, 10, "720p"), Some(15));
+        assert_eq!(video_credits_per_video(VideoModel::VeoLite, 8, "720p"), Some(10));
+        assert_eq!(video_credits_per_video(VideoModel::VeoFast, 8, "720p"), Some(20));
+        assert_eq!(video_credits_per_video(VideoModel::VeoQuality, 8, "720p"), Some(100));
+        assert_eq!(video_credits_per_video(VideoModel::VeoLite, 4, "720p"), None);
+        assert_eq!(
+            check_video_credits_for(VideoModel::OmniFlash, 4, "720p", 10, 20),
+            Ok(70)
+        );
+        // Veo Quality (100) is refused by the default cap of 20.
+        assert!(check_video_credits_for(VideoModel::VeoQuality, 8, "720p", 1, 20).is_err());
+        assert!(check_video_credits_for(VideoModel::VeoLite, 4, "720p", 1, 20).is_err());
+    }
+
+    #[test]
+    fn queue_progress_keeps_failed_scenes_on_their_numbers() {
+        let scenes = vec!["S01".to_string(), "S02".to_string(), "S03".to_string()];
+        let ready = vec!["S01".to_string(), "S03".to_string()];
+        let progress = queue_progress(&scenes, &ready, 2, 3, true);
+        assert_eq!(progress.remaining, 1);
+        assert_eq!(progress.completed_percent, 66);
+        assert_eq!(progress.failed_ids, vec!["S02".to_string()]);
+        let clean = queue_progress(&scenes, &ready, 3, 3, false);
+        assert!(clean.failed_ids.is_empty());
+    }
+
+    #[test]
+    fn batch_jobs_allow_mp4_timecode_names_for_videos() {
+        let jobs = vec![(
+            "S01".to_string(),
+            "S01_000.0-008.0.mp4".to_string(),
+            "A scene.".to_string(),
+            "16:9".to_string(),
+        )];
+        assert!(check_flow_batch_jobs(&jobs, GenerationType::Videos).is_ok());
+        assert!(check_flow_batch_jobs(&jobs, GenerationType::Images).is_err());
+        let bad = vec![(
+            "S01".to_string(),
+            "S01_000.0-008.0.png".to_string(),
+            "".to_string(),
+            "16:9".to_string(),
+        )];
+        assert!(check_flow_batch_jobs(&bad, GenerationType::Images).is_err());
     }
 }

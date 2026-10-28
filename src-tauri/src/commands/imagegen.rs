@@ -194,18 +194,18 @@ pub async fn imagegen_make_video(
         return Err(AppError::cancelled());
     }
     let report = |msg: String| job.progress(&msg, 30.0);
-    let made = match source.as_deref() {
-        Some("flow") => ig.make_video(VideoSource::Flow, &prompt, picture.as_deref(), Some(&report)).await?,
-        // Auto: Google Flow first; when every account is out of Flow credits (or none is ready), Gemini takes it.
-        Some("auto") => match ig.make_video(VideoSource::Flow, &prompt, picture.as_deref(), Some(&report)).await {
-            Ok(made) => made,
-            Err(error) if error.details.starts_with("video_wait") || error.details.starts_with("no account") => {
-                ig.make_video(VideoSource::Gemini, &prompt, picture.as_deref(), Some(&report)).await?
-            }
-            Err(error) => return Err(error),
-        },
-        _ => ig.make_video(VideoSource::Gemini, &prompt, picture.as_deref(), Some(&report)).await?,
-    };
+    // The old one-video-at-a-time Flow project engine is no longer
+    // offered anywhere in the UI: Batch Flow Studio has taken Flow's
+    // place (see `flow_batch_run`). A stored "flow"/"auto" choice that
+    // still reaches this command is refused with a pointer to it,
+    // rather than silently running the deprecated engine.
+    if matches!(source.as_deref(), Some("flow") | Some("auto")) {
+        return Err(AppError::new(
+            "Google Flow (one video at a time) is no longer offered. Use Batch Flow Studio in the Videos section instead: it sends all scenes as one batch and renames the downloads by scene number.",
+            "flow deprecated",
+        ));
+    }
+    let made = ig.make_video(VideoSource::Gemini, &prompt, picture.as_deref(), Some(&report)).await?;
     let account_name = made.account_name.clone();
     let name = crate::commands::blocking::run_blocking(move || -> Result<String, AppError> {
         std::fs::create_dir_all(&media).map_err(|e| AppError::new("The media folder could not be made.", e.to_string()))?;
@@ -226,6 +226,8 @@ pub async fn imagegen_make_video(
 }
 
 /// How many Google accounts can make a video now, and when the resting ones are back.
+/// (Only Gemini is offered in the UI now; a "flow" value here only
+/// answers for old stored choices and must not be used for new runs.)
 #[tauri::command]
 pub async fn imagegen_video_status(ig: Ig<'_>, source: Option<String>) -> Result<crate::imagegen::ops::VideoStatus, AppError> {
     Ok(ig.video_status(if source.as_deref() == Some("flow") { VideoSource::Flow } else { VideoSource::Gemini }))

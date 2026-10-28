@@ -241,6 +241,14 @@ pub struct FlowBatchConfig {
     pub url: String,
     pub images_model: String,
     pub videos_model: String,
+    /// Video models the live tool offers (Omni default, Veo Series
+    /// qualities). "Veo 3.1 Flash" from an earlier screenshot is not
+    /// among them and must not be added back.
+    #[serde(default = "default_video_model_options")]
+    pub video_model_options: Vec<String>,
+    /// Duration/resolution choices, e.g. "4s @ 720p".
+    #[serde(default = "default_video_duration_options")]
+    pub video_duration_options: Vec<String>,
     pub aspect: String,
     pub video_seconds: u32,
     pub video_resolution: String,
@@ -262,6 +270,20 @@ pub struct FlowBatchConfig {
     pub block_texts: Vec<String>,
 }
 
+fn default_video_model_options() -> Vec<String> {
+    ["Omni 1.1 Flash", "Veo 3.1 Series (Lite)", "Veo 3.1 Series (Fast)", "Veo 3.1 Series (Quality)"]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect()
+}
+
+fn default_video_duration_options() -> Vec<String> {
+    ["4s @ 360p", "4s @ 720p", "6s @ 360p", "6s @ 720p", "8s @ 360p", "8s @ 720p", "10s @ 360p", "10s @ 720p"]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect()
+}
+
 impl Default for FlowBatchConfig {
     fn default() -> Self {
         let words = |list: &[&str]| list.iter().map(|w| (*w).to_string()).collect();
@@ -269,6 +291,8 @@ impl Default for FlowBatchConfig {
             url: super::flow_batch::SHARED_TOOL_URL.into(),
             images_model: super::flow_batch::IMAGES_MODEL.into(),
             videos_model: super::flow_batch::VIDEOS_MODEL.into(),
+            video_model_options: default_video_model_options(),
+            video_duration_options: default_video_duration_options(),
             aspect: "16:9".into(),
             video_seconds: super::flow_batch::DEFAULT_VIDEO_SECONDS,
             video_resolution: "720p".into(),
@@ -362,7 +386,10 @@ impl Default for VideoConfig {
     }
 }
 
-/// Google Flow (flow.google.com): one project per account, a picture as the "Start" frame, Veo makes the video.
+/// DEPRECATED Google Flow (flow.google.com): one project per account, a
+/// picture as the "Start" frame, Veo makes the video. Superseded by
+/// Batch Flow Studio (`flow_batch`); no UI path reaches this config any
+/// more. Kept only so old saved settings still parse.
 /// Texts are regular expressions on the visible text of the page (Flow's markup has no stable names), so a
 /// changed page is fixed by a settings update. Defaults are the page as captured on 2026-10-25.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -539,11 +566,11 @@ impl EngineConfig {
         }
         if !self.flow_batch.url.starts_with("https://")
             || self.flow_batch.batch_size == 0
-            || self.flow_batch.batch_size > 16
+            || self.flow_batch.batch_size > 20
             || self.flow_batch.poll_ms < 200
             || self.flow_batch.max_credits_per_video == 0
         {
-            return Err(bad("The image engine settings are not valid, so they were not used.", "flowBatch.url must start with https://, batchSize must be 1-16, pollMs at least 200 and maxCreditsPerVideo above 0"));
+            return Err(bad("The image engine settings are not valid, so they were not used.", "flowBatch.url must start with https://, batchSize must be 1-20, pollMs at least 200 and maxCreditsPerVideo above 0"));
         }
         if self.timing.poll_ms < 200 || self.timing.page_load_timeout_ms < 5_000 {
             return Err(bad("The image engine settings are not valid, so they were not used.", "timing values are too small"));
@@ -658,7 +685,7 @@ mod tests {
         assert_eq!(config.flow_batch.video_credits_per_video, 7);
         assert_eq!(config.flow_batch.max_credits_per_video, 20);
         assert_eq!(config.flow_batch.images_model, "Nano Banana 2.1");
-        assert_eq!(config.flow_batch.videos_model, "Veo 3.1 Flash");
+        assert_eq!(config.flow_batch.videos_model, "Omni 1.1 Flash");
     }
 
     #[test]

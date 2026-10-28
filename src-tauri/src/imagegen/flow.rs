@@ -1,4 +1,8 @@
-//! Making one video in Google Flow (flow.google.com), through a Google account in the browser.
+//! DEPRECATED: making one video in Google Flow (flow.google.com), through
+//! a Google account in the browser. Batch Flow Studio has taken Flow's
+//! place in the UI, and no UI path reaches `make` any more (see
+//! `flow_batch` / `flow_batch_run`). This file is kept only so old
+//! code still compiles; new code must not call it.
 //!
 //! Every account keeps one Flow project (made the first time, then reused while the app runs). A video is made like
 //! a person does it: open the settings of the prompt box and choose Video, Frames, the model, the size and "x1";

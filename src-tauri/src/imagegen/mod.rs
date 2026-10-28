@@ -23,8 +23,13 @@ pub mod script_chat;
 pub mod settings;
 pub mod tool_page;
 pub mod video;
+/// DEPRECATED: the old one-video-at-a-time Flow project engine. It is
+/// superseded by Batch Flow Studio (see `flow_batch` /
+/// `flow_batch_run`), and no UI path reaches it any more. It is kept
+/// only so old code still compiles; new code must not call it.
 pub mod flow;
 pub mod flow_batch;
+pub mod flow_batch_run;
 pub mod worker;
 #[cfg(test)]
 mod browser_tests;

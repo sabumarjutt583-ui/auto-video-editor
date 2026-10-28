@@ -3,7 +3,10 @@ import { test } from "node:test";
 
 import {
   checkFlowVideoCredits,
+  checkFlowVideoCreditsFor,
   flowClipsNeeded,
+  flowQueueProgress,
+  flowVideoCreditsPerVideo,
   formatFlowBatchPrompts,
   formatFlowSeconds,
   parseFlowFilename,
@@ -38,6 +41,38 @@ test("rename uses the scene record times and refuses mismatches", () => {
   assert.equal(renameFlowFile("S001.png", "S01", 0, 8, "images"), null);
   assert.equal(renameFlowFile("S02.png", "S01", 0, 8, "images"), null);
   assert.equal(renameFlowFile("S01.mp4", "S01", 0, 8, "images"), null);
+});
+
+test("live video credit table by model and duration", () => {
+  assert.equal(flowVideoCreditsPerVideo("Omni 1.1 Flash", 4, "720p"), 7);
+  assert.equal(flowVideoCreditsPerVideo("Omni 1.1 Flash", 4, "360p"), 4);
+  assert.equal(flowVideoCreditsPerVideo("Omni 1.1 Flash", 6, "720p"), 10);
+  assert.equal(flowVideoCreditsPerVideo("Omni 1.1 Flash", 8, "720p"), 12);
+  assert.equal(flowVideoCreditsPerVideo("Omni 1.1 Flash", 10, "720p"), 15);
+  assert.equal(flowVideoCreditsPerVideo("Veo 3.1 Series (Lite)", 8, "720p"), 10);
+  assert.equal(flowVideoCreditsPerVideo("Veo 3.1 Series (Fast)", 8, "720p"), 20);
+  assert.equal(flowVideoCreditsPerVideo("Veo 3.1 Series (Quality)", 8, "720p"), 100);
+  // Veo costs for other durations were never verified: never guessed.
+  assert.equal(flowVideoCreditsPerVideo("Veo 3.1 Series (Lite)", 4, "720p"), null);
+  assert.equal(flowVideoCreditsPerVideo("Omni 1.1 Flash", 5, "720p"), null);
+  assert.equal(checkFlowVideoCreditsFor("Omni 1.1 Flash", 4, "720p", 10, 20), 70);
+  // Veo Quality (100 credits) is refused by the default cap of 20, with the reason.
+  assert.throws(() => checkFlowVideoCreditsFor("Veo 3.1 Series (Quality)", 8, "720p", 1, 20), /over the cap/);
+  assert.throws(() => checkFlowVideoCreditsFor("Veo 3.1 Series (Lite)", 4, "720p", 1, 20), /not known/);
+});
+
+test("queue progress keeps failed scenes on their own numbers", () => {
+  const progress = flowQueueProgress(["S01", "S02", "S03"], ["Download S01.png", "Download S03.png"], 2, 3, true);
+  assert.equal(progress.total, 3);
+  assert.equal(progress.done, 2);
+  assert.equal(progress.remaining, 1);
+  assert.equal(progress.completedPercent, 67);
+  assert.deepEqual(progress.readySceneIds, ["S01", "S03"]);
+  // S02 failed: it stays S02, S03 is never renumbered to S02.
+  assert.deepEqual(progress.failedSceneIds, ["S02"]);
+  const clean = flowQueueProgress(["S01", "S02"], ["Download S01.png", "Download S02.png"], 2, 2, false);
+  assert.deepEqual(clean.failedSceneIds, []);
+  assert.equal(clean.completedPercent, 100);
 });
 
 test("seconds format, credit guard and clip count", () => {

@@ -171,7 +171,7 @@ export async function runVideoQueue(items: readonly VideoItem[], deps: QueueDeps
   return { made, failed, left: queue };
 }
 
-/** Joins the status of Flow and Gemini for "Flow first, then Gemini": accounts that can work, and the first return time. */
+/** Joins two video statuses (kept for the Gemini status path; the "Flow first, then Gemini" auto source is no longer offered — Batch Flow Studio took Flow's place). */
 export function mergeStatus(a: VideoStatus, b: VideoStatus): VideoStatus {
   const times = [a.backAt, b.backAt].filter((t) => t > 0);
   return { ready: a.ready + b.ready, resting: a.resting + b.resting, backAt: times.length > 0 ? Math.min(...times) : 0 };

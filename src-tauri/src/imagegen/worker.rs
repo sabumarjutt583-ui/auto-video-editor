@@ -411,6 +411,24 @@ impl FreeWorker {
         }
     }
 
+    /// A new tab of this account's browser for Batch Flow Studio. It
+    /// reuses the account's session (a profile can be open only once),
+    /// so it never launches a second browser on the same profile; the
+    /// caller closes the tab afterwards. The main page keeps showing
+    /// the Gemini Canvas tool — the batch runs in this tab only.
+    pub async fn batch_tab(
+        &self,
+    ) -> Result<(std::sync::Arc<super::browser::session::Session>, super::browser::session::Tab), GenError> {
+        let (session, _, _) = self.ready().await?;
+        let tab = session.open_tab().await.map_err(|e| {
+            GenError::new(
+                ErrorKind::Session,
+                format!("Batch Flow Studio could not open a tab in this account's browser: {e}"),
+            )
+        })?;
+        Ok((session, tab))
+    }
+
     /// A JPEG of the work tab ("Show background browser"). `None` when no browser is open.
     pub async fn snapshot(&self) -> Option<Vec<u8>> {
         let session = self.inner.ready.lock().await.as_ref().map(|r| r.session.clone())?;

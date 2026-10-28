@@ -131,7 +131,9 @@
   "flowBatch": {
       "url": "https://flow.google.com/shared/tool/74a00ce5-db5d-4ac4-8ae8-96e3e9b3b099",
       "imagesModel": "Nano Banana 2.1",
-      "videosModel": "Veo 3.1 Flash",
+      "videosModel": "Omni 1.1 Flash",
+      "videoModelOptions": ["Omni 1.1 Flash", "Veo 3.1 Series (Lite)", "Veo 3.1 Series (Fast)", "Veo 3.1 Series (Quality)"],
+      "videoDurationOptions": ["4s @ 360p", "4s @ 720p", "6s @ 360p", "6s @ 720p", "8s @ 360p", "8s @ 720p", "10s @ 360p", "10s @ 720p"],
       "aspect": "16:9",
       "videoSeconds": 4,
       "videoResolution": "720p",

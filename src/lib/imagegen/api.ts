@@ -61,6 +61,8 @@ export interface FlowBatchInfo {
   url: string;
   imagesModel: string;
   videosModel: string;
+  videoModelOptions: string[];
+  videoDurationOptions: string[];
   aspect: string;
   videoSeconds: number;
   videoResolution: string;
@@ -95,6 +97,58 @@ export const flowBatchPrepare = (jobs: NewImageJob[], generationType: "images" |
 /** Builds the timecode name for one Flow file from the project scene record. */
 export const flowBatchRename = (flowName: string, sceneId: string, start: number, end: number, generationType: "images" | "videos") =>
   invoke<string>("flow_batch_rename", { request: { flowName, sceneId, start, end, generationType } });
+
+export interface FlowBatchSavedFile {
+  sceneId: string;
+  flowName: string;
+  savedName: string;
+  path: string;
+  width: number;
+  height: number;
+  duration: number;
+  modified: number;
+}
+
+export interface FlowBatchRunReport {
+  saved: FlowBatchSavedFile[];
+  failedSceneIds: string[];
+  accountName: string;
+  estimatedCredits: number;
+  perVideoCredits: number;
+}
+
+export interface FlowBatchRunRequest {
+  projectId: string;
+  accountId?: string;
+  jobs: NewImageJob[];
+  generationType: "images" | "videos";
+  videoModel?: string;
+  videoSeconds?: number;
+  videoResolution?: string;
+  maxCreditsPerVideo?: number;
+}
+
+/**
+ * The wired run: opens Batch Flow Studio in a tab of a Google
+ * account's browser, generates the whole batch, downloads per card
+ * in card order, and saves each download renamed from the scene
+ * record into the project's media folder. Returns the saved files
+ * (and any failed scene ids) so the page can register them.
+ */
+export const flowBatchRun = (request: FlowBatchRunRequest) =>
+  invoke<FlowBatchRunReport>("flow_batch_run", { request });
+
+/** Prepare with an explicit video model/duration (absent = config default). */
+export const flowBatchPrepareWith = (
+  jobs: NewImageJob[],
+  generationType: "images" | "videos",
+  videoModel?: string,
+  videoSeconds?: number,
+  videoResolution?: string,
+) =>
+  invoke<FlowBatchPrepared>("flow_batch_prepare", {
+    request: { jobs, generationType, videoModel, videoSeconds, videoResolution },
+  });
 
 /** One video from a prompt (and, with `image`, from that picture of the project's media folder), made by the next Google account that has videos left. */
 export const imagegenMakeVideo = (projectId: string, prompt: string, image: string | null, fileName: string, jobId: string, source: VideoSource = "gemini") =>

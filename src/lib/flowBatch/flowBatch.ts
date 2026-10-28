@@ -14,7 +14,7 @@ export const FLOW_BATCH_URL =
 
 export const FLOW_BATCH_DEFAULTS = {
   imagesModel: "Nano Banana 2.1",
-  videosModel: "Veo 3.1 Flash",
+  videosModel: "Omni 1.1 Flash",
   aspect: "16:9",
   videoSeconds: 4,
   videoResolution: "720p",
@@ -22,6 +22,115 @@ export const FLOW_BATCH_DEFAULTS = {
   maxCreditsPerVideo: 20,
   batchSize: 8,
 } as const;
+
+/**
+ * Video models in Batch Flow Studio, as verified live on 2026-10-28.
+ * Omni 1.1 Flash is the selected default; Veo 3.1 Series is an explicit
+ * alternative with a quality choice. "Veo 3.1 Flash" from an earlier
+ * screenshot is NOT a model the live tool offers, so it must not be
+ * offered here either.
+ */
+export type FlowBatchVideoModel =
+  | "Omni 1.1 Flash"
+  | "Veo 3.1 Series (Lite)"
+  | "Veo 3.1 Series (Fast)"
+  | "Veo 3.1 Series (Quality)";
+
+export const FLOW_BATCH_VIDEO_MODELS: readonly FlowBatchVideoModel[] = [
+  "Omni 1.1 Flash",
+  "Veo 3.1 Series (Lite)",
+  "Veo 3.1 Series (Fast)",
+  "Veo 3.1 Series (Quality)",
+];
+
+/**
+ * Live credit table (2026-10-28). Omni 1.1 Flash has a full
+ * duration/resolution table; for Veo 3.1 Series only the 8s @ 720p rate
+ * was verified, so any other Veo duration/resolution returns null
+ * (unknown cost — never guessed) and the batch must be refused.
+ */
+export function flowVideoCreditsPerVideo(
+  model: FlowBatchVideoModel,
+  seconds: number,
+  resolution: string,
+): number | null {
+  if (model === "Omni 1.1 Flash") {
+    const table: Record<string, number> = {
+      "4@360p": 4, "4@720p": 7,
+      "6@360p": 5, "6@720p": 10,
+      "8@360p": 6, "8@720p": 12,
+      "10@360p": 7, "10@720p": 15,
+    };
+    return table[`${seconds}@${resolution}`] ?? null;
+  }
+  if (seconds === 8 && resolution === "720p") {
+    if (model === "Veo 3.1 Series (Lite)") return 10;
+    if (model === "Veo 3.1 Series (Fast)") return 20;
+    if (model === "Veo 3.1 Series (Quality)") return 100;
+  }
+  return null;
+}
+
+/** Credit guard by model + duration: unknown cost, or cost over the cap, refuses the batch. */
+export function checkFlowVideoCreditsFor(
+  model: FlowBatchVideoModel,
+  seconds: number,
+  resolution: string,
+  videos: number,
+  maxPerVideo: number,
+): number {
+  const perVideo = flowVideoCreditsPerVideo(model, seconds, resolution);
+  if (perVideo === null) {
+    throw new Error(`The credit cost for ${model} at ${seconds}s @ ${resolution} is not known, so the batch was not started.`);
+  }
+  return checkFlowVideoCredits(videos, perVideo, maxPerVideo);
+}
+
+export interface FlowBatchQueueProgress {
+  total: number;
+  done: number;
+  remaining: number;
+  completedPercent: number;
+  /** Scene ids whose card has a Download button, in card order. */
+  readySceneIds: string[];
+  /** Scene ids with no Download button once the page says a card failed. */
+  failedSceneIds: string[];
+}
+
+/**
+ * Pure queue state machine for the Batch Media Queue, used by the run
+ * loop and by the panel. `downloadNames` are the per-card button texts
+ * ("Download S01.png") in card order; `pageSaysFailed` is true when a
+ * card on the page shows Failed. A failed scene's number is never
+ * reassigned to another scene: it stays in `failedSceneIds` and the
+ * other scenes keep their own ids.
+ */
+export function flowQueueProgress(
+  sceneIds: readonly string[],
+  downloadNames: readonly string[],
+  done: number,
+  total: number,
+  pageSaysFailed: boolean,
+): FlowBatchQueueProgress {
+  const readySceneIds: string[] = [];
+  for (const name of downloadNames) {
+    const parsed = parseFlowFilename(name.replace(/^Download\s+/i, ""));
+    if (parsed && sceneIds.includes(parsed[0]) && !readySceneIds.includes(parsed[0])) readySceneIds.push(parsed[0]);
+  }
+  const failedSceneIds = pageSaysFailed
+    ? sceneIds.filter((id) => !readySceneIds.includes(id))
+    : [];
+  const safeTotal = total > 0 ? total : sceneIds.length;
+  const safeDone = Math.max(0, Math.min(done, safeTotal));
+  return {
+    total: safeTotal,
+    done: safeDone,
+    remaining: safeTotal - safeDone,
+    completedPercent: safeTotal === 0 ? 0 : Math.round((safeDone / safeTotal) * 100),
+    readySceneIds,
+    failedSceneIds,
+  };
+}
 
 export type FlowBatchGeneration = "images" | "videos";
 
@@ -104,7 +213,7 @@ export function checkFlowVideoCredits(videos: number, perVideo: number, maxPerVi
   return videos * perVideo;
 }
 
-/** Veo clips from this tool are 4 seconds: how many a scene needs, rounded up. */
+/** Batch video clips last the chosen duration (4s–10s): how many a scene needs, rounded up. A longer scene is never filled automatically. */
 export function flowClipsNeeded(sceneSeconds: number, clipSeconds: number): number {
   if (sceneSeconds <= 0 || clipSeconds === 0) return 0;
   return Math.ceil(sceneSeconds / clipSeconds);

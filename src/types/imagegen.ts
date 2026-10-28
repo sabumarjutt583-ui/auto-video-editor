@@ -175,7 +175,7 @@ export interface VideoResult {
   modified: number;
 }
 
-/** Where videos are made: Gemini "Create video", Google Flow, or Flow first and Gemini when Flow has no credits. */
+/** Where videos are made: Gemini "Create video", or Batch Flow Studio in Flow's place ("flow"). "auto" is a stored value from before Batch took Flow's place and is read as Batch in the panel. */
 export type VideoSource = "gemini" | "flow" | "auto";
 
 /** Google accounts that can make videos now / are out of videos (mirrors `VideoStatus`). */
