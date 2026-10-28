@@ -124,7 +124,11 @@ export async function generatePrompts(args: GenerateArgs): Promise<GenerateResul
         if (args.resendOnError === false) break;
       }
     }
-    if (stopped) return;
+    // A batch that finished successfully is kept even if another parallel
+    // batch failed in the meantime and set stopped=true: discarding it here
+    // used to turn one failed batch into "0 prompts" for the whole run.
+    // Only a batch with no description stops the run; the worker loop still
+    // refuses to START new batches once stopped=true.
     if (!described) {
       stopped = true;
       if (failed === null || b + 1 < failed.batch) failed = { batch: b + 1, error: lastError };

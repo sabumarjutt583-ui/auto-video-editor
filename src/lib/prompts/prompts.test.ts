@@ -290,6 +290,40 @@ test("batch size and parallel requests: smaller batches, up to 3 at a time, ever
   assert.equal(most >= 1, true);
 });
 
+test("a successful batch is kept even when a parallel batch fails first", async () => {
+  // Mirrors the real timing: batch 2 fails at once (the old job-id
+  // collision) while batch 1 is still in flight, so stopped=true is set
+  // before batch 1 finishes. Batch 1's prompts must still be saved.
+  const scenes = Array.from({ length: 10 }, (_, i) => scene(i + 1));
+  const call = async (_system: string, prompt: string): Promise<string> => {
+    const ids = [...prompt.matchAll(/^(S\d+[a-z]?) \|/gm)].map((m) => m[1]);
+    if (ids.includes("S06")) throw new Error("network down");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return JSON.stringify(ids.map((id) => ({ id, scene: `Shot for ${id}`, motion: "" })));
+  };
+  const result = await generatePrompts({ scenes, targetIds: new Set(scenes.map((s) => s.id)), context: context(), call, batchSize: 5, parallel: 2, staggerMs: 0 });
+  assert.equal(result.failed?.batch, 2);
+  assert.ok(result.scenes.slice(0, 5).every((s) => s.prompt.trim() !== ""), "the delayed successful batch must be kept");
+  assert.ok(result.scenes.slice(5, 10).every((s) => s.prompt.trim() === ""));
+});
+
+test("no new batches start after a parallel batch fails", async () => {
+  const scenes = Array.from({ length: 20 }, (_, i) => scene(i + 1));
+  const started: string[] = [];
+  const call = async (_system: string, prompt: string): Promise<string> => {
+    const ids = [...prompt.matchAll(/^(S\d+[a-z]?) \|/gm)].map((m) => m[1]);
+    started.push(ids[0] ?? "");
+    if (ids.includes("S06")) throw new Error("network down");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    return JSON.stringify(ids.map((id) => ({ id, scene: `Shot for ${id}`, motion: "" })));
+  };
+  const result = await generatePrompts({ scenes, targetIds: new Set(scenes.map((s) => s.id)), context: context(), call, batchSize: 5, parallel: 2, staggerMs: 0 });
+  assert.equal(result.failed?.batch, 2);
+  assert.ok(result.scenes.slice(0, 5).every((s) => s.prompt.trim() !== ""));
+  assert.ok(result.scenes.slice(10).every((s) => s.prompt.trim() === ""), "batches 3 and 4 must never start");
+  assert.ok(!started.includes("S11") && !started.includes("S16"));
+});
+
 test("with parallel requests a failing batch stops new ones and keeps the finished ones", async () => {
   const scenes = Array.from({ length: 20 }, (_, i) => scene(i + 1));
   const call = async (_system: string, prompt: string): Promise<string> => {

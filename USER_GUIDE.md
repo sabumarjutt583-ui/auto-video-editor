@@ -125,6 +125,8 @@ If an account reaches its daily limit, only that account waits (the time is show
 
 In the Prompt Generator (Project and Quick) choose **Written by: Gemini** or **Groq** (the same choice is in Settings, *Who writes the texts*). Both use your API keys. The word timing of your voice (SRT) is always done by Groq.
 
+Prompts are written in batches (Settings > Who writes the texts > "Scenes per request", default 10, and "Requests at the same time", default 2). If one batch fails, no new batches start, but batches that already finished are kept — so a run can show some prompts even when another batch fails, and the failed batch's Details are the provider's error, not a job-id error. Until the fixed release is installed, if you see "That job is already running" with 0 prompts, set "Requests at the same time" to 1 and press Generate prompts once, and wait: with 1, batches run one by one and cannot collide on the same job id.
+
 **Several keys.** In Settings you can save up to 10 Gemini keys and up to 10 Groq keys (for example from different Google accounts). The first key is used until it reaches its limit; then the app rests that key for a while and switches to the next one by itself. The list shows "Resting after its limit" with the time left. A key that is refused (wrong or removed) is skipped for an hour. If every key is used up, you see the error, and with *If the chosen writer fails, ask the other one* ticked the other provider is asked.
 
 ## Motion graphics (free, written by the AI)
