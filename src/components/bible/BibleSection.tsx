@@ -2,7 +2,7 @@ import { Lock, LockOpen, Plus, Sparkles, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { generateText } from "../../lib/ai";
-import { applyCast, newCharacter, newLocation, removeCharacter, removeLocation, sceneCounts } from "../../lib/bible/edit";
+import { applyCast, clearBible, newCharacter, newLocation, removeCharacter, removeLocation, removeUnusedBible, sceneCounts } from "../../lib/bible/edit";
 import { BIBLE_SYSTEM_INSTRUCTION, CAST_ONLY_INSTRUCTION, castOnlyPrompt, parseDetected, scenesPrompt, type Detected } from "../../lib/bible/detect";
 import { isCancelled, toAppError } from "../../lib/errors";
 import { runJob, selectJob, useJobStore } from "../../store/jobStore";
@@ -20,11 +20,28 @@ export function BibleSection({ project }: { project: Project }) {
   const [error, setError] = useState<AppError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [detecting, setDetecting] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const { characterBible: characters, locationBible: locations, scenes, bibleLocked: locked } = project;
   const counts = useMemo(() => sceneCounts(scenes), [scenes]);
   const detected = characters.length > 0 || locations.length > 0;
   const busy = detecting || job !== null;
+  const unusedCharacters = characters.filter((c) => (counts[c.id] ?? 0) === 0);
+  const unusedLocations = locations.filter((l) => (counts[l.id] ?? 0) === 0);
+  const unusedTotal = unusedCharacters.length + unusedLocations.length;
+
+  function deleteUnused() {
+    const result = removeUnusedBible(characters, locations, scenes, counts);
+    update({ characterBible: result.characters, locationBible: result.locations, scenes: result.scenes });
+    setNotice(result.deleted === 0 ? "No unused characters or locations were found." : `Deleted ${result.deleted} unused ${result.deleted === 1 ? "entry" : "entries"}.`);
+  }
+
+  function clearAll() {
+    const result = clearBible(characters, locations, scenes);
+    update({ characterBible: result.characters, locationBible: result.locations, scenes: result.scenes, bibleLocked: false });
+    setConfirmClear(false);
+    setNotice("Bible cleared. Run Auto detect or add characters again, then rewrite prompts.");
+  }
 
   /** Asks Gemini twice at most. `castOnly` keeps the locked bible and only fills who is in each scene. */
   async function detect(castOnly: boolean) {
@@ -89,8 +106,32 @@ export function BibleSection({ project }: { project: Project }) {
             Fill who is in each scene
           </Button>
         )}
+        <Button disabled={locked || busy || !detected} onClick={deleteUnused} title={unusedTotal === 0 ? "Every character and location is used in a scene." : undefined}>
+          Delete unused{unusedTotal > 0 ? ` (${unusedTotal})` : ""}
+        </Button>
+        <Button disabled={locked || busy || !detected} onClick={() => setConfirmClear(true)}>
+          Clear bible
+        </Button>
         {locked && <span className="text-xs text-muted">Locked: prompts use these texts exactly. Unlock to edit.</span>}
       </div>
+      {confirmClear && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/40 bg-warning/10 px-5 py-4" role="alertdialog" aria-label="Clear bible">
+          <p className="text-sm">
+            Delete all {characters.length} characters and {locations.length} locations? Scenes will lose their cast, and prompts already written with these texts will still contain the old words — you must rewrite prompts after clearing.
+          </p>
+          <div className="flex gap-2">
+            <Button onClick={() => setConfirmClear(false)}>Cancel</Button>
+            <Button variant="danger" onClick={clearAll}>
+              Delete bible
+            </Button>
+          </div>
+        </div>
+      )}
+      {detected && unusedTotal > 0 && !confirmClear && (
+        <p className="text-sm text-muted" role="status">
+          {unusedCharacters.length} characters and {unusedLocations.length} locations from a previous session are not used in any scene. Use Delete unused to clear them, or Clear bible to start a new bible.
+        </p>
+      )}
       {job && <JobBar job={job} />}
 
       {!detected && !busy && (

@@ -40,6 +40,45 @@ export function removeLocation(locations: readonly Location[], scenes: readonly 
   };
 }
 
+/** Clears the whole bible: every character and location is removed, and every scene loses its cast. */
+export function clearBible(_characters: readonly Character[], _locations: readonly Location[], scenes: readonly Scene[]): { characters: Character[]; locations: Location[]; scenes: Scene[] } {
+  return {
+    characters: [],
+    locations: [],
+    scenes: scenes.map((scene) => ({ ...scene, characterIds: [], locationId: null })),
+  };
+}
+
+/** Removes only bible entries that no scene uses (scene count 0). Used entries and their cast are kept. */
+export function removeUnusedBible(
+  characters: readonly Character[],
+  locations: readonly Location[],
+  scenes: readonly Scene[],
+  counts: Readonly<Record<string, number>> = sceneCounts(scenes),
+): { characters: Character[]; locations: Location[]; scenes: Scene[]; deleted: number } {
+  let keptCharacters = [...characters];
+  let keptLocations = [...locations];
+  let keptScenes = [...scenes];
+  let deleted = 0;
+  for (const character of characters) {
+    if ((counts[character.id] ?? 0) === 0) {
+      const result = removeCharacter(keptCharacters, keptScenes, character.id);
+      keptCharacters = result.characters;
+      keptScenes = result.scenes;
+      deleted += 1;
+    }
+  }
+  for (const location of locations) {
+    if ((counts[location.id] ?? 0) === 0) {
+      const result = removeLocation(keptLocations, keptScenes, location.id);
+      keptLocations = result.locations;
+      keptScenes = result.scenes;
+      deleted += 1;
+    }
+  }
+  return { characters: keptCharacters, locations: keptLocations, scenes: keptScenes, deleted };
+}
+
 /** Adds the character to the scene, or removes it when it is already there. */
 export function toggleCharacter(scenes: readonly Scene[], index: number, id: string): Scene[] {
   return scenes.map((scene, i) => {

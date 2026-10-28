@@ -84,7 +84,7 @@ export function QuickGenerator({ project, session, onSaved }: QuickGeneratorProp
 
       {confirmNew && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning/40 bg-warning/10 px-5 py-4" role="alertdialog" aria-label="New quick session">
-          <p className="text-sm">Start a new quick session? The script, voice, scenes and prompts of this one are deleted. Your style and options stay.</p>
+          <p className="text-sm">Start a new quick session? The script, voice, scenes, prompts and character bible of this one are deleted. Your style and options stay.</p>
           <div className="flex gap-2">
             <Button onClick={() => setConfirmNew(false)}>Cancel</Button>
             <Button

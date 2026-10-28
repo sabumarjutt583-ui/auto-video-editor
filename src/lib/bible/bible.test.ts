@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { emptyScene } from "../scenes/assemble.ts";
 import type { Scene } from "../../types/project.ts";
 import { castOnlyPrompt, parseDetected, scenesPrompt } from "./detect.ts";
-import { applyCast, newCharacter, removeCharacter, removeLocation, sceneCounts, setSceneLocation, toggleCharacter } from "./edit.ts";
+import { applyCast, clearBible, newCharacter, removeCharacter, removeLocation, removeUnusedBible, sceneCounts, setSceneLocation, toggleCharacter } from "./edit.ts";
 
 const IDS = ["S01", "S02", "S03"];
 
@@ -92,6 +92,51 @@ test("the cast is applied to scenes and edited with chips", () => {
   list = setSceneLocation(list, 2, "l1");
   assert.equal(list[2]?.locationId, "l1");
   assert.deepEqual(sceneCounts(list), { c1: 2, c2: 1, l1: 3 });
+});
+
+test("clearing the bible empties both lists and clears every scene cast", () => {
+  const parsed = parseDetected(ANSWER, IDS);
+  assert.ok(parsed);
+  const list = applyCast(scenes(), parsed.cast);
+  const cleared = clearBible(parsed.characters, parsed.locations, list);
+  assert.deepEqual(cleared.characters, []);
+  assert.deepEqual(cleared.locations, []);
+  assert.ok(cleared.scenes.every((s) => s.characterIds.length === 0 && s.locationId === null));
+});
+
+test("deleting unused bible entries keeps used ones and clears cast only for deleted ids", () => {
+  const parsed = parseDetected(ANSWER, IDS);
+  assert.ok(parsed);
+  // S01 uses c1 + l1, S02 uses c1 + c2 + l1, S03 uses nothing. Add an unused character and location.
+  const characters = [...parsed.characters, { id: "c9", name: "Unused", role: "", appearance: "unused" }];
+  const locations = [...parsed.locations, { id: "l9", name: "Unused place", description: "unused" }];
+  const list = applyCast(scenes(), parsed.cast);
+  const result = removeUnusedBible(characters, locations, list);
+  assert.deepEqual(result.characters.map((c) => c.id), ["c1", "c2"]);
+  assert.deepEqual(result.locations.map((l) => l.id), ["l1"]);
+  assert.equal(result.deleted, 2);
+  assert.deepEqual(result.scenes[1]?.characterIds, ["c1", "c2"]);
+  assert.equal(result.scenes[1]?.locationId, "l1");
+});
+
+test("deleting unused entries with an all-unused bible deletes everything", () => {
+  const parsed = parseDetected(ANSWER, IDS);
+  assert.ok(parsed);
+  const emptyCast = scenes();
+  const result = removeUnusedBible(parsed.characters, parsed.locations, emptyCast);
+  assert.deepEqual(result.characters, []);
+  assert.deepEqual(result.locations, []);
+  assert.equal(result.deleted, 3);
+});
+
+test("deleting unused entries with nothing unused changes nothing", () => {
+  const parsed = parseDetected(ANSWER, IDS);
+  assert.ok(parsed);
+  const list = applyCast(scenes(), parsed.cast);
+  const result = removeUnusedBible(parsed.characters, parsed.locations, list);
+  assert.equal(result.deleted, 0);
+  assert.deepEqual(result.characters.map((c) => c.id), ["c1", "c2"]);
+  assert.deepEqual(result.locations.map((l) => l.id), ["l1"]);
 });
 
 test("deleting a character or location removes it from every scene", () => {
