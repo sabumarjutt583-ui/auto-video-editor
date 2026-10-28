@@ -3,7 +3,29 @@
 All notable changes to Auto Video Editor are written here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the version numbers follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.7.0] - 2026-10-28
+
+### Added
+- Dashboard page with the 7-step progress bar (Script Writing, Voice Generation, SRT Generation, Image Prompts, Image Generation, Video Editing, Export & Verify), per-project buttons, finished-video duration and size, pause between steps, and Show Live Claude, API Monitor, Open Script and Open Document
+- Claude Script Writing as Step 0 of a new video, with per-channel master prompts, multiple Claude accounts with rotation, and per-channel Claude account picks
+- Microsoft Edge TTS as a direct, opt-in voice provider (Gemini remains the default), with Korean and Spanish voices
+- ChatGPT web chat for custom styles, replacing the OpenAI API-key option (a saved OpenAI key is kept, old openai-engine styles load but return a friendly error)
+- Batch Flow Studio in Flow's place: automated batch run loop, live Omni/Veo credit table with a credit guard, default Omni 1.1 Flash, and Flow file renaming to scene timecode names
+- Project Images and Project Subtitles pages (project-scoped regenerate and caption overrides)
+- Clear bible and Delete unused for the character bible, with an unused-entry notice
+- Motion-graphics overlay as a post-render pass for text and lower-third layers only
+- Crash resume at stage level, and persistent rest times with user-set back-online times for Groq/Gemini keys and Claude accounts
+- API key cap raised from 10 to 50 slots for Groq and Gemini
+
+### Changed
+- Prompt generation: parallel batches share one job id safely, and a successful batch is kept even if another parallel batch fails
+- Make Video pipeline logic, graphics-director plan, and ping-pong clip fit (the clip fit needs the new sidecar in this release)
+
+### Fixed
+- Groq text model replaced with openai/gpt-oss-120b (the old llama-3.3-70b-versatile model is no longer served to free/developer tiers)
+- Quick-session voice playback HTTP 403: $APPDATA/quick/** added to the asset protocol scope
+- Prompt Generator "That job is already running" error on parallel batches
+- Urdu captions stay on Noto Sans Arabic (libass cannot draw Nastaliq, so it showed boxes)
 
 ## [0.6.1] - 2026-10-25
 
