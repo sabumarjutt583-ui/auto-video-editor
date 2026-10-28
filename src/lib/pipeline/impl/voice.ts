@@ -11,13 +11,21 @@ export async function voiceStage(ctx: StageContext): Promise<void> {
     let source = ctx.voiceFile;
     if (source === null) {
       if (project.script.trim() === "") throw new Error("There is no script to make the voice from.");
-      ctx.say("Making the voice with Gemini");
-      const options = await ttsOptions();
       const settings = useSettingsStore.getState().settings;
+      const provider = settings?.ttsProvider ?? "gemini";
+      ctx.say(provider === "edge" ? "Making the voice with Edge TTS" : "Making the voice with Gemini");
+      const options = await ttsOptions();
       const model = ctx.profile.voice.model || settings?.ttsModel || options.defaultModel;
-      const voice = ctx.profile.voice.voice || settings?.ttsVoice || options.defaultVoice;
-      const style = ctx.profile.voice.style || settings?.ttsStyle || "";
-      const made = await runJob("tts", "Making the voice", (id) => ttsGenerate(ctx.projectId, { text: project.script, voice, model, style }, id));
+      // A profile voice (if one is set) always wins; otherwise the provider's
+      // own voice from settings is used. Edge drops the style note, because
+      // Edge would speak Gemini's "Say in a calm voice:" prefix aloud.
+      const voice =
+        ctx.profile.voice.voice ||
+        (provider === "edge" ? settings?.ttsEdgeVoice || options.edgeDefaultVoice : settings?.ttsVoice || options.defaultVoice);
+      const style = provider === "edge" ? "" : ctx.profile.voice.style || settings?.ttsStyle || "";
+      const made = await runJob("tts", "Making the voice", (id) =>
+        ttsGenerate(ctx.projectId, { text: project.script, voice, model, style, provider, rate: settings?.ttsRate ?? 0, volume: settings?.ttsVolume ?? 0 }, id),
+      );
       source = made.path;
     }
     ctx.say("Copying the voice into the project");

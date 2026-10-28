@@ -29,6 +29,11 @@ tokio = { version = "1", features = ["process", "time", "sync", "macros", "io-ut
 keyring = "4"
 # native-tls = Windows Schannel / macOS Secure Transport, so no extra C toolchain is needed to build.
 reqwest = { version = "0.13", default-features = false, features = ["native-tls", "json", "http2", "system-proxy"] }
+# Direct Edge TTS calls only: a WebSocket client over the system's TLS
+# (Windows Schannel / macOS Secure Transport, like reqwest above), so no
+# extra C toolchain is needed. No git dependencies, pinned major versions.
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+futures-util = "0.3"
 tauri-plugin-process = "2"
 tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy", "zip"] }
 trash = "5"

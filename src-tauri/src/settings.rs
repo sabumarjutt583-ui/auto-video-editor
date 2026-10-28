@@ -60,6 +60,14 @@ pub struct Settings {
     pub tts_model: String,
     pub tts_voice: String,
     pub tts_style: String,
+    /// Who speaks: `"gemini"` (the default) or `"edge"` (Microsoft Edge TTS,
+    /// free and unofficial, no key). Anything else is treated as Gemini.
+    pub tts_provider: String,
+    /// The Microsoft voice used when the provider is Edge.
+    pub tts_edge_voice: String,
+    /// Edge only: speaking rate and volume in percent (clamped on load).
+    pub tts_rate: i32,
+    pub tts_volume: i32,
     /// Empty lines after every prompt in Copy all and Export TXT (1 to 3).
     pub export_empty_lines: u8,
     /// Write the id (S01_000.0-005.1 or P01) before every prompt in Copy all and Export TXT.
@@ -124,6 +132,10 @@ impl Default for Settings {
             tts_model: crate::tts::voices::DEFAULT_MODEL.to_string(),
             tts_voice: crate::tts::voices::DEFAULT_VOICE.to_string(),
             tts_style: String::new(),
+            tts_provider: "gemini".to_string(),
+            tts_edge_voice: crate::api::edge_tts::DEFAULT_EDGE_VOICE.to_string(),
+            tts_rate: 0,
+            tts_volume: 0,
             export_empty_lines: 2,
             export_include_ids: true,
             export_folder: String::new(),
@@ -233,11 +245,23 @@ impl Settings {
         let tts_model = clean_model_name(&self.tts_model, false).unwrap_or_else(|| crate::tts::voices::DEFAULT_MODEL.to_string());
         let tts_voice = if crate::tts::voices::is_voice(&self.tts_voice) { self.tts_voice.clone() } else { crate::tts::voices::DEFAULT_VOICE.to_string() };
         let tts_style: String = self.tts_style.trim().chars().take(300).collect();
+        let tts_provider = if self.tts_provider.trim().eq_ignore_ascii_case("edge") { "edge".to_string() } else { "gemini".to_string() };
+        let tts_edge_voice = if crate::api::edge_tts::is_edge_voice(&self.tts_edge_voice) {
+            self.tts_edge_voice.clone()
+        } else {
+            crate::api::edge_tts::DEFAULT_EDGE_VOICE.to_string()
+        };
+        let tts_rate = self.tts_rate.clamp(-50, 100);
+        let tts_volume = self.tts_volume.clamp(-100, 100);
         let text_provider = if self.text_provider == "groq" { "groq" } else { "gemini" }.to_string();
         Ok(Self {
             tts_model,
             tts_voice,
             tts_style,
+            tts_provider,
+            tts_edge_voice,
+            tts_rate,
+            tts_volume,
             text_provider,
             api_batch_size: self.api_batch_size.clamp(5, 20),
             api_parallel: self.api_parallel.clamp(1, 3),

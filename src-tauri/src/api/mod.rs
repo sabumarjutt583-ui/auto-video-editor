@@ -3,6 +3,7 @@
 
 pub mod base64;
 pub mod client;
+pub mod edge_tts;
 pub mod error;
 pub mod gemini;
 pub mod monitor;

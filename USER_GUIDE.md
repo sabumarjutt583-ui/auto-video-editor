@@ -227,6 +227,8 @@ In the Image Generator, Videos card, choose where the videos are made: **Google 
 ## Make the voice-over inside the app
 In Prompt Generator, Voice step, use **Make the voice with Gemini**: paste the script, pick a model and a voice (press **Listen** to hear it), optionally write a style such as "in a calm, warm storyteller voice", then press **Make voice**. Long scripts are made in pieces; if something fails, press the button again and the finished pieces are not made twice. It uses your Gemini API key (Settings). You can still upload your own voice-over instead.
 
+Or choose **Microsoft Edge TTS (free, unofficial)** as the voice provider in the same card: pick a language, then a Microsoft voice (for example ko-KR-SunHiNeural or ko-KR-InJoonNeural for Korean, es-ES-AlvaroNeural for Spanish), set the rate and volume, press **Listen**, then **Make voice**. Edge needs no key, card, or account — only an internet connection — and it is unofficial, so Microsoft may change or limit it at any time with no guarantee. A style note is not used for Edge (Edge would read it out loud); use rate and volume instead. Pitch is not offered, because Edge ignores it. If Edge fails, the error says so and the app does NOT quietly switch you back to Gemini — you switch the provider yourself. Make Video uses the same provider choice from Settings, so a video made with an Edge voice renders exactly like a Gemini-voice video.
+
 ## Channels
 Open **Channels** in the sidebar to see all your channels and every video: how many are being made, which wait for you and which are finished. Open a channel to make a new video, see each video's steps, play or show a finished video, or change the channel's settings.
 

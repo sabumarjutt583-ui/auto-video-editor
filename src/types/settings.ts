@@ -20,6 +20,13 @@ export interface AppSettings {
   ttsModel: string;
   ttsVoice: string;
   ttsStyle: string;
+  /** Who speaks: "gemini" (the default) or "edge" (Microsoft Edge TTS, free and unofficial, no key). */
+  ttsProvider: "gemini" | "edge";
+  /** The Microsoft voice used when the provider is Edge. */
+  ttsEdgeVoice: string;
+  /** Edge only: speaking rate (-50..+100) and volume (-100..+100) in percent. */
+  ttsRate: number;
+  ttsVolume: number;
   /** Empty lines after every prompt in Copy all and Export TXT (1 to 3). */
   exportEmptyLines: number;
   /** Write the id before every prompt in Copy all and Export TXT. */
