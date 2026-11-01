@@ -178,6 +178,23 @@ fn describe(error: &reqwest::Error) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// No API key is sent. A 401/403 response is expected and proves transport.
+    #[tokio::test]
+    #[ignore = "live unauthenticated Google transport diagnostic"]
+    async fn live_google_transport_diagnostic() {
+        for http1 in [false, true] {
+            let mut builder = reqwest::Client::builder()
+                .connect_timeout(std::time::Duration::from_secs(8))
+                .timeout(std::time::Duration::from_secs(12));
+            if http1 { builder = builder.http1_only(); }
+            let client = builder.build().unwrap();
+            let response = client.get("https://generativelanguage.googleapis.com/v1beta/models").send().await;
+            match response {
+                Ok(response) => eprintln!("Google transport http1_only={http1}: HTTP {} {:?}", response.status(), response.version()),
+                Err(error) => eprintln!("Google transport http1_only={http1}: {}", super::describe(&error.without_url())),
+            }
+        }
+    }
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;

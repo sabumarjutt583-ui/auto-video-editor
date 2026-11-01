@@ -255,6 +255,47 @@ impl Session {
         Ok(frames)
     }
 
+    /// Every frame belonging to an extra work tab. Flow can render the
+    /// shared tool inside an iframe, so automation must inspect that tab's
+    /// frame tree rather than only its top-level document.
+    pub async fn frames_in_tab(&self, tab: &Tab) -> Result<Vec<Frame>, CdpError> {
+        let mut frames = vec![tab.frame.clone()];
+        let targets = self.cdp.call("Target.getTargets", json!({}), None).await?;
+        let mut sessions = vec![tab.frame.session.clone()];
+        let mut visited_targets = std::collections::HashSet::new();
+        let mut index = 0;
+        // A cross-process child owns its own frame tree. Walk each owned
+        // session rather than stopping at the outer Flow tab's frame tree.
+        while index < sessions.len() && index < 64 {
+            let root = sessions[index].clone();
+            index += 1;
+            let mut child_ids = Vec::new();
+            if let Ok(tree) = self.cdp.call("Page.getFrameTree", json!({}), Some(&root)).await {
+                collect_child_frames(&tree["frameTree"], &mut child_ids, true);
+            }
+            for info in targets["targetInfos"].as_array().into_iter().flatten() {
+                if info["type"] != "iframe" { continue; }
+                let Some(id) = info["targetId"].as_str() else { continue };
+                if !child_ids.iter().any(|frame_id| frame_id == id)
+                    || !visited_targets.insert(id.to_string()) { continue; }
+                let attached = self.cdp.call("Target.attachToTarget", json!({"targetId": id, "flatten": true}), None).await;
+                if let Some(session) = attached.ok().and_then(|a| a["sessionId"].as_str().map(str::to_string)) {
+                    sessions.push(session.clone());
+                    frames.push(Frame { session, context_id: None });
+                }
+            }
+            for frame_id in child_ids {
+                let world = self.cdp.call("Page.createIsolatedWorld", json!({"frameId": frame_id, "worldName": "auto-editor"}), Some(&root)).await;
+                if let Some(context) = world.ok().and_then(|w| w["executionContextId"].as_i64()) {
+                    frames.push(Frame { session: root.clone(), context_id: Some(context) });
+                }
+            }
+        }
+        frames.sort_by(|a, b| a.session.cmp(&b.session).then(a.context_id.cmp(&b.context_id)));
+        frames.dedup();
+        Ok(frames)
+    }
+
     /// The first frame where `expression` is true (for example `!!document.querySelector('#x')`).
     pub async fn find_frame(&self, expression: &str) -> Result<Option<Frame>, CdpError> {
         for frame in self.frames().await? {

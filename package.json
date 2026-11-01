@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test:ts": "node --test \"src/**/*.test.ts\"",
+    "test:reliability": "node --test scripts/reliability.test.mjs",
     "setup:ffmpeg": "node scripts/fetch-ffmpeg.mjs",
     "pretauri": "node scripts/fetch-ffmpeg.mjs --if-missing",
     "tauri": "tauri",

@@ -130,6 +130,8 @@
   },
   "flowBatch": {
       "url": "https://flow.google.com/shared/tool/74a00ce5-db5d-4ac4-8ae8-96e3e9b3b099",
+        "imageStudioUrl": "https://flow.google.com/shared/tool/9e3ffb14-cf47-4137-8276-c88fde320c61",
+        "videoStudioUrl": "https://flow.google.com/shared/tool/cd8dede2-e843-470b-bc49-ab1ddb517186",
       "imagesModel": "Nano Banana 2.1",
       "videosModel": "Omni 1.1 Flash",
       "videoModelOptions": ["Omni 1.1 Flash", "Veo 3.1 Series (Lite)", "Veo 3.1 Series (Fast)", "Veo 3.1 Series (Quality)"],

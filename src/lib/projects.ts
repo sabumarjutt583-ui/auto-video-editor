@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { assertProjectDeletable } from "./pipeline/activity.ts";
 
 import type { Project, ProjectList, ProjectSummary } from "../types";
 
@@ -25,6 +26,7 @@ export function renameProject(id: string, name: string): Promise<ProjectSummary>
 }
 
 export function deleteProject(id: string): Promise<void> {
+  assertProjectDeletable(id);
   return invoke<void>("delete_project", { id });
 }
 

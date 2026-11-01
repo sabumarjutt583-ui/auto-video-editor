@@ -23,7 +23,9 @@ export function stageDone(project: Project, stage: StageId): boolean {
       return project.scenes.length > 0 && project.scenes.every((scene) => scene.prompt.trim() !== "");
     case "images": {
       const needed = pictureScenes(project);
-      return needed.length > 0 && needed.every((scene) => (project.mediaMap[scene.id] ?? "") !== "");
+      const videoOnly = project.scenes.length > 0 && project.scenes.every((scene) => scene.mediaType === "video");
+      return (needed.length > 0 || videoOnly) &&
+        needed.every((scene) => (project.mediaMap[scene.id] ?? "") !== "");
     }
     case "audio":
       return readEditor(project).audio.mix !== null;

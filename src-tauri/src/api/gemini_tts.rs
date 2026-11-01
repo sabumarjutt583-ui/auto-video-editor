@@ -60,6 +60,25 @@ pub async fn speak(key: &str, model: &str, voice: &str, text: &str) -> Result<Sp
 mod tests {
     use super::*;
 
+    /// Uses a key saved through the app, never a key passed in the command line.
+    #[tokio::test]
+    #[ignore = "live Gemini API request; save a key in the app and set AVE_LIVE_GEMINI_OUTPUT"]
+    async fn live_gemini_voice_smoke() {
+        let output = std::env::var_os("AVE_LIVE_GEMINI_OUTPUT").expect("set an output directory");
+        let key = crate::keys::require(crate::keys::Provider::Gemini).expect("save a Gemini key in the app first");
+        let model = std::env::var("AVE_LIVE_GEMINI_MODEL").unwrap_or_else(|_| crate::tts::voices::DEFAULT_MODEL.to_string());
+        let audio = tokio::time::timeout(std::time::Duration::from_secs(90), speak(
+            &key, &model, "Kore", "This is a short Gemini voice test for the automatic video editor. The audio should be clear and complete.",
+        )).await.expect("live Gemini deadline").expect("live Gemini speech generation");
+        let samples = crate::tts::wav::samples_from_pcm(&audio.pcm);
+        assert!(samples.len() > audio.rate as usize, "at least one second of speech");
+        assert!(samples.iter().any(|sample| sample.unsigned_abs() > 100), "audio must not be silent");
+        let folder = std::path::PathBuf::from(output);
+        std::fs::create_dir_all(&folder).expect("output directory");
+        std::fs::write(folder.join("gemini-voice-sample.wav"), crate::tts::wav::wav_bytes(&samples, audio.rate)).expect("save voice");
+        eprintln!("Gemini {model}: {:.2} seconds saved", samples.len() as f64 / f64::from(audio.rate));
+    }
+
     #[test]
     fn the_request_asks_for_audio_with_the_voice() {
         let body = request_body("Hello", "Kore");

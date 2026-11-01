@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { assertProjectAvailable, isProjectActive } from "../lib/pipeline/activity.ts";
+import { invalidateProject } from "../lib/pipeline/invalidate.ts";
 
 import { toAppError } from "../lib/errors";
 import { openProject, saveProject } from "../lib/projects";
@@ -75,24 +77,35 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     saveError: null,
 
     open: async (id) => {
+      assertProjectAvailable(id);
+      if (get().project?.id === id && isProjectActive(id)) return;
       await get().flush();
+      if (dirty) throw get().saveError ?? new Error("Please save your changes before opening another project.");
       const project = await openProject(id);
+      // Edits may arrive while the next project is loading.
+      await get().flush();
+      if (dirty) throw get().saveError ?? new Error("Please save your changes before opening another project.");
+      assertProjectAvailable(id);
       reset(project);
     },
 
     close: async () => {
+      assertProjectAvailable(null);
       await get().flush();
+      if (dirty) throw get().saveError ?? new Error("Please save your changes before closing the project.");
+      assertProjectAvailable(null);
       reset(null);
     },
 
-    discard: () => reset(null),
+    discard: () => { assertProjectAvailable(null); reset(null); },
 
     update: (patch) => {
       const current = get().project;
       if (!current) return;
+      if (patch.activePartId !== undefined && patch.activePartId !== current.activePartId) assertProjectAvailable(null);
       revision += 1;
       dirty = true;
-      set({ project: { ...current, ...patch } });
+      set({ project: { ...current, ...invalidateProject(current, patch) } });
       scheduleSave();
     },
 
@@ -100,6 +113,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       clearTimeout(saveTimer);
       if (dirty) await enqueueSave();
       else await saveChain;
+      // Edits received during the write must be durable before a checkpoint or
+      // navigation completes. A failed write stays dirty for an explicit retry.
+      while (dirty && get().saveState !== "error") await enqueueSave();
+      clearTimeout(saveTimer);
     },
   };
 });

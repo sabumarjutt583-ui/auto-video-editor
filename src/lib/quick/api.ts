@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { assertProjectDeletable } from "../pipeline/activity.ts";
+import { QUICK_ID } from "./textScenes.ts";
 
 import type { Project, ProjectSummary } from "../../types";
 
@@ -15,10 +17,12 @@ export function quickOpen(): Promise<QuickOpen> {
 
 /** A new, empty session. The style and options of the old one stay; its files (voice too) are deleted. */
 export function quickReset(): Promise<Project> {
+  assertProjectDeletable(QUICK_ID);
   return invoke<Project>("quick_reset");
 }
 
 /** Moves the session into a normal project and returns its summary. */
 export function quickSaveAsProject(name: string): Promise<ProjectSummary> {
+  assertProjectDeletable(QUICK_ID);
   return invoke<ProjectSummary>("quick_save_as_project", { name });
 }

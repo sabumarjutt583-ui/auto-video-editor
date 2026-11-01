@@ -169,16 +169,12 @@ export function FlowBatchPanel() {
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5" aria-label="Batch Flow Studio">
-      <h2 className="text-base font-semibold tracking-tight">Batch Flow Studio — in Flow&apos;s place</h2>
+    <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5" aria-label="Batch Flow Studios">
+      <h2 className="text-base font-semibold tracking-tight">Batch Flow Studios</h2>
       <p className="text-sm text-muted">
-        The user&apos;s own batch tool inside Google Flow, for images and videos together. It has taken the place of the old
-        one-video-at-a-time Google Flow engine, which is no longer offered. The Gemini Canvas tool stays as the other image
-        option. Prompts go as paragraphs — one paragraph per prompt, one blank line between prompts, never &quot;Prompt
-        N:&quot; lines (live-verified: 20 prompts → 20 cards, S01–S20, all Ready, 0 credits for images) — and downloads
-        arrive as <code>S01.png</code> / <code>S01.mp4</code>, which this panel renames from the scene record, e.g.{" "}
-        <code>S01_000.0-008.0.png</code>. A video clip lasts only the chosen duration (4s–10s), so a longer scene needs
-        more than one clip or a loop.
+        Open the separate image or video batch tool in Google Flow. Both tools are designed for ordered scene prompts,
+        batch size 8 by default, and sequence-named downloads. Flow requires a project to be open before a shared tool
+        can run.
       </p>
       <p className="text-sm text-muted">
         Warning: a prompt with no character name gets &quot;Jin Kun&quot; locked in by the Flow tool itself, and the word
@@ -186,11 +182,19 @@ export function FlowBatchPanel() {
         tool itself if only one character is wanted — this app never sets Jin Kun.
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button variant="primary" onClick={() => void openExternalLink("flow_batch")}>
-          Open Batch Flow Studio
+        <Button variant="primary" onClick={() => void openExternalLink("flow_image_studio")}>
+          Open Batch Image Studio
+        </Button>
+        <Button onClick={() => void openExternalLink("flow_video_studio")}>
+          Open Batch Video Studio
         </Button>
         <Button onClick={() => void (async () => { setInfo(await flowBatchConfig()); })()}>Show defaults</Button>
       </div>
+      <p role="note" className="rounded-lg border border-line bg-surface p-3 text-sm text-muted">
+        Video batches now run in Batch Video Studio as Text to Video. Image batches still use the existing Flow image
+        workflow. Image/frame/video uploads are not transferred into Video Studio automatically yet, so those video
+        modes need to be set up there manually.
+      </p>
       {!project ? (
         <p className="text-sm text-muted">Open a project first to run a batch for its scenes.</p>
       ) : (

@@ -53,7 +53,12 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineOut
     }
     if (options.pauses[stage]) {
       onEvent({ type: "waiting", stage });
-      if (!(await options.confirm(stage))) {
+      const approved = await options.confirm(stage);
+      if (options.cancelRequested()) {
+        onEvent({ type: "cancelled", stage });
+        return "cancelled";
+      }
+      if (!approved) {
         onEvent({ type: "stopped", stage });
         return "stopped";
       }
@@ -68,6 +73,10 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineOut
       }
       onEvent({ type: "error", stage, error });
       return "failed";
+    }
+    if (options.cancelRequested()) {
+      onEvent({ type: "cancelled", stage });
+      return "cancelled";
     }
     if (!options.isDone(stage)) {
       onEvent({ type: "error", stage, error: new IncompleteStage(stage) });

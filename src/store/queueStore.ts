@@ -79,12 +79,24 @@ export const useQueueStore = create<QueueState>((set, get) => {
           const profile: ChannelProfile = { ...channel, pauses: { ...NO_PAUSES } };
           commit(setItem(get().items, item.id, { status: "running", note: "" }));
           const pipeline = usePipelineStore.getState();
-          if (item.projectId) await pipeline.continueProject(item.projectId, profile, ensureConsent);
-          else await pipeline.start({ profile, name: item.name, script: item.script, topic: item.topic, voiceFile: item.voiceFile, ensureConsent });
+          // Save the project link as soon as it exists, not only after the whole
+          // video finishes. A restart can then resume instead of duplicating it.
+          const stopTracking = usePipelineStore.subscribe((state) => {
+            if (state.running && state.projectId && state.channelId === item.channelId) {
+              const queued = get().items.find((entry) => entry.id === item.id);
+              if (queued && queued.projectId !== state.projectId) commit(setItem(get().items, item.id, { projectId: state.projectId }));
+            }
+          });
+          try {
+            if (item.projectId) await pipeline.continueProject(item.projectId, profile, ensureConsent, item.voiceFile);
+            else await pipeline.start({ profile, name: item.name, script: item.script, topic: item.topic, voiceFile: item.voiceFile, ensureConsent });
+          } finally {
+            stopTracking();
+          }
 
           const after = usePipelineStore.getState();
           const projectId = after.projectId ?? item.projectId;
-          if (after.finished !== null) {
+          if (after.error === null && after.problems.length === 0 && after.view.status === "finished") {
             commit(setItem(get().items, item.id, { status: "done", projectId, note: "" }));
           } else if (!projectId && (after.error?.details === "RateLimit" || after.error?.details === "Auth")) {
             // The script writer cannot work now (usage limit or signed out): the same video waits and the queue stops.

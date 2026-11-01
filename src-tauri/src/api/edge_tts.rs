@@ -1,14 +1,15 @@
 //! Microsoft Edge TTS, called directly — no API key, no card, no account, no
 //! model download, and no proxy server in between.
 //!
-//! How the direct call works (restated from public implementations of the same
-//! protocol; no implementation was copied verbatim):
+//! Transport is implemented here; the v2 token module has separate upstream
+//! attribution and licensing. The direct call works as follows:
 //! 1. The tool opens a WebSocket to Microsoft's Edge speech endpoint. It looks
 //!    like an Edge browser (User-Agent + Origin headers) and carries a
 //!    time-based security token, `Sec-MS-GEC`: the current time, rounded down
 //!    to a 5-minute window, expressed in Windows ticks (100-nanosecond steps
 //!    since 1601-01-01), concatenated with Microsoft's trusted client token,
-//!    SHA-256 hashed, in uppercase hex. There is no secret to store.
+//!    hashed using the current client's v2 CS64/SHA-256 digest format.
+//!    See edge_token.rs for source attribution. There is no user secret to store.
 //! 2. First message: `speech.config` JSON — MP3 output
 //!    (`audio-24khz-48kbitrate-mono-mp3`), word boundaries on (so the app
 //!    could time words), sentence boundaries off.
@@ -39,11 +40,11 @@ use serde::Serialize;
 use tokio::io::AsyncWriteExt;
 use std::process::Stdio;
 use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
 use super::client::{http, read_json, send};
 use super::error::ApiError;
 use crate::api::gemini_tts::Spoken;
-use crate::library::hash::sha256_hex;
 
 /// The Edge speech endpoint (WebSocket). The trailing part is built per call
 /// with the trusted client token, a connection id, and the Sec-MS-GEC token.
@@ -52,10 +53,13 @@ const WS_BASE: &str = "wss://speech.platform.bing.com/consumer/speech/synthesize
 const VOICES_URL: &str = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list";
 /// Microsoft's trusted client token, as used by public Edge TTS clients. It is
 /// not a user secret: it is the same constant every Edge TTS client sends.
-const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB9E8145B1D5F5E5";
+const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
+// Public client protocol parameters, checked against the maintained v2 client.
+// Keep endpoint, version, token and subprotocol together when updating.
+const SEC_MS_GEC_VERSION: &str = "2-143.0.3650.75";
 /// An Edge browser user agent, so the endpoint treats the call like Read Aloud.
-const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0";
-const ORIGIN: &str = "https://www.bing.com";
+const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0";
+const ORIGIN: &str = "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold";
 const OUTPUT_FORMAT: &str = "audio-24khz-48kbitrate-mono-mp3";
 /// Reading one piece takes the service up to a couple of minutes at most.
 const SPEAK_TIMEOUT: Duration = Duration::from_secs(240);
@@ -131,9 +135,13 @@ fn format_percent(value: i32, min: i32, max: i32) -> String {
 /// Builds the SSML document for one piece. Rate is clamped to -50..+100 and
 /// volume to -100..+100; anything outside is brought inside, never rejected.
 pub fn build_ssml(voice: &str, rate: i32, volume: i32, text: &str) -> String {
+    let parts: Vec<&str> = voice.splitn(3, '-').collect();
+    let name = if parts.len() == 3 {
+        format!("Microsoft Server Speech Text to Speech Voice ({}-{}, {})", parts[0], parts[1], parts[2])
+    } else { voice.to_string() };
     format!(
         "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"{}\"><prosody rate=\"{}\" volume=\"{}\">{}</prosody></voice></speak>",
-        voice,
+        escape_xml(&name),
         format_percent(rate, -50, 100),
         format_percent(volume, -100, 100),
         escape_xml(text)
@@ -149,11 +157,11 @@ pub fn windows_ticks(unix_secs: u64) -> u64 {
 
 /// The Sec-MS-GEC token for a Unix time: ticks rounded DOWN to a 5-minute
 /// window (300 seconds = 3,000,000,000 ticks), concatenated with the trusted
-/// client token, SHA-256 hashed, uppercase hex.
+/// client token, in the v2 uppercase CS64-SHA256 format.
 pub fn sec_ms_gec(unix_secs: u64) -> String {
     let ticks = windows_ticks(unix_secs);
     let rounded = ticks - ticks % 3_000_000_000;
-    sha256_hex(format!("{rounded}{TRUSTED_CLIENT_TOKEN}").as_bytes()).to_uppercase()
+    super::edge_token::token(format!("{rounded}{TRUSTED_CLIENT_TOKEN}").as_bytes())
 }
 
 /// A date in RFC 1123 form, e.g. `Mon, 01 Jan 2024 00:00:00 GMT`, for the
@@ -190,19 +198,25 @@ pub fn request_id() -> String {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("{nanos:x}-{n:x}-{}", std::process::id())
+    format!("{:032x}", nanos ^ (u128::from(n) << 64) ^ (u128::from(std::process::id()) << 32))
+}
+
+fn speech_timestamp(unix_secs: u64) -> String {
+    let date = rfc1123(unix_secs);
+    // The service uses JavaScript Date.toString(), not an HTTP date.
+    format!("{} {} {} {} {} GMT+0000 (Coordinated Universal Time)", &date[..3], &date[8..11], &date[5..7], &date[12..16], &date[17..25])
 }
 
 /// The first message of a call: the output format and boundary settings.
 pub fn config_message(timestamp: &str) -> String {
     format!(
-        "X-Timestamp:{timestamp}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{{\"context\":{{\"synthesis\":{{\"audio\":{{\"metadataOptions\":{{\"sentenceBoundaryEnabled\":false,\"wordBoundaryEnabled\":true}},\"outputFormat\":\"{OUTPUT_FORMAT}\"}}}}}}}}"
+        "X-Timestamp:{timestamp}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{{\"context\":{{\"synthesis\":{{\"audio\":{{\"metadataoptions\":{{\"sentenceBoundaryEnabled\":\"false\",\"wordBoundaryEnabled\":\"true\"}},\"outputFormat\":\"{OUTPUT_FORMAT}\"}}}}}}}}\r\n"
     )
 }
 
 /// The second message of a call: the SSML document, with its headers.
 pub fn ssml_message(request: &str, timestamp: &str, ssml: &str) -> String {
-    format!("X-Timestamp:{timestamp}\r\nX-RequestId:{request}\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n{ssml}")
+    format!("X-RequestId:{request}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:{timestamp}Z\r\nPath:ssml\r\n\r\n{ssml}")
 }
 
 /// Finds the header block of one WebSocket frame (`headers\r\n\r\npayload`).
@@ -219,6 +233,15 @@ pub fn extract_audio(frame: &[u8]) -> Option<&[u8]> {
     } else {
         None
     }
+}
+
+/// Binary speech frames start with a two-byte big-endian header length.
+/// That prefix is not UTF-8 and the header need not have a blank-line separator.
+fn extract_binary_audio(frame: &[u8]) -> Option<&[u8]> {
+    let size = u16::from_be_bytes(frame.get(..2)?.try_into().ok()?) as usize;
+    let end = 2 + size;
+    let header = std::str::from_utf8(frame.get(2..end)?).ok()?;
+    header.lines().any(|line| line.trim() == "Path:audio").then(|| &frame[end..])
 }
 
 /// Whether one frame ends the turn (`Path:turn.end`).
@@ -340,15 +363,21 @@ async fn decode_mp3(mp3: &[u8]) -> Result<Spoken, ApiError> {
         .arg("-ar")
         .arg("24000")
         .arg("pipe:1");
-    cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
     let mut child = cmd.spawn().map_err(|e| {
         ApiError::Network(format!("Edge TTS: FFmpeg could not be started to decode the MP3 ({e})."))
     })?;
-    if let Some(mut stdin) = child.stdin.take() {
-        let _ = stdin.write_all(mp3).await;
-        let _ = stdin.shutdown().await;
-    }
-    let out = child.wait_with_output().await.map_err(|e| {
+    let stdin = child.stdin.take();
+    // Feed MP3 and drain PCM concurrently: either pipe can fill for long speech.
+    let feed = async move {
+        if let Some(mut stdin) = stdin {
+            stdin.write_all(mp3).await?;
+            stdin.shutdown().await?;
+        }
+        Ok::<(), std::io::Error>(())
+    };
+    let (written, output) = tokio::join!(feed, child.wait_with_output());
+    let out = output.map_err(|e| {
         ApiError::Network(format!("Edge TTS: FFmpeg stopped while decoding the MP3 ({e})."))
     })?;
     if !out.status.success() {
@@ -358,12 +387,25 @@ async fn decode_mp3(mp3: &[u8]) -> Result<Spoken, ApiError> {
             "Edge TTS: FFmpeg could not decode the MP3 audio ({detail})."
         )));
     }
+    written.map_err(|e| ApiError::Network(format!("Edge TTS: audio could not be sent to FFmpeg ({e}).")))?;
     if out.stdout.len() < 2 {
         return Err(ApiError::BadResponse(
             "Edge TTS: the decoded audio came out empty.".to_string(),
         ));
     }
     Ok(Spoken { pcm: out.stdout, rate: 24_000 })
+}
+
+fn speech_request(url: &str, token: &str) -> Result<tokio_tungstenite::tungstenite::http::Request<()>, ApiError> {
+    // A hand-built Request is passed through unchanged by tungstenite. Start
+    // from its URL conversion so Host/Upgrade/version/key are all present.
+    let mut request = url.into_client_request()
+        .map_err(|e| ApiError::Network(format!("Edge TTS: the call could not be built ({e}).")))?;
+    for (name, value) in [("user-agent", USER_AGENT), ("origin", ORIGIN), ("sec-ms-gec", token), ("sec-ms-gec-version", SEC_MS_GEC_VERSION)] {
+        request.headers_mut().insert(name, value.parse()
+            .map_err(|e| ApiError::Network(format!("Edge TTS: an invalid request header ({e}).")))?);
+    }
+    Ok(request)
 }
 
 async fn speak_inner(voice: &str, rate: i32, volume: i32, text: &str) -> Result<Vec<u8>, ApiError> {
@@ -379,22 +421,23 @@ async fn speak_inner(voice: &str, rate: i32, volume: i32, text: &str) -> Result<
     let token = sec_ms_gec(now);
     let connection = request_id();
     let url = format!(
-        "{WS_BASE}?TrustedClientToken={TRUSTED_CLIENT_TOKEN}&ConnectionId={connection}&Sec-MS-GEC={token}&Sec-MS-GEC-Version=1"
+        "{WS_BASE}?TrustedClientToken={TRUSTED_CLIENT_TOKEN}&ConnectionId={connection}&Sec-MS-GEC={token}&Sec-MS-GEC-Version={SEC_MS_GEC_VERSION}"
     );
-    let request = tokio_tungstenite::tungstenite::http::Request::builder()
-        .uri(url)
-        .header("User-Agent", USER_AGENT)
-        .header("Origin", ORIGIN)
-        .header("Sec-MS-GEC", token)
-        .header("Sec-MS-GEC-Version", "1")
-        .body(())
-        .map_err(|e| ApiError::Network(format!("Edge TTS: the call could not be built ({e}).")))?;
+    let request = speech_request(&url, &token)?;
     let (mut ws, _) = tokio_tungstenite::connect_async(request).await.map_err(|e| {
+        if let tokio_tungstenite::tungstenite::Error::Http(response) = &e {
+            let status = response.status().as_u16();
+            if status == 401 || status == 403 {
+                return ApiError::BadResponse(format!(
+                    "Edge TTS: Microsoft rejected this speech connection (HTTP {status}). No audio was generated. This is a service rejection, not a missing Gemini API key. Try another configured voice provider."
+                ));
+            }
+        }
         ApiError::Network(format!(
             "Edge TTS (Microsoft, free and unofficial) could not be reached. Check the internet connection; Microsoft may also have changed or limited the endpoint. ({e})"
         ))
     })?;
-    let timestamp = rfc1123(now);
+    let timestamp = speech_timestamp(now);
     let request = request_id();
     ws.send(Message::Text(config_message(&timestamp).into())).await.map_err(|e| {
         ApiError::Network(format!("Edge TTS: the connection broke while sending the settings ({e})."))
@@ -420,11 +463,8 @@ async fn speak_inner(voice: &str, rate: i32, volume: i32, text: &str) -> Result<
                 }
             }
             Message::Binary(bytes) => {
-                if let Some(chunk) = extract_audio(&bytes) {
+                if let Some(chunk) = extract_binary_audio(&bytes) {
                     audio.extend_from_slice(chunk);
-                }
-                if is_turn_end(&bytes) {
-                    break;
                 }
             }
             Message::Ping(payload) => {
@@ -462,6 +502,74 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[tokio::test]
+    async fn long_mp3_is_fed_and_decoded_without_a_pipe_deadlock() {
+        assert!(crate::ffmpeg_job::sidecars_for_tests(), "install the FFmpeg sidecar before this integration test");
+        let output = crate::ffmpeg::command(crate::ffmpeg::Tool::Ffmpeg).unwrap()
+            .args(["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=45", "-ar", "24000", "-ac", "1", "-c:a", "libmp3lame", "-b:a", "48k", "-f", "mp3", "pipe:1"])
+            .output().await.unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(output.stdout.len() > 128 * 1024);
+        let speech = tokio::time::timeout(Duration::from_secs(15), decode_mp3(&output.stdout)).await.expect("decoder must drain both pipes").unwrap();
+        assert!(speech.pcm.len() > 40 * 24000 * 2);
+    }
+
+    #[test]
+    fn speech_requests_include_standard_websocket_and_provider_headers() {
+        let request = speech_request("wss://example.com/speech", "ABC123").unwrap();
+        assert_eq!(request.headers()["host"], "example.com");
+        assert_eq!(request.headers()["connection"], "Upgrade");
+        assert_eq!(request.headers()["upgrade"], "websocket");
+        assert_eq!(request.headers()["sec-websocket-version"], "13");
+        assert_eq!(request.headers()["sec-websocket-key"].as_bytes().len(), 24);
+        assert_eq!(request.headers()["sec-ms-gec"], "ABC123");
+        assert_eq!(request.headers()["origin"], ORIGIN);
+        assert_eq!(request.headers()["sec-ms-gec-version"], SEC_MS_GEC_VERSION);
+        let id = request_id();
+        assert_eq!(id.len(), 32);
+        assert!(id.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_eq!(speech_timestamp(0), "Thu Jan 01 1970 00:00:00 GMT+0000 (Coordinated Universal Time)");
+    }
+
+    #[test]
+    fn real_binary_frames_use_length_prefix_and_preserve_only_audio_payload() {
+        let header = format!("X-RequestId:{}\r\nContent-Type:audio/mpeg\r\nPath:audio\r\n", "a".repeat(100));
+        let mut frame = (header.len() as u16).to_be_bytes().to_vec();
+        frame.extend_from_slice(header.as_bytes());
+        frame.extend_from_slice(&[0xff, 0xfb, 0, 7]);
+        assert_eq!(extract_binary_audio(&frame), Some(&[0xff, 0xfb, 0, 7][..]));
+        assert_eq!(extract_binary_audio(&[]), None);
+        assert_eq!(extract_binary_audio(&[0, 30, 1]), None);
+        let header = b"Path:audio.metadata\r\n";
+        let mut metadata = (header.len() as u16).to_be_bytes().to_vec();
+        metadata.extend_from_slice(header);
+        assert_eq!(extract_binary_audio(&metadata), None);
+    }
+
+    /// Explicit live probe: never contacts Microsoft during ordinary unit tests.
+    #[tokio::test]
+    #[ignore = "contacts Microsoft; set AVE_LIVE_EDGE_OUTPUT to a writable output folder"]
+    async fn live_edge_voice_smoke() {
+        let folder = std::env::var_os("AVE_LIVE_EDGE_OUTPUT").expect("set AVE_LIVE_EDGE_OUTPUT");
+        let folder = std::path::PathBuf::from(folder);
+        std::fs::create_dir_all(&folder).expect("output folder");
+        let available = voices().await;
+        assert!(available.len() > FALLBACK.len(), "live voice list must be fetched, not just the fallback");
+        for (voice, rate, text, file) in [
+            ("en-US-AriaNeural", 0, "This is a short voice test for the automatic video editor. The finished audio should be clear and complete.", "edge-voice-sample.wav"),
+            ("ur-PK-AsadNeural", 10, "یہ آٹو ویڈیو ایڈیٹر کی آواز کا ایک مختصر ٹیسٹ ہے۔ اب ہم اردو میں بھی آواز بنا رہے ہیں۔", "edge-voice-urdu-sample.wav"),
+        ] {
+            assert!(available.iter().any(|v| v.name == voice), "selected voice must be in the live list");
+            let spoken = tokio::time::timeout(Duration::from_secs(45), speak(voice, rate, 0, text))
+                .await.expect("live voice deadline").expect("live Edge speech generation");
+            let samples = crate::tts::wav::samples_from_pcm(&spoken.pcm);
+            assert!(samples.len() > spoken.rate as usize, "at least one second of audio");
+            assert!(samples.iter().any(|s| s.unsigned_abs() > 100), "audio must not be silent");
+            std::fs::write(folder.join(file), crate::tts::wav::wav_bytes(&samples, spoken.rate)).expect("save sample");
+            eprintln!("Edge {voice}: {:.2} seconds saved to {file}", samples.len() as f64 / f64::from(spoken.rate));
+        }
+    }
+
     #[test]
     fn xml_characters_are_escaped() {
         assert_eq!(escape_xml("a<b & \"c\" 'd' >e"), "a&lt;b &amp; &quot;c&quot; &apos;d&apos; &gt;e");
@@ -470,7 +578,7 @@ mod tests {
     #[test]
     fn ssml_wraps_voice_rate_volume_and_escaped_text() {
         let ssml = build_ssml("ko-KR-SunHiNeural", 20, -10, "Hello <world> & friends.");
-        assert!(ssml.contains("name=\"ko-KR-SunHiNeural\""));
+        assert!(ssml.contains("name=\"Microsoft Server Speech Text to Speech Voice (ko-KR, SunHiNeural)\""));
         assert!(ssml.contains("rate=\"+20%\""));
         assert!(ssml.contains("volume=\"-10%\""));
         assert!(ssml.contains("Hello &lt;world&gt; &amp; friends."));
@@ -501,8 +609,10 @@ mod tests {
         let next_window = sec_ms_gec(1_704_067_200 + 300);
         assert_eq!(first, same_window);
         assert_ne!(first, next_window);
-        assert_eq!(first.len(), 64);
-        assert!(first.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+        assert_eq!(first.len(), 81);
+        let (cs64, sha256) = first.split_once('-').unwrap();
+        assert_eq!((cs64.len(), sha256.len()), (16, 64));
+        assert!(first.chars().all(|c| c == '-' || (c.is_ascii_hexdigit() && !c.is_ascii_lowercase())));
     }
 
     #[test]
@@ -510,7 +620,7 @@ mod tests {
         let config = config_message("Mon, 01 Jan 2024 00:00:00 GMT");
         assert!(config.contains("Path:speech.config"));
         assert!(config.contains("audio-24khz-48kbitrate-mono-mp3"));
-        assert!(config.contains("wordBoundaryEnabled\":true"));
+        assert!(config.contains("wordBoundaryEnabled\":\"true\""));
         let message = ssml_message("req-1", "Mon, 01 Jan 2024 00:00:00 GMT", "<speak>x</speak>");
         assert!(message.contains("X-RequestId:req-1"));
         assert!(message.contains("Path:ssml"));

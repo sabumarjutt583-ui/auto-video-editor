@@ -9,8 +9,11 @@ pub const ASPECTS: [&str; 3] = ["16:9", "1:1", "9:16"];
 pub const MAX_PROMPT_CHARS: usize = 8000;
 pub const MAX_SCENES: usize = 2000;
 
-/// `S07`, `S12`, `S05b`.
+/// `S07`, `S12`, `S05b`, and quick-prompt project scenes such as `P01`.
 pub fn valid_scene_id(id: &str) -> bool {
+    if id.starts_with('P') {
+        return valid_quick_id(id);
+    }
     let rest = id.strip_prefix('S').unwrap_or("");
     let digits = rest.chars().take_while(char::is_ascii_digit).count();
     let tail = &rest[digits..];

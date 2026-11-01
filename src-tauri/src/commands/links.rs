@@ -16,6 +16,8 @@ pub enum ExternalLink {
     OpenaiKeys,
     /// Batch Flow Studio (the user's own batch tool, shared tool link only).
     FlowBatch,
+    FlowImageStudio,
+    FlowVideoStudio,
 }
 
 impl ExternalLink {
@@ -25,6 +27,8 @@ impl ExternalLink {
             ExternalLink::GeminiKeys => "https://aistudio.google.com/apikey",
             ExternalLink::OpenaiKeys => "https://platform.openai.com/api-keys",
             ExternalLink::FlowBatch => crate::imagegen::flow_batch::SHARED_TOOL_URL,
+            ExternalLink::FlowImageStudio => crate::imagegen::flow_batch::IMAGE_STUDIO_URL,
+            ExternalLink::FlowVideoStudio => crate::imagegen::flow_batch::VIDEO_STUDIO_URL,
         }
     }
 }

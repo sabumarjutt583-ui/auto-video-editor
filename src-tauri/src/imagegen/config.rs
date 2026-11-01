@@ -236,8 +236,8 @@ impl ChatConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct FlowBatchConfig {
-    /// The ONLY Batch Flow Studio address this engine uses. Earlier Flow
-    /// project links are superseded and must not be added back.
+    /// Default combined Flow tool address. Video batches override this with
+    /// the user's separate Batch Video Studio URL at run time.
     pub url: String,
     pub images_model: String,
     pub videos_model: String,
@@ -717,8 +717,9 @@ mod tests {
             value.to_string()
         };
         assert_eq!(EngineConfig::parse(&without_chat).unwrap().chat.selectors.send, "button[aria-label=\"Send message\"]", "an older settings package still works");
-        let http = BUNDLED_JSON.replace("https://gemini.google.com/app\",\n    \"selectors", "http://gemini.google.com/app\",\n    \"selectors");
-        assert!(EngineConfig::parse(&http).is_err());
+        let mut http: serde_json::Value = serde_json::from_str(BUNDLED_JSON).unwrap();
+        http["chat"]["url"] = serde_json::json!("http://gemini.google.com/app");
+        assert!(EngineConfig::parse(&http.to_string()).is_err());
     }
 
     #[test]

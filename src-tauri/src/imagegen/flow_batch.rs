@@ -60,6 +60,12 @@ use serde::{Deserialize, Serialize};
 /// links from screenshots are superseded and must not be added back.
 pub const SHARED_TOOL_URL: &str =
     "https://flow.google.com/shared/tool/74a00ce5-db5d-4ac4-8ae8-96e3e9b3b099";
+/// Separate custom Flow tools supplied by the user. These are launch links
+/// only until their distinct UI adapters are implemented and verified.
+pub const IMAGE_STUDIO_URL: &str =
+    "https://flow.google.com/shared/tool/9e3ffb14-cf47-4137-8276-c88fde320c61";
+pub const VIDEO_STUDIO_URL: &str =
+    "https://flow.google.com/shared/tool/4fea4e77-c524-4060-af9c-259e7b941a11";
 
 /// Batch Size shown live ("8 at a time (Default)"); the tool also offers
 /// 6, 10, 12 and 20 ("Fast 500+").

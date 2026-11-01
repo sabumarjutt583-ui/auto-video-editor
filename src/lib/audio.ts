@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { assertProjectIdle } from "./pipeline/activity.ts";
 
 import type { CleanupParams, CleanupResult, SilenceReport, VoiceImport, Waveform } from "../types";
 
@@ -8,6 +9,7 @@ export function importVoice(projectId: string, sourcePath: string): Promise<Voic
 
 /** Puts the voice files of the open part aside and (optionally) brings another part's files back. */
 export function swapVoiceFiles(projectId: string, stash: string, restore: string | null): Promise<void> {
+  assertProjectIdle(projectId, "switching voice parts");
   return invoke<void>("swap_voice_files", { projectId, stash, restore });
 }
 

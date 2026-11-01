@@ -272,7 +272,12 @@ pub async fn flow_batch_run(
         max_credits_per_video: request.max_credits_per_video,
     })?;
     let generation = generation_of(&request.generation_type)?;
-    let cfg = EngineConfig::bundled().flow_batch;
+    let mut cfg = EngineConfig::bundled().flow_batch;
+    // Keep the established image runner, and route video batches to the
+    // separate Batch Video Studio custom tool supplied by the user.
+    if generation == GenerationType::Videos {
+        cfg.url = crate::imagegen::flow_batch::VIDEO_STUDIO_URL.to_string();
+    }
     let (model, seconds, resolution, _) = resolve_video_choice(
         &cfg,
         request.video_model,
@@ -285,7 +290,9 @@ pub async fn flow_batch_run(
     std::fs::create_dir_all(&media)
         .map_err(|e| AppError::new("The project's media folder could not be made.", e.to_string()))?;
 
-    // Pick the account: the requested one, else the first ready one.
+    // Flow's shared-tool handoff depends on a real interactive page, so use a
+    // normal browser window for this run. Do not reuse an account currently
+    // running another job; switching its browser mode would interrupt it.
     let account_id = match request.account_id {
         Some(id) => id,
         None => {
@@ -295,7 +302,7 @@ pub async fn flow_batch_run(
                     accounts
                         .views(now)
                         .into_iter()
-                        .find(|view| view.enabled && matches!(view.status, AccountStatus::Ready | AccountStatus::Busy))
+                        .find(|view| view.enabled && view.status == AccountStatus::Ready)
                         .map(|view| view.id)
                 })
                 .ok_or_else(|| {
@@ -316,15 +323,30 @@ pub async fn flow_batch_run(
                 .map(|view| view.name)
         })
         .unwrap_or_default();
+    let account_ready = ig.engine.read_accounts(|accounts| {
+        accounts.views(now_ms()).into_iter().any(|view| {
+            view.id == account_id && view.enabled && view.status == AccountStatus::Ready
+        })
+    });
+    if !account_ready {
+        return Err(AppError::new(
+            "This Google account is busy or not ready. Finish its current task, then try Batch Flow Studio again.",
+            "Flow batch requires an enabled, ready account",
+        ));
+    }
     let settings = ig.engine.settings();
     let worker = ig
         .real
         .worker(&account_id, &settings)
         .map_err(|e| AppError::new(e.message.clone(), format!("{:?}", e.kind)))?;
+    worker.switch_to_window().await;
     let (session, tab) = worker
         .batch_tab()
         .await
         .map_err(|e| AppError::new(e.message.clone(), format!("{:?}", e.kind)))?;
+    // Keep the interactive Flow page visible while the shared-tool project
+    // handoff loads. A hidden/headless tab could stall before its editor UI.
+    let _ = worker.show_window().await;
     let run_result = flow_batch_run::run_batch(
         &session,
         &tab,
@@ -340,8 +362,20 @@ pub async fn flow_batch_run(
         },
     )
     .await;
-    session.close_tab(&tab).await;
-    let downloads = run_result.map_err(|e| AppError::new(e.message.clone(), format!("{:?}", e.kind)))?;
+    let downloads = match run_result {
+        Ok(downloads) => {
+            session.close_tab(&tab).await;
+            let _ = session.minimize().await;
+            downloads
+        }
+        Err(e) => {
+            let _ = worker.show_window().await;
+            return Err(AppError::new(
+                format!("{} The Flow browser has been left open so you can see what stopped it.", e.message),
+                format!("{:?}", e.kind),
+            ));
+        }
+    };
 
     let scenes: std::collections::HashMap<String, (f64, f64)> = request
         .jobs

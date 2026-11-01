@@ -8,29 +8,27 @@ use super::error::ApiError;
 
 const MODELS_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 
-/// Checks a key by sending a tiny prompt to the chosen model.
+/// Checks authentication without generating content or consuming model quota.
 ///
 /// The key travels in the `x-goog-api-key` header, never in the URL, so it cannot
 /// end up in error messages or logs that contain the request address.
-pub async fn test_key(key: &str, model: &str) -> Result<(), ApiError> {
-    let model = clean_model_name(model, false).ok_or_else(|| {
-        ApiError::BadResponse("That Gemini model name is not valid.".to_string())
-    })?;
+pub async fn test_key(key: &str, _model: &str) -> Result<(), ApiError> {
+    test_key_at(key, MODELS_URL).await
+}
+
+async fn test_key_at(key: &str, url: &str) -> Result<(), ApiError> {
     let client = http()?;
     let auth = secret_header("", key)?;
-    let url = format!("{MODELS_URL}/{model}:generateContent");
-    let body = json!({ "contents": [{ "parts": [{ "text": "Reply with OK" }] }] });
-
     let response = send(|| {
         client
-            .post(&url)
+            .get(url)
+            .timeout(std::time::Duration::from_secs(20))
             .header("x-goog-api-key", auth.clone())
-            .json(&body)
     })
     .await
     .map_err(|error| error.redact(key))?;
 
-    // A 200 answer with readable JSON means the key and model were accepted.
+    // Model availability, generation quota and speech are tested separately.
     read_json(response)
         .await
         .map(|_| ())
@@ -102,6 +100,28 @@ pub async fn generate_parts_at(url: &str, key: &str, system: Option<&str>, parts
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn key_validation_does_not_generate_content_or_put_the_key_in_the_url() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut bytes = vec![0; 8192];
+            let count = stream.read(&mut bytes).await.unwrap();
+            let request = String::from_utf8_lossy(&bytes[..count]);
+            assert!(request.starts_with("GET /models HTTP/1.1\r\n"));
+            assert!(!request.lines().next().unwrap().contains("dummy-test-key"));
+            assert!(request.to_ascii_lowercase().contains("x-goog-api-key: dummy-test-key"));
+            assert!(!request.contains("generateContent"));
+            let body = r#"{"models":[]}"#;
+            let response = format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+            stream.write_all(response.as_bytes()).await.unwrap();
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(5), test_key_at("dummy-test-key", &format!("http://{address}/models"))).await.unwrap().unwrap();
+        server.await.unwrap();
+    }
 
     #[tokio::test]
     async fn generate_sends_the_key_in_a_header_and_asks_for_json() {

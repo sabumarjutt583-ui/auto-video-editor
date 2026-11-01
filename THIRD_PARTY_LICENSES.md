@@ -1,6 +1,19 @@
 # Third-party material
 
-Auto Video Editor ships the following third-party material. Only the data files listed here are bundled; none of these packages is a dependency of the app (the files were converted once by `scripts/build-graphic-assets.mjs` and `scripts/build-flags.mjs` and committed under `src/lib/graphics/assets/`). Nothing is loaded from the internet: maps, flags and icons all work offline, and no Google Maps or online map tiles are used.
+## Edge speech protocol compatibility
+
+`src-tauri/src/api/edge_token.rs` is a Rust adaptation of the v2 token algorithm
+from rany and contributors' edge-tts `src/edge_tts/drm.py`, licensed under
+LGPL version 3. The adapted module retains that licence and is supplied
+in source form. The app's EULA does not restrict rights granted for this module
+under its LGPL licence. See `licenses/edge-tts-LICENSE.txt` and
+`licenses/GPL-3.0.txt`. Source: https://github.com/rany2/edge-tts.
+
+The protocol code is compiled locally; no Python runtime or new crate dependency
+is introduced. Service access remains subject to Microsoft's availability and
+account/service restrictions.
+
+The following tables document bundled data assets; the protocol module is documented separately above. None of the asset packages below is a runtime dependency of the app (the files were converted once by `scripts/build-graphic-assets.mjs` and `scripts/build-flags.mjs` and committed under `src/lib/graphics/assets/`). Maps, flags and icons work offline; no Google Maps or online map tiles are used.
 
 | Material | Used for | Licence | Source |
 |---|---|---|---|
