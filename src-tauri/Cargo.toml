@@ -1,6 +1,6 @@
 [package]
 name = "auto-video-editor"
-version = "0.7.3"
+version = "0.7.4"
 description = "Auto Video Editor: prompt generator and automatic video editor for faceless YouTube creators"
 edition = "2021"
 rust-version = "1.77"
@@ -41,3 +41,4 @@ trash = "5"
 [dev-dependencies]
 # Local mock server used by the API helper tests.
 tokio = { version = "1", features = ["rt", "macros", "net", "io-util"] }
+
