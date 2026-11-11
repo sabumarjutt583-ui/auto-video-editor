@@ -59,6 +59,7 @@ pub async fn transcribe_voice(
     voice_path: String,
     language: Option<String>,
     job_id: String,
+    model: Option<String>,
 ) -> Result<Vec<SpokenWord>, AppError> {
     let project_dir = project_folder(&app, &project_id)?;
     let file = resolve(&project_dir, &voice_path)?;
@@ -67,7 +68,10 @@ pub async fn transcribe_voice(
     }
     run_blocking(|| keys::require(Provider::Groq)).await?;
     let app_for_settings = app.clone();
-    let model = run_blocking(move || settings::load(&app_for_settings)).await?.groq_whisper_model;
+    let model = match model.filter(|value| !value.trim().is_empty()) {
+        Some(model) => model,
+        None => run_blocking(move || settings::load(&app_for_settings)).await?.groq_whisper_model,
+    };
 
     let job = jobs.begin(&job_id, "transcribe", event_sink(app))?;
     let info = probe(&file).await?;

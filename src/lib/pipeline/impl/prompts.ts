@@ -3,7 +3,6 @@ import { toAppError } from "../../errors.ts";
 import { generatePrompts, type PromptContext } from "../../prompts/generate.ts";
 import { runJob } from "../../../store/jobStore.ts";
 import { useProjectStore } from "../../../store/projectStore.ts";
-import { useSettingsStore } from "../../../store/settingsStore.ts";
 import { useStyleStore } from "../../../store/styleStore.ts";
 import { openProjectOf, patchProject, type StageContext } from "./context.ts";
 
@@ -14,7 +13,7 @@ export async function promptsStage(ctx: StageContext): Promise<void> {
   const style = useStyleStore.getState().styles.find((s) => s.id === project.styleId);
   if (!style) throw new Error("The picture style of the channel profile was not found. Choose a style in the profile.");
   const context: PromptContext = { style, characters: project.characterBible, locations: project.locationBible, settings: project.promptSettings, aspect: project.settings.aspectRatio };
-  const settings = useSettingsStore.getState().settings;
+  const settings = ctx.providers;
   const targetIds = new Set(project.scenes.filter((scene) => scene.prompt.trim() === "").map((scene) => scene.id));
   if (targetIds.size === 0) return;
   ctx.say(`Writing ${targetIds.size} prompts`);
@@ -29,7 +28,7 @@ export async function promptsStage(ctx: StageContext): Promise<void> {
       resendOnError: true,
       batchSize: Math.min(20, Math.max(5, settings?.apiBatchSize ?? 10)),
       parallel: Math.min(3, Math.max(1, settings?.apiParallel ?? 2)),
-      call: async (system, prompt) => (await generateText(prompt, system, true, jobId)).text,
+      call: async (system, prompt) => (await generateText(prompt, system, true, jobId, ctx.providers)).text,
       onBatch: (number, total) => ctx.say(`Prompts: batch ${number} of ${total}`),
       onScenes,
     });

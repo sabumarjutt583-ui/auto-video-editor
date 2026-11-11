@@ -44,7 +44,7 @@ pub fn open_external_link(link: ExternalLink) -> Result<(), AppError> {
     })
 }
 
-fn open_in_browser(url: &str) -> std::io::Result<()> {
+pub(crate) fn open_in_browser(url: &str) -> std::io::Result<()> {
     #[cfg(target_os = "windows")]
     let mut command = {
         use std::os::windows::process::CommandExt;

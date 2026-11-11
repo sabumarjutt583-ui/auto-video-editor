@@ -12,6 +12,7 @@ import { voiceStage } from "./voice.ts";
 export type { StageContext } from "./context.ts";
 
 const IMPLS: Record<StageId, (ctx: StageContext) => Promise<void>> = {
+  script: async () => { throw new Error("The saved script is empty. Add a script before making the voice."); },
   voice: voiceStage,
   timing: timingStage,
   scenes: scenesStage,

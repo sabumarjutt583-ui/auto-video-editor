@@ -1,7 +1,7 @@
 {
   "name": "auto-video-editor",
   "private": true,
-  "version": "0.7.4",
+  "version": "0.7.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -45,4 +45,3 @@
     "vite": "^8.3.4"
   }
 }
-

@@ -1,6 +1,6 @@
 [package]
 name = "auto-video-editor"
-version = "0.7.4"
+version = "0.7.5"
 description = "Auto Video Editor: prompt generator and automatic video editor for faceless YouTube creators"
 edition = "2021"
 rust-version = "1.77"
@@ -28,7 +28,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["process", "time", "sync", "macros", "io-util", "rt", "net"] }
 keyring = "4"
 # native-tls = Windows Schannel / macOS Secure Transport, so no extra C toolchain is needed to build.
-reqwest = { version = "0.13", default-features = false, features = ["native-tls", "json", "http2", "system-proxy"] }
+reqwest = { version = "0.13", default-features = false, features = ["native-tls", "json", "http2", "system-proxy", "form", "query"] }
 # Direct Edge TTS calls only: a WebSocket client over the system's TLS
 # (Windows Schannel / macOS Secure Transport, like reqwest above), so no
 # extra C toolchain is needed. No git dependencies, pinned major versions.
@@ -37,8 +37,10 @@ futures-util = "0.3"
 tauri-plugin-process = "2"
 tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy", "zip"] }
 trash = "5"
+rand = "0.9"
+sha2 = "0.10"
+base64 = "0.22"
 
 [dev-dependencies]
 # Local mock server used by the API helper tests.
 tokio = { version = "1", features = ["rt", "macros", "net", "io-util"] }
-

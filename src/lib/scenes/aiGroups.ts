@@ -9,9 +9,9 @@ export type RunRequest = (start: (jobId: string) => Promise<TextAnswer>) => Prom
  * for once more. Returns null when both answers were unusable, so the caller can fall back to
  * "per seconds" with 5 s.
  */
-export async function groupSentencesWithAi(sentences: readonly string[], run: RunRequest): Promise<[number, number][] | null> {
+export async function groupSentencesWithAi(sentences: readonly string[], run: RunRequest, options?: Parameters<typeof generateText>[4]): Promise<[number, number][] | null> {
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const answer = await run((jobId) => generateText(aiPrompt(sentences), AI_SYSTEM_INSTRUCTION, true, jobId));
+    const answer = await run((jobId) => generateText(aiPrompt(sentences), AI_SYSTEM_INSTRUCTION, true, jobId, options));
     const groups = parseAiGroups(answer.text, sentences.length);
     if (groups) return groups;
   }

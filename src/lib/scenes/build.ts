@@ -1,8 +1,9 @@
+import { validTimingRanges } from "./schedule.ts";
 import { splitSentences, type Sentence } from "../sentences.ts";
 import type { TimedWord } from "../timing/types.ts";
 import type { Scene, SceneSettings } from "../../types/project.ts";
 import { assembleScenes } from "./assemble.ts";
-import { groupByCount, groupBySeconds, makeUnits, type Unit } from "./units.ts";
+import { groupByCount, type Unit } from "./units.ts";
 import { mergeShortScenes, DEFAULT_MIN_SECONDS } from "./short.ts";
 import { splitLongVideoScenes } from "./video.ts";
 
@@ -27,12 +28,34 @@ export function buildBySentences({ words, voiceDuration, settings }: BuildInput)
   return finish(assembleScenes(units, groups, words, sentences, voiceDuration), words, sentences, voiceDuration, settings);
 }
 
-/** Per Seconds: cut only at sentence ends (or at commas and pauses inside very long sentences). */
+/** Per Seconds: nearest boundary between words, independent of sentence length. */
 export function buildBySeconds({ words, voiceDuration, settings }: BuildInput, targetSeconds = settings.targetSeconds): Scene[] {
+  if (words.length === 0) return [];
   const sentences = splitSentences(words);
-  const units = makeUnits(sentences, words, targetSeconds);
-  const groups = groupBySeconds(units, words, voiceDuration, targetSeconds);
-  return finish(assembleScenes(units, groups, words, sentences, voiceDuration), words, sentences, voiceDuration, settings);
+  const saved = settings.mode === "seconds" ? validTimingRanges(settings.timingRanges) : [];
+  const ranges = saved.length ? saved : [{ startSeconds: 0, targetSeconds: Number.isFinite(targetSeconds) ? Math.max(1, Math.min(60, targetSeconds)) : FALLBACK_SECONDS }];
+  const rangeAt = (time: number) => [...ranges].reverse().find(r => r.startSeconds <= time) ?? ranges[0];
+  const units: Unit[] = [];
+  let first = 0;
+  while (first < words.length) {
+    const start = first === 0 ? 0 : words[first].start;
+    const range = rangeAt(start);
+    const nextRange = ranges.find(r => r.startSeconds > start);
+    const target = Math.min(start + range.targetSeconds, nextRange?.startSeconds ?? Infinity);
+    // Compare the closest valid boundaries on either side, including the audio end.
+    const timeAt = (index: number) => index === words.length ? voiceDuration : words[index].start;
+    const validCut = (index: number) => index === words.length ||
+      (words[index].start > start && words[index].start >= words[index - 1].end);
+    let next = first + 1;
+    while (next < words.length && words[next].start < target) next++;
+    let before = next - 1;
+    while (before > first && !validCut(before)) before--;
+    while (next < words.length && !validCut(next)) next++;
+    if (before > first && Math.abs(timeAt(before) - target) < Math.abs(timeAt(next) - target)) next = before;
+    units.push({ firstWord: first, lastWord: next - 1 });
+    first = next;
+  }
+  return finish(assembleScenes(units, units.map((_, i) => [i, i] as [number, number]), words, sentences, voiceDuration), words, sentences, voiceDuration, { ...settings, minSeconds: 0 });
 }
 
 /** AI mode: `groups` are runs of sentences as [first, last] (0-based), already validated. */

@@ -40,7 +40,7 @@ export function reduceView(view: RunView, event: PipelineEvent): RunView {
     case "error":
       return setRow({ ...view, status: "failed" }, event.stage, { state: "error", error: event.error });
     case "stopped":
-      return setRow({ ...view, status: "stopped" }, event.stage, { state: "pending", detail: "Stopped before this step" });
+      return setRow({ ...view, status: "stopped" }, event.stage, { state: "pending", detail: "Stopped after review" });
     case "cancelled":
       return { ...(event.stage ? setRow(view, event.stage, { state: "pending", detail: "Cancelled" }) : view), status: "cancelled" };
     case "finished":

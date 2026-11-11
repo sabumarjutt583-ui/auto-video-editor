@@ -18,6 +18,8 @@ interface SettingsState {
   saveError: AppError | null;
   load: () => Promise<void>;
   update: (patch: Partial<AppSettings>) => void;
+  /** Waits for an immediate disk save and reports whether it succeeded. */
+  flush: () => Promise<boolean>;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -76,6 +78,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => {
       revision += 1;
       set({ settings: { ...current, ...patch } });
       scheduleSave();
+    },
+    flush: async () => {
+      clearTimeout(saveTimer);
+      if (!get().settings) return false;
+      set({ saveState: "saving", saveError: null });
+      saveChain = saveChain.then(persist);
+      await saveChain;
+      return get().saveState === "saved";
     },
   };
 });

@@ -29,20 +29,20 @@ const idle: ActiveRun = { projectId: null, running: false, waiting: null, failed
 
 test("a new video has no finished step and a finished one has all", () => {
   assert.equal(percentOf(video("n")), 0);
-  assert.equal(currentStage(video("n")), "voice");
-  const all = video("f", { voiceLocked: true, hasWords: true, sceneCount: 4, bibleLocked: true, promptsWritten: 4, pictureScenes: 4, pictures: 4, audioMixed: true, rendered: true });
+  assert.equal(currentStage(video("n")), "script");
+  const all = video("f", { hasScript: true, voiceLocked: true, hasWords: true, sceneCount: 4, bibleLocked: true, promptsWritten: 4, pictureScenes: 4, pictures: 4, audioMixed: true, rendered: true });
   assert.equal(percentOf(all), 100);
   assert.equal(currentStage(all), null);
 });
 
 test("steps with a count show how far they are", () => {
-  const rows = stageProgress(video("p", { voiceLocked: true, hasWords: true, sceneCount: 40, bibleLocked: true, promptsWritten: 40, pictureScenes: 40, pictures: 12 }));
+  const rows = stageProgress(video("p", { hasScript: true, voiceLocked: true, hasWords: true, sceneCount: 40, bibleLocked: true, promptsWritten: 40, pictureScenes: 40, pictures: 12 }));
   const by = Object.fromEntries(rows.map((r) => [r.id, r]));
   assert.equal(by.scenes?.detail, "40 scenes");
   assert.equal(by.prompts?.done, true);
   assert.equal(by.images?.done, false);
   assert.equal(by.images?.detail, "12 of 40");
-  assert.equal(currentStage(video("p", { voiceLocked: true, hasWords: true, sceneCount: 40, bibleLocked: true, promptsWritten: 40, pictureScenes: 40, pictures: 12 })), "images");
+  assert.equal(currentStage(video("p", { hasScript: true, voiceLocked: true, hasWords: true, sceneCount: 40, bibleLocked: true, promptsWritten: 40, pictureScenes: 40, pictures: 12 })), "images");
 });
 
 test("half-written prompts are not a finished step", () => {
@@ -84,4 +84,13 @@ test("attention list and recent list", () => {
   assert.deepEqual(needAttention(list, active).map((v) => v.id), ["run"]);
   assert.deepEqual(recentlyFinished(list).map((v) => v.id), ["new", "old"]);
   assert.equal(recentlyFinished(list, 1).length, 1);
+});
+
+
+test("saved failures survive restart and interrupted reviews can be resumed", () => {
+  const run = { status: "failed", currentStage: "voice", completedStages: [], failedScenes: [], updatedAt: "" };
+  assert.equal(videoState(video("failure", { makeVideoRun: run }), idle), "failed");
+  assert.equal(videoState(video("review", { makeVideoRun: { ...run, status: "waiting" } }), idle), "stopped");
+  assert.equal(videoState(video("script", { hasScript: true }), idle), "stopped");
+  assert.equal(videoState(video("failure", { makeVideoRun: run }), { ...idle, projectId: "failure", running: true }), "running");
 });

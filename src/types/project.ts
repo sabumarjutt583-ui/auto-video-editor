@@ -87,7 +87,14 @@ export interface VoiceCleanup {
 
 export type SceneMode = "sentence" | "seconds" | "ai";
 
+export interface SceneTimingRange {
+  startSeconds: number;
+  targetSeconds: number;
+}
+
 export interface SceneSettings {
+  /** Ordered ranges starting at zero; the final range continues to the end. */
+  timingRanges?: SceneTimingRange[];
   mode: SceneMode;
   /** Used by the per-sentence mode: 1 to 4. */
   sentencesPerScene: number;
@@ -119,7 +126,12 @@ export interface ProjectSettings {
  * Paths are relative to the project folder (e.g. "audio/voice.wav") or absolute.
  */
 export interface MakeVideoRun {
-  /** "running" | "paused" | "stopped" | "failed" | "finished" — "running" after a restart means the run was interrupted (crash/close). */
+  providerSnapshot?: import("../lib/pipeline/providers").ProviderSnapshot | null;
+  /** Output reviews accepted for this run. */
+  approvedStages?: string[];
+  /** Frozen channel choices for this production; absent on legacy projects. */
+  profileSnapshot?: import("../lib/pipeline/profile").ChannelProfile | null;
+  /** "running" | "paused" | "stopped" | "failed" | "finished" â€” "running" after a restart means the run was interrupted (crash/close). */
   status: string;
   currentStage: string;
   completedStages: string[];
@@ -169,6 +181,8 @@ export interface Project {
   scriptWordsRequested?: number;
   /** The fingerprint of the master prompt used (see lib/script/step0.ts). */
   scriptMasterPromptVersion?: string;
+  claudeConversationUrl?: string;
+  claudeAccountId?: string;
   /** True when word times were estimated from line-level times (SRT/VTT). */
   timingEstimated: boolean;
   /** How well the script matched the timed words, 0 to 100. */
@@ -215,6 +229,8 @@ export type ProjectStatus = "prompts_ready" | "media_matched" | "rendered";
 
 /** The small version of a project shown on a card. */
 export interface ProjectSummary {
+  claudeConversationUrl?: string;
+  claudeAccountId?: string;
   id: string;
   name: string;
   createdAt: string;

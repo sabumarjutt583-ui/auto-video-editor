@@ -117,6 +117,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       // navigation completes. A failed write stays dirty for an explicit retry.
       while (dirty && get().saveState !== "error") await enqueueSave();
       clearTimeout(saveTimer);
+      if (dirty) throw get().saveError ?? new Error("The project could not be saved. Please try again before continuing.");
     },
   };
 });

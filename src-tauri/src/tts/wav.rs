@@ -59,9 +59,9 @@ pub fn read_wav(bytes: &[u8]) -> Option<(Vec<i16>, u32)> {
 
 /// Cuts silence from the start and end, keeping `keep_ms` of it.
 pub fn trim_silence(samples: &[i16], rate: u32, keep_ms: u32) -> Vec<i16> {
-    let threshold = 300i16; // about -40 dBFS
-    let Some(first) = samples.iter().position(|s| s.abs() > threshold) else { return Vec::new() };
-    let last = samples.iter().rposition(|s| s.abs() > threshold).unwrap_or(first);
+    let threshold = 300u16; // about -40 dBFS
+    let Some(first) = samples.iter().position(|s| s.unsigned_abs() > threshold) else { return Vec::new() };
+    let last = samples.iter().rposition(|s| s.unsigned_abs() > threshold).unwrap_or(first);
     let keep = (rate as usize * keep_ms as usize) / 1000;
     let from = first.saturating_sub(keep);
     let to = (last + 1 + keep).min(samples.len());
@@ -70,11 +70,18 @@ pub fn trim_silence(samples: &[i16], rate: u32, keep_ms: u32) -> Vec<i16> {
 
 /// Loudness of the speech parts in dBFS (RMS of the samples above the silence threshold). None when there is no speech.
 pub fn speech_rms_db(samples: &[i16]) -> Option<f64> {
-    let loud: Vec<f64> = samples.iter().filter(|s| s.abs() > 300).map(|s| f64::from(*s) / 32768.0).collect();
-    if loud.len() < 100 {
-        return None;
+    // Accumulate directly: a long voice must not allocate another f64 buffer per sample.
+    let mut count = 0usize;
+    let mut sum = 0.0;
+    for sample in samples {
+        if sample.unsigned_abs() > 300 {
+            let value = f64::from(*sample) / 32768.0;
+            sum += value * value;
+            count += 1;
+        }
     }
-    let mean_square = loud.iter().map(|v| v * v).sum::<f64>() / loud.len() as f64;
+    if count < 100 { return None; }
+    let mean_square = sum / count as f64;
     Some(10.0 * mean_square.log10())
 }
 
@@ -87,6 +94,19 @@ pub fn match_loudness(samples: &[i16], target_db: f64) -> Vec<i16> {
         gain = 0.97 / peak.max(1e-9);
     }
     samples.iter().map(|s| (f64::from(*s) * gain).round().clamp(-32768.0, 32767.0) as i16).collect()
+}
+
+/// A short ramp prevents a non-zero sample from jumping straight to/from inserted silence.
+/// Length and internal speech samples are preserved; this is not a general noise remover.
+pub fn fade_edges(samples: &mut [i16], rate: u32) {
+    let count = ((u64::from(rate) * 5 / 1000) as usize).min(samples.len() / 2);
+    if count < 2 { return; }
+    let len = samples.len();
+    for i in 0..count {
+        let gain = i as f64 / (count - 1) as f64;
+        samples[i] = (f64::from(samples[i]) * gain).round() as i16;
+        samples[len - 1 - i] = (f64::from(samples[len - 1 - i]) * gain).round() as i16;
+    }
 }
 
 /// `ms` of silence.
@@ -145,8 +165,47 @@ mod tests {
         assert!((a - target).abs() < 0.5 && (b - target).abs() < 0.5, "{a} {b}");
         let hot = tone(2000, 30000);
         let boosted = match_loudness(&hot, -1.0);
-        assert!(boosted.iter().all(|s| s.abs() as f64 <= 0.97 * 32768.0 + 1.0));
+        assert!(boosted.iter().all(|s| s.unsigned_abs() as f64 <= 0.97 * 32768.0 + 1.0));
         assert_eq!(match_loudness(&silence(1000, 100), -20.0), silence(1000, 100));
+    }
+
+    #[test]
+    fn full_scale_negative_samples_are_speech_and_never_overflow() {
+        let samples = vec![i16::MIN; 200];
+        let mut padded = vec![0; 50];
+        padded.extend_from_slice(&samples);
+        padded.extend_from_slice(&[0; 50]);
+        assert_eq!(trim_silence(&padded, 1000, 0), samples);
+        assert_eq!(speech_rms_db(&samples), Some(0.0));
+        let normalized = match_loudness(&samples, -20.0);
+        assert!((speech_rms_db(&normalized).unwrap() + 20.0).abs() < 0.1);
+        assert!(normalized.iter().all(|s| *s < 0));
+        let joined = crate::tts::assemble(&[(padded, false), (samples, true)], 24_000);
+        assert!(!joined.is_empty());
+        assert!(joined.iter().all(|s| f64::from(s.unsigned_abs()) <= 0.97 * 32768.0 + 1.0));
+    }
+
+    #[test]
+    fn every_pcm_value_can_be_processed_and_round_tripped() {
+        let samples: Vec<i16> = (i16::MIN..=i16::MAX).collect();
+        assert_eq!(read_wav(&wav_bytes(&samples, 24_000)).unwrap().0, samples);
+        assert!(speech_rms_db(&samples).unwrap().is_finite());
+        let trimmed = trim_silence(&samples, 24_000, 0);
+        assert_eq!(trimmed, samples);
+        let normalized = match_loudness(&samples, 0.0);
+        assert_eq!(normalized.len(), samples.len());
+        assert!(normalized.iter().all(|s| f64::from(s.unsigned_abs()) <= 0.97 * 32768.0 + 1.0));
+    }
+
+    #[test]
+    fn edge_ramps_remove_boundary_jumps_without_moving_speech() {
+        let mut samples = vec![i16::MIN; 1000];
+        fade_edges(&mut samples, 24_000);
+        assert_eq!(samples.len(), 1000);
+        assert_eq!((samples[0], samples[999]), (0, 0));
+        assert_eq!(samples[120..880], vec![i16::MIN; 760]);
+        fade_edges(&mut [], 24_000);
+        fade_edges(&mut [i16::MIN], 24_000);
     }
 
     #[test]

@@ -1,3 +1,5 @@
+import { TimingRanges } from "./TimingRanges";
+import type { TimedWord } from "../../lib/timing/types";
 import { Layers } from "lucide-react";
 import { useState } from "react";
 
@@ -7,6 +9,8 @@ import { Button, Card, Field, NumberField, SegmentedControl } from "../ui";
 const PRESET_SECONDS = [3, 5, 8] as const;
 
 interface ModeCardProps {
+  words?: readonly TimedWord[];
+  voiceDuration?: number;
   settings: SceneSettings;
   busy: boolean;
   onChange: (settings: SceneSettings) => void;
@@ -15,7 +19,7 @@ interface ModeCardProps {
 }
 
 /** How the narration is cut into scenes. */
-export function ModeCard({ settings, busy, onChange, onMaxVideo }: ModeCardProps) {
+export function ModeCard({ settings, busy, onChange, onMaxVideo, words, voiceDuration }: ModeCardProps) {
   const [custom, setCustom] = useState(!PRESET_SECONDS.some((value) => value === settings.targetSeconds));
   const [customValue, setCustomValue] = useState(settings.targetSeconds);
 
@@ -49,7 +53,7 @@ export function ModeCard({ settings, busy, onChange, onMaxVideo }: ModeCardProps
       )}
 
       {settings.mode === "seconds" && (
-        <Field label="Target length of a scene" hint="Scenes are cut only at the end of a sentence. A very long sentence is cut at a comma or pause.">
+        <Field label="Target length of a scene" hint="Cuts near the selected duration, between spoken words. Sentences may continue in the next scene. The final scene keeps the remaining audio; earlier scenes are not shortened to balance it.">
           <div className="flex flex-wrap items-center gap-3">
             <SegmentedControl<"3" | "5" | "8" | "custom">
               label="Target seconds"
@@ -61,12 +65,12 @@ export function ModeCard({ settings, busy, onChange, onMaxVideo }: ModeCardProps
                   return;
                 }
                 setCustom(false);
-                onChange({ ...settings, targetSeconds: Number(value) });
+                onChange({ ...settings, targetSeconds: Number(value), timingRanges: [] });
               }}
               options={[
-                { value: "3", label: "3 s" },
-                { value: "5", label: "5 s" },
-                { value: "8", label: "8 s" },
+                { value: "3", label: "~3 s" },
+                { value: "5", label: "~5 s" },
+                { value: "8", label: "~8 s" },
                 { value: "custom", label: "Custom" },
               ]}
             />
@@ -75,7 +79,7 @@ export function ModeCard({ settings, busy, onChange, onMaxVideo }: ModeCardProps
                 <div className="w-28">
                   <NumberField id="custom-seconds" value={customValue} min={1} max={60} step={0.5} onChange={setCustomValue} />
                 </div>
-                <Button disabled={busy} onClick={() => onChange({ ...settings, targetSeconds: customValue })}>
+                <Button disabled={busy} onClick={() => onChange({ ...settings, targetSeconds: customValue, timingRanges: [] })}>
                   Apply
                 </Button>
               </>
@@ -84,13 +88,15 @@ export function ModeCard({ settings, busy, onChange, onMaxVideo }: ModeCardProps
         </Field>
       )}
 
+      {settings.mode === "seconds" && <TimingRanges settings={settings} onChange={onChange} busy={busy} words={words} voiceDuration={voiceDuration} />}
+
       {settings.mode === "ai" && (
         <p className="text-sm text-muted">Gemini reads the sentences and starts a new scene where the picture should change. Needs a Gemini key in Settings.</p>
       )}
 
-      <Field label="Shortest scene (seconds)" htmlFor="min-scene" hint="A scene shorter than this is joined to the scene before it (0 = off).">
+      <Field label="Shortest scene (seconds)" htmlFor="min-scene" hint={settings.mode === "seconds" ? "Not used in seconds mode: the selected duration takes priority, including a shorter final scene." : "A scene shorter than this is joined to the scene before it (0 = off)."}>
         <div className="w-28">
-          <NumberField id="min-scene" value={settings.minSeconds ?? 2} min={0} max={10} step={0.5} disabled={busy} onChange={(seconds) => onChange({ ...settings, minSeconds: seconds })} />
+          <NumberField id="min-scene" value={settings.minSeconds ?? 2} min={0} max={10} step={0.5} disabled={busy || settings.mode === "seconds"} onChange={(seconds) => onChange({ ...settings, minSeconds: seconds })} />
         </div>
       </Field>
 

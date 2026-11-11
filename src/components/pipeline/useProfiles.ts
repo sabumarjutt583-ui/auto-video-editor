@@ -10,6 +10,7 @@ export interface ProfilesView {
   chosen: ChannelProfile | null;
   /** Saves (adds or replaces) a profile and chooses it. */
   save: (profile: ChannelProfile) => void;
+  saveNow: (profile: ChannelProfile) => Promise<void>;
   remove: (id: string) => void;
   choose: (id: string) => void;
 }
@@ -34,5 +35,14 @@ export function useProfiles(): ProfilesView {
     [profiles, update],
   );
   const choose = useCallback((id: string) => update({ channelProfileId: id }), [update]);
-  return { profiles, chosen, save, remove, choose };
+  const saveNow = useCallback(async (profile: ChannelProfile) => {
+    const store = useSettingsStore.getState();
+    if (!store.settings) throw new Error("Settings have not loaded yet. Try again once the app is ready.");
+    // Read the latest profiles so saving one channel cannot erase another channel's changes.
+    store.update({ channelProfiles: upsertProfile(readProfiles(store.settings.channelProfiles ?? []), profile), channelProfileId: profile.id });
+    if (!await useSettingsStore.getState().flush()) {
+      throw useSettingsStore.getState().saveError ?? new Error("The channel settings could not be saved.");
+    }
+  }, []);
+  return { profiles, chosen, save, saveNow, remove, choose };
 }

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { create } from 'zustand';
 import { runPipeline } from '../src/lib/pipeline/runner.ts';
-import { stageDone } from '../src/lib/pipeline/plan.ts';
+import { stageDone, pictureScenes } from '../src/lib/pipeline/plan.ts';
 import { assertProjectAvailable, assertProjectDeletable, acquireProject, isProjectActive } from '../src/lib/pipeline/activity.ts';
 import { invalidateProject } from '../src/lib/pipeline/invalidate.ts';
 import { defaultProfile, profileProblems, readProfiles } from '../src/lib/pipeline/profile.ts';
@@ -12,6 +12,7 @@ import * as queueLogic from '../src/lib/pipeline/queue.ts';
 import { initialView, reduceView, withDetail } from '../src/lib/pipeline/view.ts';
 import { STAGE_IDS, NO_PAUSES } from '../src/lib/pipeline/stages.ts';
 import { recordFromProject, scriptRecordFor } from '../src/lib/script/step0.ts';
+import { captureProviders, voiceProviderMismatch } from '../src/lib/pipeline/providers.ts';
 import { readEditor } from '../src/lib/editor/model.ts';
 
 const errorOf = e => ({message:e.message ?? String(e),details:e.details ?? '',code:e.code});
@@ -26,7 +27,9 @@ function loadStore(file, name, deps) {
 
 function pipelineStore(projects, overrides={}) {
   return loadStore('../src/store/pipelineStore.ts','usePipelineStore',{
-    create,acquireProject,stageDone,profileProblems,runPipeline,STAGE_IDS,initialView,reduceView,withDetail,recordFromProject,scriptRecordFor,
+    create,acquireProject,stageDone,pictureScenes,captureProviders,voiceProviderMismatch,profileProblems,runPipeline,STAGE_IDS,initialView,reduceView,withDetail,recordFromProject,scriptRecordFor,
+    useSettingsStore:{getState:()=>({settings:{ttsProvider:'gemini',ttsVoice:'Leda',ttsModel:'test',textProvider:'gemini',apiBatchSize:5,apiParallel:1,ttsRate:0,ttsVolume:0}})},
+    ttsOptions:async()=>({defaultVoice:'Leda',defaultModel:'test',edgeDefaultVoice:'en-US-AriaNeural'}),
     isCancelled:e=>e?.code==='cancelled',toAppError:errorOf,useProjectStore:projects,
     useJobStore:{getState:()=>({jobs:{}})},requestCancel:()=>{},window:{setTimeout},
     createProject:async()=>baseProject(),writeScript:async()=> 'Generated script',writeScriptForStep0:async()=>({script:'Generated script',record:null}),
@@ -88,9 +91,9 @@ test('edits arriving while another project loads are saved before switching', as
 for (const boundary of ['approval','final work']) test(`cancel during ${boundary} cannot finish the pipeline`, async()=>{
   let cancelled=false,done=false,runs=0;
   const events=[];
-  const outcome=await runPipeline({stages:['voice'],isDone:()=>done,pauses:{voice:boundary==='approval'},confirm:async()=>{cancelled=true;return true;},run:async()=>{runs++;done=true;cancelled=true;},cancelRequested:()=>cancelled,isCancel:()=>false,onEvent:e=>events.push(e.type)});
+  const outcome=await runPipeline({stages:['voice'],isDone:()=>done,pauses:{voice:boundary==='approval'},confirm:async()=>{cancelled=true;return true;},run:async()=>{runs++;done=true;cancelled=boundary==='final work';},cancelRequested:()=>cancelled,isCancel:()=>false,onEvent:e=>events.push(e.type)});
   assert.equal(outcome,'cancelled');
-  assert.equal(runs,boundary==='approval'?0:1);
+  assert.equal(runs,1);
   assert.equal(events.includes('finished'),false);
 });
 
@@ -123,12 +126,12 @@ test('active project blocks switching, closing and deletion; release restores na
 test('two starts during script generation make one request; cancel prevents project creation',async()=>{
   const gate=deferred();let writes=0,creates=0;
   const projects=projectStore({open:async()=>baseProject(),save:async()=> 'saved'});
-  const pipeline=pipelineStore(projects,{writeScript:async()=>{writes++;return gate.promise;},createProject:async()=>{creates++;return baseProject();}});
+  const pipeline=pipelineStore(projects,{writeScriptForStep0:async()=>{writes++;return {script:await gate.promise,record:null};},createProject:async()=>{creates++;return baseProject();}});
   const profile=channel();profile.script={writer:'claude',masterPrompt:'Write a story'};
   const args=input({script:'',topic:'A story',profile});
   const first=pipeline.getState().start(args);
   await pipeline.getState().start(args);
-  assert.equal(writes,1);assert.equal(pipeline.getState().running,true);
+  await tick();assert.equal(writes,1);assert.equal(pipeline.getState().running,true);
   pipeline.getState().cancel();gate.resolve('Completed late');await first;
   assert.equal(creates,0);assert.equal(pipeline.getState().running,false);
   projects.getState().discard();
@@ -140,7 +143,7 @@ test('project creation is reserved synchronously and releases after failure',asy
   const pipeline=pipelineStore(projects,{createProject:async()=>{creates++;await gate.promise;return baseProject();}});
   const first=pipeline.getState().start(input());
   await pipeline.getState().start(input());
-  assert.equal(creates,1);gate.resolve();await first;
+  await tick();assert.equal(creates,1);gate.resolve();await first;
   assert.equal(pipeline.getState().running,false);assert.ok(pipeline.getState().error);
   assert.doesNotThrow(()=>assertProjectAvailable('B'));projects.getState().discard();
 });
@@ -159,11 +162,12 @@ test('fresh pipeline resumes saved outputs and persists completion before releas
   stored.editor=readEditor(stored);stored.editor.audio.mix={path:'mix.wav',builtAt:'old',integrated:-14,truePeak:-1,range:3};
   const projects=projectStore({open:async()=>structuredClone(stored),save:async p=>{stored=structuredClone(p);return 'saved';}});
   const ran=[];
+  const profile=defaultProfile('channel');profile.pauses={...NO_PAUSES};
   const pipeline=pipelineStore(projects,{runStage:async stage=>{ran.push(stage);projects.getState().update({renderedAt:'now',exportDurationSeconds:5});}});
-  await pipeline.getState().continueProject('A',defaultProfile('channel'),async()=>true);
+  await pipeline.getState().continueProject('A',profile,async()=>true);
   assert.deepEqual(ran,['render']);assert.equal(stored.makeVideoRun.status,'finished');assert.equal(pipeline.getState().view.status,'finished');
   const restored=pipelineStore(projects,{runStage:async()=>assert.fail('finished stages must not rerun')});
-  await restored.getState().continueProject('A',defaultProfile('channel'),async()=>true);
+  await restored.getState().continueProject('A',profile,async()=>true);
   assert.equal(restored.getState().view.status,'finished');projects.getState().discard();
 });
 
@@ -239,3 +243,5 @@ test('replacing timings keeps explicit imported results and invalidates old scen
   const part={activePartId:'p2',script:'Part 2',renderedAt:'previous export'};
   assert.deepEqual(invalidateProject(p,part),part);
 });
+
+test('failed voice save retains metadata for retry',async()=>{let fail=true,saved;const projects=projectStore({open:async()=>baseProject(),save:async p=>{if(fail)throw Error('disk full');saved=structuredClone(p);return 'saved';}});await projects.getState().open('A');projects.getState().update({voicePath:'voice.wav',voiceOriginalPath:'original.wav',voiceDuration:12,voiceLocked:true});await assert.rejects(projects.getState().flush(),e=>e.message.includes('disk full'));assert.equal(projects.getState().project.voicePath,'voice.wav');fail=false;await projects.getState().flush();assert.equal(saved.voicePath,'voice.wav');projects.getState().discard();});

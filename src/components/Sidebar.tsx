@@ -1,9 +1,12 @@
 import { NavLink } from "react-router-dom";
+import { Fragment } from "react";
 
 import { cn } from "../lib/cn";
 import { NAV_ITEMS } from "../lib/nav";
 import { EngineStatus } from "./EngineStatus";
 import { Logo } from "./Logo";
+
+const SECTION_LABELS: Record<string, string> = { "/dashboard": "Create", "/channels": "Channels", "/image-generator": "Tools", "/settings": "App" };
 
 /** Fixed 240px navigation column. */
 export function Sidebar() {
@@ -16,6 +19,8 @@ export function Sidebar() {
 
       <nav aria-label="Main" className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
         {NAV_ITEMS.map(({ path, label, icon: Icon }) => (
+          <Fragment key={path}>
+          {SECTION_LABELS[path] && <p className="mt-4 mb-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-muted">{SECTION_LABELS[path]}</p>}
           <NavLink
             key={path}
             to={path}
@@ -41,6 +46,7 @@ export function Sidebar() {
               </>
             )}
           </NavLink>
+          </Fragment>
         ))}
       </nav>
 

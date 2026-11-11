@@ -33,7 +33,7 @@ test("NAV_ITEMS lists the main pages in sidebar order, without Admin in a user b
   );
   assert.deepEqual(
     NAV_ITEMS.map((item) => item.label),
-    ["Dashboard", "Projects", "Channels", "Prompt Generator", "Image Generator", "Auto Editor", "Project images", "Project subtitles", "SFX Library", "Settings"],
+    ["Dashboard", "Projects", "Channels & Prompts", "Channel Pipelines", "Image Generator", "Auto Editor", "Project images", "Project subtitles", "SFX Library", "Settings"],
   );
   assert.ok(NAV_ITEMS.every((item) => item.path.startsWith("/")));
   assert.equal(new Set(NAV_ITEMS.map((item) => item.path)).size, NAV_ITEMS.length, "no duplicate nav paths");

@@ -2,21 +2,23 @@ import { Download, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { Counters, QueuePanel, VideoList, useChannelData } from "../components/channels";
+import { QueuePanel, VideoList, useChannelData } from "../components/channels";
 import { ErrorNotice } from "../components/ErrorNotice";
+import { ChannelSettingsEditor } from "../components/channels/ChannelSettingsEditor";
 import { useConsent } from "../components/imagegen/useConsent";
-import { ProfileBasics, ProfileEditing, ProfilePauses, ProfileScript, ProfileVoiceLook, StartCard, useProfiles } from "../components/pipeline";
+import { StartCard, useProfiles } from "../components/pipeline";
 import { Button, SegmentedControl } from "../components/ui";
 import { pickSavePath } from "../lib/dialog";
 import { toAppError } from "../lib/errors";
 import { writeTextFile } from "../lib/files";
-import { countVideos, videosOf } from "../lib/pipeline/dashboard";
+import { videosOf } from "../lib/pipeline/dashboard";
 import { NO_CHANNEL } from "../lib/pipeline/channels";
 import { canWriteScript, exportProfile, profileProblems } from "../lib/pipeline/profile";
-import { writeScript, writeScriptForStep0 } from "../lib/script/write";
+import { writeScriptForStep0 } from "../lib/script/write";
+import type { ScriptRecord } from "../lib/script/step0";
 import type { AppError } from "../types";
 
-type Tab = "videos" | "new" | "queue" | "settings";
+type Tab = "videos" | "new" | "queue" | "settings" | "script";
 
 /** One channel: its videos with progress, a form for a new video, and its profile. */
 export function ChannelPage() {
@@ -28,6 +30,7 @@ export function ChannelPage() {
   const { ensure, dialog } = useConsent();
   const [name, setName] = useState("");
   const [script, setScript] = useState("");
+  const [scriptRecord, setScriptRecord] = useState<ScriptRecord | undefined>();
   const [topic, setTopic] = useState("");
   const [wordCount, setWordCount] = useState<number | null>(null);
   const [writing, setWriting] = useState(false);
@@ -40,7 +43,7 @@ export function ChannelPage() {
   const known = new Set(profiles.profiles.map((p) => p.id));
   const videos = orphan ? data.projects.filter((p) => !known.has(p.channelId)) : videosOf(data.projects, id);
   const requested = params.get("tab");
-  const tab: Tab = orphan ? "videos" : requested === "new" || requested === "queue" || requested === "settings" ? requested : "videos";
+  const tab: Tab = orphan ? "videos" : requested === "new" || requested === "queue" || requested === "settings" || requested === "script" ? requested : "videos";
   const setTab = (next: Tab) => setParams(next === "videos" ? {} : { tab: next }, { replace: true });
   const busy = data.run.running;
 
@@ -69,11 +72,12 @@ export function ChannelPage() {
   function start() {
     if (!profile) return;
     // The run goes on in the store while the person watches the list, so it is not awaited here.
-    void data.run.start({ profile, name: name || topic, script, topic, wordCount: wordCount ?? undefined, voiceFile, ensureConsent: ensure });
+    void data.run.start({ profile, name: name || topic, script, scriptRecord, topic, wordCount: wordCount ?? undefined, voiceFile, ensureConsent: ensure });
     if (profileProblems(profile, { script, voiceFile, topic }).length === 0) {
       setName("");
       setTopic("");
       setScript("");
+      setScriptRecord(undefined);
       setWordCount(null);
       setVoiceFile(null);
       setTab("videos");
@@ -85,14 +89,9 @@ export function ChannelPage() {
     setError(null);
     setWriting(true);
     try {
-      // Step 0: with a word count, the question carries the title, topic and
-      // word count; without one, the older topic-only question is used.
-      if (wordCount !== null) {
-        const written = await writeScriptForStep0(profile, { title: name, topic, wordCount });
-        setScript(written.script);
-      } else {
-        setScript(await writeScript(profile, topic));
-      }
+      const written = await writeScriptForStep0(profile, { title: name, topic, wordCount });
+      setScript(written.script);
+      setScriptRecord(written.record);
     } catch (caught) {
       setError(toAppError(caught, "The script could not be written."));
     } finally {
@@ -107,6 +106,7 @@ export function ChannelPage() {
         { value: "new", label: "New video" },
         { value: "queue", label: "Queue" },
         { value: "settings", label: "Settings" },
+        { value: "script", label: "Claude Script" },
       ];
 
   return (
@@ -119,7 +119,6 @@ export function ChannelPage() {
         <h2 className="text-lg font-semibold tracking-tight">{profile ? profile.name : "No channel"}</h2>
         {orphan && <p className="text-sm text-muted">Projects made before channels existed, or whose channel was deleted.</p>}
       </div>
-      <Counters counts={countVideos(videos, data.active)} />
       {data.run.writing && <p className="rounded-xl border border-accent/40 bg-accent-soft px-4 py-3 text-sm" role="status">The script writer is writing a script. This can take a minute or more…</p>}
       {options.length > 1 && <SegmentedControl<Tab> label="Channel sections" value={tab} onChange={setTab} options={options} />}
       {data.error && <ErrorNotice error={data.error} />}
@@ -138,7 +137,7 @@ export function ChannelPage() {
           disabled={busy}
           problems={data.run.problems}
           onName={setName}
-          onScript={setScript}
+          onScript={(value) => { setScript(value); setScriptRecord(undefined); }}
           onVoiceFile={setVoiceFile}
           onStart={start}
           writer={canWriteScript(profile) ? { topic, writing, onTopic: setTopic, onWrite: () => void writeNow() } : undefined}
@@ -149,13 +148,11 @@ export function ChannelPage() {
 
       {tab === "queue" && profile && <QueuePanel canWrite={canWriteScript(profile)} channelId={profile.id} channelName={(cid) => profiles.profiles.find((p) => p.id === cid)?.name ?? "Video"} ensureConsent={ensure} />}
 
+      {profile && <div hidden={tab !== "settings" && tab !== "script"}>
+        <ChannelSettingsEditor key={profile.id} profile={profile} section={tab === "script" ? "script" : "settings"} onSave={profiles.saveNow} />
+      </div>}
       {tab === "settings" && profile && (
         <>
-          <ProfileBasics profile={profile} onChange={profiles.save} />
-          <ProfileScript profile={profile} onChange={profiles.save} />
-          <ProfileVoiceLook profile={profile} onChange={profiles.save} />
-          <ProfileEditing profile={profile} onChange={profiles.save} />
-          <ProfilePauses profile={profile} onChange={profiles.save} />
           <div className="flex flex-wrap gap-3">
             <Button icon={Download} onClick={() => void exportIt()}>
               Export profile

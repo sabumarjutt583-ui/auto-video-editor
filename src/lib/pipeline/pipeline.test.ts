@@ -144,7 +144,7 @@ test("pictures are done when every image scene with a prompt has a file", () => 
   assert.ok(!stageDone(project({ scenes: [] }), "images"), "no scenes, nothing to show");
 });
 
-function run(options: { done?: StageId[]; fail?: StageId; cancelAt?: StageId; pauses?: Partial<typeof NO_PAUSES>; confirm?: boolean; incomplete?: StageId; stages?: StageId[] }) {
+function run(options: { done?: StageId[]; approved?: StageId[]; fail?: StageId; cancelAt?: StageId; pauses?: Partial<typeof NO_PAUSES>; confirm?: boolean; incomplete?: StageId; stages?: StageId[] }) {
   const events: PipelineEvent[] = [];
   const ran: StageId[] = [];
   const done = new Set<StageId>(options.done ?? []);
@@ -162,6 +162,7 @@ function run(options: { done?: StageId[]; fail?: StageId; cancelAt?: StageId; pa
       if (stage !== options.incomplete) done.add(stage);
     },
     pauses: { ...NO_PAUSES, ...options.pauses },
+    isApproved: (stage) => options.approved?.includes(stage) ?? false,
     confirm: async () => options.confirm ?? true,
     cancelRequested: () => cancel,
     isCancel: (error) => error instanceof Error && error.message === "cancelled",
@@ -178,16 +179,16 @@ test("all steps run in order and the run finishes", async () => {
 });
 
 test("finished steps are skipped, not run again", async () => {
-  const { promise, events, ran } = run({ done: ["voice", "timing", "scenes"] });
+  const { promise, events, ran } = run({ done: ["script", "voice", "timing", "scenes"] });
   assert.equal(await promise, "finished");
   assert.deepEqual(ran, ["cast", "prompts", "images", "audio", "render"]);
-  assert.deepEqual(events.filter((e) => e.type === "skipped").map((e) => (e as { stage: StageId }).stage), ["voice", "timing", "scenes"]);
+  assert.deepEqual(events.filter((e) => e.type === "skipped").map((e) => (e as { stage: StageId }).stage), ["script", "voice", "timing", "scenes"]);
 });
 
 test("an error stops the run and keeps what was finished", async () => {
   const { promise, events, ran } = run({ fail: "prompts" });
   assert.equal(await promise, "failed");
-  assert.deepEqual(ran, ["voice", "timing", "scenes", "cast", "prompts"]);
+  assert.deepEqual(ran, ["script", "voice", "timing", "scenes", "cast", "prompts"]);
   const last = events.at(-1);
   assert.equal(last?.type, "error");
 });
@@ -202,7 +203,7 @@ test("a step that returns without finishing its work is an error", async () => {
 test("cancel stops the run quietly", async () => {
   const { promise, events, ran } = run({ cancelAt: "scenes" });
   assert.equal(await promise, "cancelled");
-  assert.deepEqual(ran, ["voice", "timing", "scenes"]);
+  assert.deepEqual(ran, ["script", "voice", "timing", "scenes"]);
   assert.equal(events.at(-1)?.type, "cancelled");
 });
 
@@ -216,12 +217,12 @@ test("a step with a pause waits and goes on after Continue", async () => {
 test("pressing Stop at a pause ends the run there", async () => {
   const { promise, ran, events } = run({ pauses: { images: true }, confirm: false });
   assert.equal(await promise, "stopped");
-  assert.deepEqual(ran, ["voice", "timing", "scenes", "cast", "prompts"]);
+  assert.deepEqual(ran, ["script", "voice", "timing", "scenes", "cast", "prompts", "images"]);
   assert.equal(events.at(-1)?.type, "stopped");
 });
 
-test("a finished step does not ask for a pause", async () => {
-  const { promise, events } = run({ done: ["prompts"], pauses: { prompts: true }, confirm: false });
+test("an approved finished step does not ask for a pause", async () => {
+  const { promise, events } = run({ done: ["prompts"], approved: ["prompts"], pauses: { prompts: true }, confirm: false });
   assert.equal(await promise, "finished");
   assert.ok(!events.some((e) => e.type === "waiting"));
 });
@@ -276,4 +277,56 @@ test("the profile list: add, replace, remove, choose", () => {
   assert.deepEqual(removeProfile(list, "a").map((p) => p.id), ["b"]);
   const full = Array.from({ length: MAX_PROFILES }, (_, i) => defaultProfile(`p${i}`));
   assert.equal(upsertProfile(full, defaultProfile("extra")).length, MAX_PROFILES);
+});
+
+
+test("completed output awaiting review is not generated twice on resume", async () => {
+  const { promise, ran, events } = run({ stages: ["images", "audio"], done: ["images"], pauses: { images: true }, confirm: false });
+  assert.equal(await promise, "stopped");
+  assert.deepEqual(ran, []);
+  assert.ok(events.some((event) => event.type === "waiting" && event.stage === "images"));
+});
+
+test("review sees finished output and approval is saved before the next stage", async () => {
+  const ready = new Set<StageId>();
+  const order: string[] = [];
+  assert.equal(await runPipeline({
+    stages: ["images", "audio"], pauses: { ...NO_PAUSES, images: true },
+    isDone: (stage) => ready.has(stage), run: async (stage) => { ready.add(stage); order.push(stage); },
+    confirm: async () => { assert.ok(ready.has("images")); order.push("review"); return true; },
+    onApproved: async () => { order.push("saved"); },
+    cancelRequested: () => false, isCancel: () => false, onEvent: () => {},
+  }), "finished");
+  assert.deepEqual(order, ["images", "review", "saved", "audio"]);
+});
+
+test("failed approval save prevents progression", async () => {
+  const events: PipelineEvent[] = [];
+  assert.equal(await runPipeline({
+    stages: ["images", "audio"], pauses: { ...NO_PAUSES, images: true },
+    isDone: () => true, run: async () => { throw new Error("must not run"); },
+    confirm: async () => true, onApproved: async () => { throw new Error("disk full"); },
+    cancelRequested: () => false, isCancel: () => false, onEvent: (event) => events.push(event),
+  }), "failed");
+  assert.equal(events.at(-1)?.type, "error");
+});
+
+
+test("saved script review stops before any voice generation", async () => {
+  const { promise, ran, events } = run({ stages: ["script", "voice"], done: ["script"], pauses: { script: true }, confirm: false });
+  assert.equal(await promise, "stopped");
+  assert.deepEqual(ran, []);
+  assert.ok(events.some(e => e.type === "waiting" && e.stage === "script"));
+});
+
+test("approved script resumes straight into voice without rewriting", async () => {
+  const { promise, ran, events } = run({ stages: ["script", "voice"], done: ["script"], approved: ["script"], pauses: { script: true }, confirm: false });
+  assert.equal(await promise, "finished");
+  assert.deepEqual(ran, ["voice"]);
+  assert.ok(!events.some(e => e.type === "waiting"));
+});
+
+test("legacy script review migrates from scenes while explicit new pauses stay intact", () => {
+  assert.deepEqual(readProfile({ pauses: { scenes: true } }, "legacy").pauses, { ...NO_PAUSES, script: true });
+  assert.deepEqual(readProfile({ pauses: { script: false, scenes: true } }, "new").pauses, { ...NO_PAUSES, scenes: true });
 });

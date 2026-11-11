@@ -163,13 +163,8 @@ impl Session {
             .map(|list| list.iter().filter(|t| t["type"] == "page").filter_map(|t| t["targetId"].as_str().map(str::to_string)).collect())
             .unwrap_or_default();
         let target = match pages.split_first() {
-            Some((first, extra)) => {
-                // One work tab per account: close any other tab.
-                for id in extra {
-                    let _ = cdp.call("Target.closeTarget", json!({ "targetId": id }), None).await;
-                }
-                first.clone()
-            }
+            // Existing production conversations must survive reattachment.
+            Some((first, _)) => first.clone(),
             None => cdp.call("Target.createTarget", json!({ "url": "about:blank" }), None).await?["targetId"].as_str().unwrap_or_default().to_string(),
         };
         let attached = cdp.call("Target.attachToTarget", json!({ "targetId": target, "flatten": true }), None).await?;

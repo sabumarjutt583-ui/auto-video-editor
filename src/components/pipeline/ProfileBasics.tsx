@@ -1,3 +1,4 @@
+import { TimingRanges } from "../scenes/TimingRanges";
 import { LANGUAGES } from "../../lib/languages";
 import type { ChannelProfile } from "../../lib/pipeline/profile";
 import type { AspectRatio, Quality } from "../../types";
@@ -57,10 +58,11 @@ export function ProfileBasics({ profile, onChange }: Props) {
           options={[
             { value: "seconds", label: "Every N seconds" },
             { value: "sentence", label: "Per sentence" },
-            { value: "ai", label: "Gemini decides" },
+            { value: "ai", label: "AI decides" },
           ]}
         />
       </Field>
+      {scenes.mode === "seconds" && <TimingRanges settings={scenes} onChange={(scenes) => onChange({ ...profile, scenes })} />}
       <div className="grid gap-4 sm:grid-cols-3">
         {scenes.mode === "seconds" && (
           <Field label="Seconds per scene" htmlFor="p-seconds" hint="1 to 60. Cuts happen at the end of a word.">

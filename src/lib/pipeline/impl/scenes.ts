@@ -15,7 +15,8 @@ export async function scenesStage(ctx: StageContext): Promise<void> {
     const sentences = splitSentences(project.words);
     const groups = await groupSentencesWithAi(
       sentences.map((sentence) => sentence.text),
-      (start) => runJob("ai", "Asking Gemini to group the sentences", start),
+      (start) => runJob("ai", "Grouping the sentences", start),
+      ctx.providers,
     );
     scenes = groups ? buildFromSentenceGroups(input, groups) : buildBySeconds(input, FALLBACK_SECONDS);
   } else if (settings.mode === "seconds") {

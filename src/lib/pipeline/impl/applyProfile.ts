@@ -22,6 +22,8 @@ export function applyChannelProfile(profile: ChannelProfile, script?: string, re
           // The project file stores 0 for "none asked" (a number field, never null).
           scriptWordsRequested: record.wordCountRequested ?? 0,
           scriptMasterPromptVersion: record.masterPromptVersion,
+          claudeConversationUrl: record.claudeConversationUrl ?? "",
+          claudeAccountId: record.claudeAccountId ?? "",
         }),
     editor: { ...editor, ...profileEditor(profile, editor) },
   });

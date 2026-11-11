@@ -100,13 +100,13 @@ test("per sentence: 1 to 4 sentences, no gaps, ends at the voice length", () => 
   assert.equal(one[1]?.start, words[one[1]?.firstWord ?? 0]?.start);
 });
 
-test("per seconds: cuts only at sentence ends, no gaps", () => {
+test("per seconds: cuts near target word boundaries, no gaps", () => {
   const { words, duration } = speak(STORY);
   for (const target of [3, 5, 8, 12]) {
     const scenes = buildBySeconds({ words, voiceDuration: duration, settings: SETTINGS }, target);
     assertNoGaps(scenes, duration);
     for (const scene of scenes.slice(0, -1)) {
-      assert.match(words[scene.lastWord]?.text ?? "", /[.!?,]$/, `scene ${scene.id} ends mid-sentence`);
+      assert.ok(scene.duration <= target + 1.5, `scene ${scene.id} exceeds target tolerance`);
     }
   }
   const coarse = buildBySeconds({ words, voiceDuration: duration, settings: SETTINGS }, 12);
@@ -114,7 +114,7 @@ test("per seconds: cuts only at sentence ends, no gaps", () => {
   assert.ok(coarse.length < fine.length);
 });
 
-test("per seconds: a very long sentence is cut at commas or pauses, never inside a word", () => {
+test("per seconds: a very long sentence is cut between words without waiting for punctuation", () => {
   const long = "First he packed his bag, then he locked the door, then he walked down the hill, then he crossed the bridge, then he reached the station, and finally he sat down to wait for the last train of the night.";
   const { words, duration } = speak(long);
   const scenes = buildBySeconds({ words, voiceDuration: duration, settings: SETTINGS }, 3);
@@ -122,7 +122,7 @@ test("per seconds: a very long sentence is cut at commas or pauses, never inside
   assertNoGaps(scenes, duration);
   const joined = scenes.map((scene) => scene.text).join(" ");
   assert.equal(joined.replace(/\s+/g, " "), long);
-  for (const scene of scenes.slice(0, -1)) assert.match(words[scene.lastWord]?.text ?? "", /,$/);
+  for (const scene of scenes.slice(1)) assert.equal(scene.start, words[scene.firstWord].start);
 });
 
 test("scene texts always add up to the script", () => {

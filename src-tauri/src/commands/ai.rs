@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
 use crate::api::{gemini, groq, rotate};
@@ -16,6 +16,28 @@ pub struct TextAnswer {
     pub provider: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TextOptions {
+    text_provider: String,
+    gemini_model: String,
+    groq_text_model: String,
+    fallback_to_groq: bool,
+}
+
+impl TextOptions {
+    fn apply(self, settings: &mut settings::Settings) -> Result<(), AppError> {
+        if self.text_provider != "gemini" && self.text_provider != "groq" {
+            return Err(AppError::new("Unknown text provider.", self.text_provider));
+        }
+        settings.text_provider = self.text_provider;
+        settings.gemini_model = self.gemini_model;
+        settings.groq_text_model = self.groq_text_model;
+        settings.fallback_to_groq = self.fallback_to_groq;
+        Ok(())
+    }
+}
+
 /// Asks the chosen writer (Gemini or Groq, set in Settings) for text. With several keys of that provider the next key
 /// is used when one hits its limit. When every key fails and the backup is switched on, the other provider is asked.
 /// Used for scene grouping, the character bible and prompt writing. Can be cancelled.
@@ -27,9 +49,11 @@ pub async fn generate_text(
     prompt: String,
     json: bool,
     job_id: String,
+    options: Option<TextOptions>,
 ) -> Result<TextAnswer, AppError> {
     let job = jobs.begin(&job_id, "ai", event_sink(app.clone()))?;
-    let settings = run_blocking(move || settings::load(&app)).await?;
+    let mut settings = run_blocking(move || settings::load(&app)).await?;
+    if let Some(options) = options { options.apply(&mut settings)?; }
     let system = system.as_deref();
     let first = if settings.text_provider == "groq" { Provider::Groq } else { Provider::Gemini };
 
@@ -95,7 +119,20 @@ pub fn chat_question(system: Option<&str>, prompt: &str, json: bool) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::chat_question;
+    use super::{chat_question, TextOptions};
+
+    #[test]
+    fn frozen_text_choices_override_live_defaults_without_saving_them() {
+        let mut settings = crate::settings::Settings::default();
+        TextOptions { text_provider: "groq".into(), gemini_model: "saved-gemini".into(),
+            groq_text_model: "saved-groq".into(), fallback_to_groq: false }.apply(&mut settings).unwrap();
+        assert_eq!(settings.text_provider, "groq");
+        assert_eq!(settings.gemini_model, "saved-gemini");
+        assert_eq!(settings.groq_text_model, "saved-groq");
+        assert!(!settings.fallback_to_groq);
+        assert!(TextOptions { text_provider: "unknown".into(), gemini_model: "x".into(),
+            groq_text_model: "x".into(), fallback_to_groq: true }.apply(&mut settings).is_err());
+    }
 
     #[test]
     fn the_chat_question_carries_instructions_task_and_json_rule() {

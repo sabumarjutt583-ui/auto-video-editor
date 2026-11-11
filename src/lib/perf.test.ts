@@ -53,7 +53,7 @@ function timed<T>(label: string, limitMs: number, work: () => T): T {
   return result;
 }
 
-test("a 20-minute voice-over with about 200 scenes is processed quickly", async () => {
+test("a 20-minute voice-over with four-second scenes is processed quickly", async () => {
   const script = makeScript();
   assert.ok(splitWords(script).length > 2500);
 
@@ -64,7 +64,8 @@ test("a 20-minute voice-over with about 200 scenes is processed quickly", async 
 
   const settings: SceneSettings = { mode: "seconds", sentencesPerScene: 1, targetSeconds: 4, maxVideoSeconds: 8 };
   const scenes: Scene[] = timed("build the scenes", 1500, () => buildBySeconds({ words: aligned.words, voiceDuration: VOICE_SECONDS, settings }));
-  assert.ok(scenes.length >= 150 && scenes.length <= 260, `got ${scenes.length} scenes`);
+  const expectedScenes = VOICE_SECONDS / settings.targetSeconds;
+  assert.ok(Math.abs(scenes.length - expectedScenes) <= 5, `got ${scenes.length} scenes; expected about ${expectedScenes}`);
   const sum = scenes.reduce((total, scene) => total + scene.duration, 0);
   assert.ok(Math.abs(sum - VOICE_SECONDS) < 1e-6, "the scenes cover the whole voice-over");
 

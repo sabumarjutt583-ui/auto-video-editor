@@ -20,8 +20,10 @@ export interface PipelineOptions {
   isDone: (stage: StageId) => boolean;
   run: (stage: StageId) => Promise<void>;
   pauses: Pauses;
-  /** Called before a step that wants a "Continue". Resolves false when the person stops the run. */
+  /** Reviews completed output before the next step. Resolves false to stop. */
   confirm: (stage: StageId) => Promise<boolean>;
+  isApproved?: (stage: StageId) => boolean;
+  onApproved?: (stage: StageId) => Promise<void>;
   /** The person pressed Cancel. */
   cancelRequested: () => boolean;
   /** True for the error a cancelled job throws. */
@@ -47,39 +49,40 @@ export async function runPipeline(options: PipelineOptions): Promise<PipelineOut
       onEvent({ type: "cancelled", stage });
       return "cancelled";
     }
-    if (options.isDone(stage)) {
-      onEvent({ type: "skipped", stage });
-      continue;
-    }
-    if (options.pauses[stage]) {
-      onEvent({ type: "waiting", stage });
-      const approved = await options.confirm(stage);
-      if (options.cancelRequested()) {
-        onEvent({ type: "cancelled", stage });
-        return "cancelled";
-      }
-      if (!approved) {
-        onEvent({ type: "stopped", stage });
-        return "stopped";
-      }
-    }
-    onEvent({ type: "start", stage });
+    const alreadyDone = options.isDone(stage);
     try {
-      await options.run(stage);
+      if (alreadyDone) {
+        onEvent({ type: "skipped", stage });
+      } else {
+        onEvent({ type: "start", stage });
+        await options.run(stage);
+        if (options.cancelRequested()) {
+          onEvent({ type: "cancelled", stage });
+          return "cancelled";
+        }
+        if (!options.isDone(stage)) throw new IncompleteStage(stage);
+      }
+      // Completed output survives Stop/restart, but unapproved output must still
+      // be reviewed. Persist approval before allowing the following stage.
+      if (options.pauses[stage] && (!alreadyDone || !options.isApproved?.(stage))) {
+        onEvent({ type: "waiting", stage });
+        const approved = await options.confirm(stage);
+        if (options.cancelRequested()) {
+          onEvent({ type: "cancelled", stage });
+          return "cancelled";
+        }
+        if (!approved) {
+          onEvent({ type: "stopped", stage });
+          return "stopped";
+        }
+        await options.onApproved?.(stage);
+      }
     } catch (error) {
       if (options.isCancel(error) || options.cancelRequested()) {
         onEvent({ type: "cancelled", stage });
         return "cancelled";
       }
       onEvent({ type: "error", stage, error });
-      return "failed";
-    }
-    if (options.cancelRequested()) {
-      onEvent({ type: "cancelled", stage });
-      return "cancelled";
-    }
-    if (!options.isDone(stage)) {
-      onEvent({ type: "error", stage, error: new IncompleteStage(stage) });
       return "failed";
     }
     onEvent({ type: "done", stage });

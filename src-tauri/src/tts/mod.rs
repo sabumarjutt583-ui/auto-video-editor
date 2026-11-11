@@ -69,7 +69,8 @@ pub fn clean_folder(folder: &Path, keep: &[PathBuf]) {
 pub fn assemble(pieces: &[(Vec<i16>, bool)], rate: u32) -> Vec<i16> {
     let mut out: Vec<i16> = Vec::new();
     for (index, (samples, paragraph_end)) in pieces.iter().enumerate() {
-        let tidy = wav::match_loudness(&wav::trim_silence(samples, rate, EDGE_MS), TARGET_DB);
+        let mut tidy = wav::match_loudness(&wav::trim_silence(samples, rate, EDGE_MS), TARGET_DB);
+        wav::fade_edges(&mut tidy, rate);
         out.extend_from_slice(&tidy);
         if index + 1 < pieces.len() {
             out.extend(wav::silence(rate, if *paragraph_end { PARAGRAPH_GAP_MS } else { GAP_MS }));

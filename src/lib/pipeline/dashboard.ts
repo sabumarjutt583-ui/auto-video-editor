@@ -26,6 +26,7 @@ export function stageProgress(project: ProjectSummary): StageProgress[] {
   const promptsDone = project.sceneCount > 0 && project.promptsWritten >= project.sceneCount;
   const picturesDone = project.pictureScenes > 0 && project.pictures >= project.pictureScenes;
   const done: Record<StageId, boolean> = {
+    script: project.hasScript === true,
     voice: project.voiceLocked,
     timing: project.hasWords,
     scenes: project.sceneCount > 0,
@@ -36,6 +37,7 @@ export function stageProgress(project: ProjectSummary): StageProgress[] {
     render: project.rendered,
   };
   const detail: Record<StageId, string> = {
+    script: project.hasScript ? "Script saved" : "",
     voice: "",
     timing: "",
     scenes: project.sceneCount > 0 ? `${project.sceneCount} scenes` : "",
@@ -66,7 +68,9 @@ export function videoState(project: ProjectSummary, active: ActiveRun): VideoSta
     if (active.failed) return "failed";
   }
   if (project.rendered) return "finished";
-  const started = project.voiceLocked || project.hasWords || project.sceneCount > 0;
+  if (project.makeVideoRun?.status === "failed") return "failed";
+  if (project.makeVideoRun && ["running", "waiting", "paused", "stopped"].includes(project.makeVideoRun.status)) return "stopped";
+  const started = project.hasScript === true || project.voiceLocked || project.hasWords || project.sceneCount > 0;
   return started ? "stopped" : "empty";
 }
 

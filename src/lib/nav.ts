@@ -9,8 +9,8 @@ export interface NavItem {
 export const NAV_ITEMS: readonly NavItem[] = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/projects", label: "Projects", icon: FolderOpen },
-  { path: "/channels", label: "Channels", icon: Tv },
-  { path: "/prompt-generator", label: "Prompt Generator", icon: Sparkles },
+  { path: "/channels", label: "Channels & Prompts", icon: Tv },
+  { path: "/prompt-generator", label: "Channel Pipelines", icon: Sparkles },
   { path: "/image-generator", label: "Image Generator", icon: ImagePlus },
   { path: "/auto-editor", label: "Auto Editor", icon: Clapperboard },
   { path: "/project-images", label: "Project images", icon: Image },

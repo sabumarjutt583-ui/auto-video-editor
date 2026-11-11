@@ -151,9 +151,17 @@ pub enum SceneMode {
     Ai,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SceneTimingRange {
+    pub start_seconds: f64,
+    pub target_seconds: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SceneSettings {
+    pub timing_ranges: Vec<SceneTimingRange>,
     pub mode: SceneMode,
     /// Used by the per-sentence mode: 1 to 4.
     pub sentences_per_scene: u32,
@@ -167,7 +175,7 @@ pub struct SceneSettings {
 
 impl Default for SceneSettings {
     fn default() -> Self {
-        Self { mode: SceneMode::Sentence, sentences_per_scene: 1, target_seconds: 5.0, max_video_seconds: 8.0, min_seconds: 2.0 }
+        Self { timing_ranges: Vec::new(), mode: SceneMode::Sentence, sentences_per_scene: 1, target_seconds: 5.0, max_video_seconds: 8.0, min_seconds: 2.0 }
     }
 }
 
@@ -249,6 +257,9 @@ pub struct VoicePart {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct MakeVideoRun {
+    pub provider_snapshot: Option<serde_json::Value>,
+    pub approved_stages: Vec<String>,
+    pub profile_snapshot: Option<serde_json::Value>,
     pub status: String,
     pub current_stage: String,
     pub completed_stages: Vec<String>,
@@ -301,6 +312,8 @@ pub struct Project {
     pub script_words_requested: u32,
     /// The fingerprint of the master prompt used (see src/lib/script/step0.ts).
     pub script_master_prompt_version: String,
+    pub claude_conversation_url: String,
+    pub claude_account_id: String,
     /// True when word times were estimated from line-level times (SRT/VTT).
     pub timing_estimated: bool,
     /// How well the script matched the timed words, 0 to 100.
@@ -365,6 +378,8 @@ impl Default for Project {
             script_topic: String::new(),
             script_words_requested: 0,
             script_master_prompt_version: String::new(),
+            claude_conversation_url: String::new(),
+            claude_account_id: String::new(),
             timing_estimated: false,
             alignment_quality: None,
             unmatched_words: Vec::new(),
@@ -427,6 +442,8 @@ pub fn derive_status(project: &Project) -> Option<ProjectStatus> {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSummary {
+    pub claude_conversation_url: String,
+    pub claude_account_id: String,
     pub id: String,
     pub name: String,
     pub created_at: String,
@@ -456,6 +473,8 @@ pub struct ProjectSummary {
 impl From<&Project> for ProjectSummary {
     fn from(project: &Project) -> Self {
         Self {
+            claude_conversation_url: project.claude_conversation_url.clone(),
+            claude_account_id: project.claude_account_id.clone(),
             id: project.id.clone(),
             name: project.name.clone(),
             created_at: project.created_at.clone(),

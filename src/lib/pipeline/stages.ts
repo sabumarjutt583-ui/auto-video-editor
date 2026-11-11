@@ -1,5 +1,5 @@
 /** The steps "Make video" runs, in order. */
-export type StageId = "voice" | "timing" | "scenes" | "cast" | "prompts" | "images" | "audio" | "render";
+export type StageId = "script" | "voice" | "timing" | "scenes" | "cast" | "prompts" | "images" | "audio" | "render";
 
 export interface StageInfo {
   id: StageId;
@@ -9,6 +9,7 @@ export interface StageInfo {
 }
 
 export const STAGES: readonly StageInfo[] = [
+  { id: "script", label: "Script", hint: "Review the saved narration before making its voice." },
   { id: "voice", label: "Voice", hint: "Make the voice from the script (or use your own file), clean it and lock it." },
   { id: "timing", label: "Word timing", hint: "Get the time of every word from the voice." },
   { id: "scenes", label: "Scenes", hint: "Cut the narration into scenes." },
@@ -25,7 +26,7 @@ export function stageLabel(id: StageId): string {
   return STAGES.find((stage) => stage.id === id)?.label ?? id;
 }
 
-/** Which steps stop and wait for a "Continue" press. true = ask first. */
+/** Which steps stop and wait for a "Continue" press. true = review completed output. */
 export type Pauses = Record<StageId, boolean>;
 
-export const NO_PAUSES: Pauses = { voice: false, timing: false, scenes: false, cast: false, prompts: false, images: false, audio: false, render: false };
+export const NO_PAUSES: Pauses = { script: false, voice: false, timing: false, scenes: false, cast: false, prompts: false, images: false, audio: false, render: false };

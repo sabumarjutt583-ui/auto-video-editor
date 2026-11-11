@@ -1,4 +1,5 @@
 pub mod app_update;
+pub mod cloud;
 pub mod ai;
 pub mod chatgpt;
 pub mod audio;

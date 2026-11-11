@@ -1,3 +1,5 @@
+import { localeLabel, microsoftVoiceLabel } from "../../lib/tts/voiceLabels";
+import { useVoiceFavoritesStore } from "../../store/voiceFavoritesStore";
 import { AudioLines, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -38,6 +40,8 @@ export function GenerateVoiceCard({ project, disabled, onGenerated }: GenerateVo
   const [error, setError] = useState<AppError | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const favoritesStore = useVoiceFavoritesStore();
   const samples = useRef(new Map<string, string>());
 
   useEffect(() => {
@@ -84,8 +88,15 @@ export function GenerateVoiceCard({ project, disabled, onGenerated }: GenerateVo
   const stats = useMemo(() => scriptStats(script), [script]);
   const busy = job !== null;
   const modelNote = options?.models.find((m) => m.id === model)?.note;
-  const shownEdgeVoices = filterEdgeVoices(edgeList ?? options?.edgeVoices ?? [], edgeLanguage);
-  const languages = edgeLanguages(edgeList ?? options?.edgeVoices ?? []);
+  const favorites = favoritesStore[isEdge ? "edge" : "gemini"];
+  const allEdgeVoices = edgeList ?? options?.edgeVoices ?? [];
+  const prioritize = <T extends { name: string },>(voices: T[]) => voices
+    .filter((v) => !favoritesOnly || favorites.includes(v.name))
+    .sort((a, b) => Number(favorites.includes(b.name)) - Number(favorites.includes(a.name)) || a.name.localeCompare(b.name));
+  const shownEdgeVoices = prioritize(filterEdgeVoices(allEdgeVoices, edgeLanguage));
+  const shownGeminiVoices = prioritize([...(options?.voices ?? [])]);
+  const selectedVisible = (isEdge ? shownEdgeVoices : shownGeminiVoices).some((v) => v.name === voice);
+  const languages = edgeLanguages(allEdgeVoices).sort((a, b) => localeLabel(a).localeCompare(localeLabel(b)));
 
   async function listen() {
     setError(null);
@@ -163,7 +174,7 @@ export function GenerateVoiceCard({ project, disabled, onGenerated }: GenerateVo
               <option value="">All languages</option>
               {languages.map((language) => (
                 <option key={language} value={language}>
-                  {language}
+                  {localeLabel(language)}
                 </option>
               ))}
             </Select>
@@ -192,22 +203,28 @@ export function GenerateVoiceCard({ project, disabled, onGenerated }: GenerateVo
                 else updateSettings({ ttsVoice: event.target.value });
               }}
             >
+              {!selectedVisible && voice && <option value={voice}>{favorites.includes(voice) ? "★ " : ""}{isEdge ? microsoftVoiceLabel(voice) : voice}</option>}
               {isEdge
                 ? shownEdgeVoices.map((v) => (
                     <option key={v.name} value={v.name}>
-                      {v.name} · {v.gender || "voice"}
+                      {favorites.includes(v.name) ? "★ " : ""}{microsoftVoiceLabel(v.name, v.locale, v.gender)}
                     </option>
                   ))
-                : (options?.voices ?? []).map((v) => (
+                : shownGeminiVoices.map((v) => (
                     <option key={v.name} value={v.name}>
-                      {v.name} · {v.feel}
+                      {favorites.includes(v.name) ? "★ " : ""}{v.name}
                     </option>
                   ))}
             </Select>
+            <Button disabled={disabled || busy || !voice} onClick={() => favoritesStore.toggle(isEdge ? "edge" : "gemini", voice)}>
+              {favorites.includes(voice) ? "★ Saved" : "☆ Favourite"}
+            </Button>
             <Button icon={Play} loading={listening} disabled={disabled || busy || !options} onClick={() => void listen()}>
               Listen
             </Button>
           </div>
+          <label className="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={favoritesOnly} onChange={(e) => setFavoritesOnly(e.target.checked)} /> Show favourites only ({favorites.length})</label>
+          {favoritesOnly && (isEdge ? shownEdgeVoices : shownGeminiVoices).length === 0 && <p className="mt-2 text-sm text-muted">No favourites match this filter. Turn off the filter, choose a voice and press Favourite.</p>}
         </Field>
         {isEdge ? (
           <Field label="Rate and volume" htmlFor="tts-rate" hint="Rate -50% to +100%, volume -100% to +100%. Pitch is not offered: the endpoint ignores it.">

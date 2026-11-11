@@ -1,3 +1,4 @@
+import { validTimingRanges } from "../scenes/schedule.ts";
 /** A channel profile: every choice that stays the same from one video of a channel to the next. */
 
 import { DEFAULT_CAPTION_STYLE } from "../captions/presets.ts";
@@ -10,11 +11,15 @@ import type { AspectRatio, Quality } from "../../types/settings.ts";
 import { MAX_MASTER_PROMPT } from "../script/prompt.ts";
 import { NO_PAUSES, STAGE_IDS, type Pauses } from "./stages.ts";
 
-export const PROFILE_VERSION = 1;
+export const PROFILE_VERSION = 2;
 export const MAX_NAME = 60;
 export const MAX_MUSIC_FILES = 20;
 
 export interface ProfileVoice {
+  provider?: "" | "edge" | "gemini";
+  edgeVoice?: string;
+  rate?: number;
+  volume?: number;
   /** Empty = the model chosen in Settings. */
   model: string;
   /** Empty = the voice chosen in Settings. */
@@ -70,7 +75,7 @@ export interface ChannelProfile {
   captions: CaptionStyle;
   audio: ProfileAudio;
   render: RenderData;
-  /** Steps that stop and ask before they start. */
+  /** Steps that pause for review after their output is ready. */
   pauses: Pauses;
 }
 
@@ -112,7 +117,7 @@ export function defaultProfile(id: string, name = "My channel"): ChannelProfile 
     aspect: "16:9",
     quality: "1080p",
     script: { writer: "off", masterPrompt: "", claudeAccountId: null },
-    voice: { model: "", voice: "", style: "", cutSilence: true },
+    voice: { provider: "", edgeVoice: "", rate: undefined, volume: undefined, model: "", voice: "", style: "", cutSilence: true },
     scenes: { ...DEFAULT_SCENES },
     look: { styleId: "", detail: "medium", tool: "dalle_gemini", outputType: "image" },
     captions: { ...DEFAULT_CAPTION_STYLE },
@@ -134,6 +139,7 @@ function readPauses(value: unknown): Pauses {
   const o = isObject(value) ? value : {};
   const result: Pauses = { ...NO_PAUSES };
   for (const id of STAGE_IDS) result[id] = o[id] === true;
+  if (!("script" in o)) { result.script = o.scenes === true; result.scenes = false; }
   return result;
 }
 
@@ -161,8 +167,12 @@ export function readProfile(value: unknown, fallbackId = "channel"): ChannelProf
     quality: pick(o.quality, QUALITIES, base.quality),
     script: { writer: pick(script.writer, WRITERS, base.script.writer), masterPrompt: str(script.masterPrompt, MAX_MASTER_PROMPT), claudeAccountId: typeof script.claudeAccountId === "string" && script.claudeAccountId.trim() !== "" ? script.claudeAccountId.trim().slice(0, 40) : null },
     voice: {
+      provider: pick(voice.provider, ["", "edge", "gemini"] as const, ""),
+      edgeVoice: str(voice.edgeVoice, 120),
+      rate: typeof voice.rate === "number" ? num(voice.rate, -50, 100, 0) : undefined,
+      volume: typeof voice.volume === "number" ? num(voice.volume, -100, 100, 0) : undefined,
       model: str(voice.model, 80),
-      voice: str(voice.voice, 40),
+      voice: str(voice.voice, 120),
       style: str(voice.style, 300),
       cutSilence: voice.cutSilence === undefined ? base.voice.cutSilence : voice.cutSilence === true,
     },
@@ -170,6 +180,7 @@ export function readProfile(value: unknown, fallbackId = "channel"): ChannelProf
       mode: pick(scenes.mode, MODES, base.scenes.mode),
       sentencesPerScene: Math.round(num(scenes.sentencesPerScene, 1, 4, base.scenes.sentencesPerScene)),
       targetSeconds: num(scenes.targetSeconds, 1, 60, base.scenes.targetSeconds),
+      ...(validTimingRanges(scenes.timingRanges).length ? { timingRanges: validTimingRanges(scenes.timingRanges) } : {}),
       maxVideoSeconds: num(scenes.maxVideoSeconds, 2, 30, base.scenes.maxVideoSeconds),
       minSeconds: num(scenes.minSeconds, 0, 10, base.scenes.minSeconds ?? 2),
     },

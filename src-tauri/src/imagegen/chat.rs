@@ -299,6 +299,15 @@ pub async fn ask_full(session: &Session, engine: &EngineConfig, prompt: &str, im
 
 /// Like `ask_full`, in a stored thread when `opts.url` is set. Returns the answer and the thread's address.
 pub async fn ask_thread(session: &Session, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration, progress: Progress<'_>, opts: &ThreadOpts) -> Result<(ChatReply, String), GenError> {
+    ask_thread_lifecycle(session, engine, prompt, images, timeout, progress, opts, false).await
+}
+
+/// Claude production conversations stay available for review after the answer.
+pub async fn ask_thread_retained(session: &Session, engine: &EngineConfig, prompt: &str, timeout: Duration, progress: Progress<'_>) -> Result<(ChatReply, String), GenError> {
+    ask_thread_lifecycle(session, engine, prompt, &[], timeout, progress, &ThreadOpts::default(), true).await
+}
+
+async fn ask_thread_lifecycle(session: &Session, engine: &EngineConfig, prompt: &str, images: &[PathBuf], timeout: Duration, progress: Progress<'_>, opts: &ThreadOpts, keep_open: bool) -> Result<(ChatReply, String), GenError> {
     let prompt = prompt.trim();
     if prompt.is_empty() {
         return Err(GenError::new(ErrorKind::BadRequest, "The prompt is empty."));
@@ -313,10 +322,10 @@ pub async fn ask_thread(session: &Session, engine: &EngineConfig, prompt: &str, 
     let tab = session.open_tab().await.map_err(|e| from_cdp(&e, "Opening a chat tab"))?;
     let result = ask_in(session, &tab, engine, prompt, images, timeout, progress, opts).await;
     match &result {
-        Ok((reply, _)) => logging::info(LOG, &format!("ask: finished, answer {} chars, {} code blocks; closing the tab", reply.text.chars().count(), reply.code.len())),
-        Err(error) => logging::warn(LOG, &format!("ask: failed ({:?}): {}; closing the tab", error.kind, error.message)),
+        Ok((reply, _)) => logging::info(LOG, &format!("ask: finished, answer {} chars, {} code blocks; retaining the conversation lifecycle", reply.text.chars().count(), reply.code.len())),
+        Err(error) => logging::warn(LOG, &format!("ask: failed ({:?}): {}; ending the request", error.kind, error.message)),
     }
-    session.close_tab(&tab).await;
+    if !keep_open { session.close_tab(&tab).await; }
     result
 }
 

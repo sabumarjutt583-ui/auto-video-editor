@@ -32,7 +32,7 @@ export function ScenesStep({ project }: { project: Project }) {
     [words, sentences, voiceDuration, settings.maxVideoSeconds],
   );
   const stats = useMemo(() => totals(scenes), [scenes]);
-  const hasPrompts = scenes.some((scene) => scene.prompt.trim() !== "");
+  const hasPrompts = scenes.some((scene) => scene.prompt.trim() !== "" || scene.matchedFile !== null) || Object.keys(project.mediaMap).length > 0;
 
   const apply = useCallback(
     async (next: SceneSettings) => {
@@ -98,6 +98,8 @@ export function ScenesStep({ project }: { project: Project }) {
       )}
 
       <ModeCard
+        words={words}
+        voiceDuration={voiceDuration}
         settings={settings}
         busy={busy}
         onChange={request}

@@ -1,7 +1,7 @@
 import { applySilenceRemoval, importVoice, skipSilenceRemoval } from "../../audio.ts";
-import { ttsGenerate, ttsOptions } from "../../tts/api.ts";
+import { voiceProviderMismatch } from "../providers.ts";
+import { ttsGenerate } from "../../tts/api.ts";
 import { runJob } from "../../../store/jobStore.ts";
-import { useSettingsStore } from "../../../store/settingsStore.ts";
 import { openProjectOf, patchProject, type StageContext } from "./context.ts";
 
 /** Voice: make it from the script (or import the person's file), clean it, lock it. */
@@ -11,20 +11,11 @@ export async function voiceStage(ctx: StageContext): Promise<void> {
     let source = ctx.voiceFile;
     if (source === null) {
       if (project.script.trim() === "") throw new Error("There is no script to make the voice from.");
-      const settings = useSettingsStore.getState().settings;
-      const provider = settings?.ttsProvider ?? "gemini";
+      const { provider, model, voice, style, rate, volume } = ctx.providers.voice;
+      if (voiceProviderMismatch(ctx.providers.voice)) throw new Error("The saved voice does not belong to its provider. Choose the voice provider and voice in Channels > Settings, save, then continue this video.");
       ctx.say(provider === "edge" ? "Making the voice with Edge TTS" : "Making the voice with Gemini");
-      const options = await ttsOptions();
-      const model = ctx.profile.voice.model || settings?.ttsModel || options.defaultModel;
-      // A profile voice (if one is set) always wins; otherwise the provider's
-      // own voice from settings is used. Edge drops the style note, because
-      // Edge would speak Gemini's "Say in a calm voice:" prefix aloud.
-      const voice =
-        ctx.profile.voice.voice ||
-        (provider === "edge" ? settings?.ttsEdgeVoice || options.edgeDefaultVoice : settings?.ttsVoice || options.defaultVoice);
-      const style = provider === "edge" ? "" : ctx.profile.voice.style || settings?.ttsStyle || "";
       const made = await runJob("tts", "Making the voice", (id) =>
-        ttsGenerate(ctx.projectId, { text: project.script, voice, model, style, provider, rate: settings?.ttsRate ?? 0, volume: settings?.ttsVolume ?? 0 }, id),
+        ttsGenerate(ctx.projectId, { text: project.script, voice, model, style, provider, rate, volume }, id),
       );
       source = made.path;
     }

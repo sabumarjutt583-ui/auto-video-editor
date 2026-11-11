@@ -67,8 +67,8 @@ test("Script Writing is its own step, not folded into Scenes", () => {
   const idle = byId(sevenStepsFromView(initialView()));
   assert.equal(idle.script?.state, "pending", "an idle run has no script step yet");
   const started = byId(sevenStepsFromView(restart(initialView())));
-  assert.equal(started.script?.state, "done", "a started run already has its script");
-  assert.equal(started.script?.done, true);
+  assert.equal(started.script?.state, "pending", "script completion requires an actual runner event");
+  assert.equal(started.script?.done, false);
 });
 
 test("the bible is folded into Image Prompts and audio into Video Editing", () => {

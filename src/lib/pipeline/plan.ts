@@ -11,6 +11,8 @@ export function pictureScenes(project: Pick<Project, "scenes">) {
 
 export function stageDone(project: Project, stage: StageId): boolean {
   switch (stage) {
+    case "script":
+      return Boolean(project.script?.trim());
     case "voice":
       return project.voiceLocked && project.voicePath !== null && project.voiceDuration > 0;
     case "timing":

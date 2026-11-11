@@ -172,7 +172,7 @@ export function Step0Card({ profiles, busy, onMakeVideo, ensureConsent }: Props)
           disabled={!canStart}
           onClick={() => {
             if (!profile) return;
-            onMakeVideo({ profile, name: title.trim() || topic.trim(), script, topic, wordCount: wordCount ?? undefined, voiceFile: null, ensureConsent });
+            onMakeVideo({ profile, name: title.trim() || topic.trim(), script, scriptRecord: record ?? undefined, topic, wordCount: wordCount ?? undefined, voiceFile: null, ensureConsent });
           }}
         >
           Make video from this script

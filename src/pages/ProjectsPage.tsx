@@ -1,3 +1,6 @@
+import { Step0Card } from "../components/script/Step0Card";
+import { useConsent } from "../components/imagegen/useConsent";
+import { usePipelineStore } from "../store/pipelineStore";
 import { Clapperboard, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -27,6 +30,8 @@ type Dialog =
 
 export function ProjectsPage() {
   const navigate = useNavigate();
+  const run = usePipelineStore();
+  const { ensure, dialog: consentDialog } = useConsent();
   const { list, loading, error: loadError, reload } = useProjectList();
   const profiles = useProfiles();
   const currentId = useProjectStore((state) => state.project?.id ?? null);
@@ -103,6 +108,13 @@ export function ProjectsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+      {consentDialog}
+      <details className="rounded-2xl border border-line bg-surface p-5">
+        <summary className="cursor-pointer font-semibold">Create video from script</summary>
+        <div className="mt-5">
+          <Step0Card profiles={profiles.profiles} busy={run.running} ensureConsent={ensure} onMakeVideo={(input) => { void run.start(input); navigate("/dashboard"); }} />
+        </div>
+      </details>
       <ProjectsToolbar
         query={query}
         sort={sort}

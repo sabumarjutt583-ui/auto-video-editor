@@ -1,6 +1,6 @@
 import type { AppError } from "../../types/index.ts";
 import { canWriteScript, type ChannelProfile } from "../pipeline/profile.ts";
-import { scriptAsk } from "./api.ts";
+import { scriptAsk, scriptAskTracked } from "./api.ts";
 import { buildScriptQuestion, cleanScript, scriptProblem } from "./prompt.ts";
 import { buildStep0Question, scriptRecordFor, type ScriptRecord } from "./step0.ts";
 
@@ -21,11 +21,11 @@ export async function writeScriptForStep0(
   const title = input.title.trim();
   const topic = input.topic.trim();
   if (title === "" && topic === "") fail("Write a title or topic for the script writer first.", "empty title and topic");
-  const answer = await scriptAsk(buildStep0Question(profile.script.masterPrompt, title, topic, input.wordCount), profile.script.claudeAccountId ?? null);
-  const script = cleanScript(answer);
+  const answer = await scriptAskTracked(buildStep0Question(profile.script.masterPrompt, title, topic, input.wordCount), profile.script.claudeAccountId ?? null);
+  const script = cleanScript(answer.text);
   const problem = scriptProblem(script);
   if (problem) fail(problem, `script words: ${script.split(/\s+/).length}`);
-  return { script, record: scriptRecordFor({ profile, title, topic, wordCount: input.wordCount, script, source: "claude" }) };
+  return { script, record: { ...scriptRecordFor({ profile, title, topic, wordCount: input.wordCount, script, source: "claude" }), claudeConversationUrl: answer.conversationUrl, claudeAccountId: answer.accountId } };
 }
 
 /** Asks the channel's script writer for a script about the topic. Throws an Error with a simple message when it cannot. */

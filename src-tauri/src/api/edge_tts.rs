@@ -228,7 +228,7 @@ fn header_end(frame: &[u8]) -> Option<usize> {
 pub fn extract_audio(frame: &[u8]) -> Option<&[u8]> {
     let end = header_end(frame)?;
     let header = std::str::from_utf8(&frame[..end]).ok()?;
-    if header.contains("Path:audio") {
+    if header.lines().any(|line| line.trim() == "Path:audio") {
         Some(&frame[end + 4..])
     } else {
         None
@@ -502,6 +502,22 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    /// Retain the provider bytes so decoder faults can be separated from synthesis faults.
+    #[tokio::test]
+    #[ignore = "live diagnostic; writes only to AVE_LIVE_EDGE_OUTPUT"]
+    async fn live_edge_capture_source() {
+        let folder = std::path::PathBuf::from(std::env::var_os("AVE_LIVE_EDGE_OUTPUT").expect("output folder"));
+        std::fs::create_dir_all(&folder).unwrap();
+        let text = "안녕하세요. 오늘은 음성 품질을 확인합니다. 문장의 시작과 끝에서 소리가 깨지지 않는지 확인해 주세요. 자연스럽고 깨끗한 목소리로 이야기를 계속합니다.";
+        let mp3 = tokio::time::timeout(SPEAK_TIMEOUT, speak_inner("ko-KR-InJoonNeural", 0, 0, text)).await.unwrap().unwrap();
+        std::fs::write(folder.join("injoon-source.mp3"), &mp3).unwrap();
+        assert!(crate::ffmpeg_job::sidecars_for_tests());
+        let spoken = decode_mp3(&mp3).await.unwrap();
+        let samples = crate::tts::wav::samples_from_pcm(&spoken.pcm);
+        std::fs::write(folder.join("injoon-decoded.wav"), crate::tts::wav::wav_bytes(&samples, spoken.rate)).unwrap();
+        eprintln!("captured {} MP3 bytes, {} PCM samples", mp3.len(), samples.len());
+    }
+
     #[tokio::test]
     async fn long_mp3_is_fed_and_decoded_without_a_pipe_deadlock() {
         assert!(crate::ffmpeg_job::sidecars_for_tests(), "install the FFmpeg sidecar before this integration test");
@@ -634,6 +650,7 @@ mod tests {
         let end_frame = b"X-RequestId:r\r\nPath:turn.end\r\n\r\n";
         assert_eq!(extract_audio(audio_frame), Some(&[1, 2, 3][..]));
         assert_eq!(extract_audio(other_frame), None);
+        assert_eq!(extract_audio(b"Path:audio.metadata\r\nContent-Type:application/json\r\n\r\n{\"Metadata\":[]}"), None);
         assert!(!is_turn_end(audio_frame));
         assert!(is_turn_end(end_frame));
     }

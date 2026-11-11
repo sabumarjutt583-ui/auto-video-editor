@@ -1,24 +1,4 @@
-/** The brother tool's 7-step display, mapped onto this tool's steps (pure).
-
-The brother tool shows: Script Writing, Voice Generation, SRT Generation, Image Prompts,
-Image Generation, Video Editing, Export & Verify. Script Writing is Step 0 here: it is
-its own step, written before the runner starts (typed in, or written by Claude from the
-channel's master prompt), and it is NOT folded into Scenes any more. Its row is driven
-by whether the project has a saved script (`hasScript` on the summary, or a run that
-has started, since a run cannot start without a script or an own voice file):
-
-- Script Writing = the saved script itself (Step 0).
-- Voice Generation = Voice, SRT Generation = Word timing (the word times become the captions).
-- Image Prompts = Characters and places AND Prompts. The character/place bible has to be
-  locked before a prompt can be written in the channel's style, so both count for this step.
-- Image Generation = Pictures, Video Editing = Music and sounds (the mix is the last editing
-  assembly), Export & Verify = Final video (the finished MP4 exists).
-
-The pause-for-review toggles use the same folding for the runner steps: "Approve Image
-Prompts" covers both the bible and the prompts, so ticking it pauses both and unticking
-it pauses neither. "Approve Script" still pauses the Scenes runner step — the first
-runner step that uses the script — while the script itself is reviewed in Step 0 before
-"Make video" is pressed at all, so the script is always seen before it is used. */
+/** Seven dashboard steps mapped to the production controller. Script review is a real checkpoint before voice. */
 
 import type { ProjectSummary } from "../../types/project.ts";
 import { stageProgress } from "./dashboard.ts";
@@ -51,8 +31,10 @@ export function sevenStepLabel(id: SevenStepId): string {
 /** Which display step an existing step belongs to. */
 export function sevenStepForStage(stage: StageId): SevenStepId {
   switch (stage) {
-    case "scenes":
+    case "script":
       return "script";
+    case "scenes":
+      return "srt";
     case "voice":
       return "voice";
     case "timing":
@@ -116,10 +98,7 @@ function combineDetail(details: readonly string[]): string {
   return details.filter((detail) => detail !== "").join(" · ");
 }
 
-/** The 7 display steps for a live run, from its row states. Step 0 is not a
-runner row: a run that has started already has its script (typed, or written
-by Claude, or an own voice file), so a started run counts Step 0 as done and
-an idle run counts it as pending. It is never read from the Scenes row. */
+/** The seven display steps follow actual runner events, including script review. */
 export function sevenStepsFromView(view: RunView): SevenStepRow[] {
   const by = Object.fromEntries(view.rows.map((step) => [step.id, step]));
   const pick = (stages: readonly StageId[]): { state: SevenStepState; detail: string } => {
@@ -130,7 +109,7 @@ export function sevenStepsFromView(view: RunView): SevenStepRow[] {
     const combined = pick(stages);
     return row(id, combined.state === "done", combined.state, combined.detail);
   };
-  const scriptRow: SevenStepRow = view.status === "idle" ? row("script", false, "pending") : row("script", true, "done", "Script saved");
+  const scriptRow = make("script", ["script"]);
   return [
     scriptRow,
     make("voice", ["voice"]),
@@ -163,7 +142,7 @@ export interface ReviewToggle {
 
 /** The brother tool's five pause-for-review toggles, on this tool's steps. */
 export const REVIEW_TOGGLES: readonly ReviewToggle[] = [
-  { id: "script", label: "Approve Script", stages: ["scenes"] },
+  { id: "script", label: "Approve Script", stages: ["script"] },
   { id: "voice", label: "Approve Voice", stages: ["voice"] },
   { id: "srt", label: "Approve SRT", stages: ["timing"] },
   { id: "imagePrompts", label: "Approve Image Prompts", stages: ["cast", "prompts"] },

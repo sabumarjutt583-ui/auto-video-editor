@@ -9,7 +9,7 @@ export async function timingStage(ctx: StageContext): Promise<void> {
   const voice = project.voicePath;
   if (voice === null) throw new Error("The voice is not ready.");
   ctx.say("Groq is listening to the voice");
-  const speech = await runJob("transcribe", "Preparing the voice", (id) => transcribeVoice(ctx.projectId, voice, project.language, id));
+  const speech = await runJob("transcribe", "Preparing the voice", (id) => transcribeVoice(ctx.projectId, voice, project.language, id, ctx.providers.groqWhisperModel));
   if (speech.length === 0) throw new Error("No words were found in the voice.");
   const outcome = buildOutcome(project.script, speech, project.voiceDuration);
   patchProject(ctx, {

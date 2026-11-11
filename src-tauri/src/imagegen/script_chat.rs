@@ -201,7 +201,7 @@ impl ScriptChat {
                     }
                     Err(e) => Err(chat::from_cdp(&e, "Opening the Claude page")),
                 };
-                session.stop().await;
+                // A connection check must not close retained production chats.
                 found
             }
             Err(error) => Err(error),
@@ -250,6 +250,10 @@ impl ScriptChat {
 
     /// Writes one answer: a fresh chat with the prompt. Resting after a usage limit is respected.
     pub async fn ask(&self, browser: &BrowserChoice, config: &EngineConfig, prompt: &str, timeout: Duration, progress: chat::Progress<'_>) -> Result<ChatReply, GenError> {
+        self.ask_tracked(browser, config, prompt, timeout, progress).await.map(|(reply, _)| reply)
+    }
+
+    pub async fn ask_tracked(&self, browser: &BrowserChoice, config: &EngineConfig, prompt: &str, timeout: Duration, progress: chat::Progress<'_>) -> Result<(ChatReply, String), GenError> {
         self.require_consent()?;
         {
             let saved = lock(&self.saved);
@@ -272,13 +276,13 @@ impl ScriptChat {
                         let signed = Self::signed_in_on(&session, &tab, &engine).await;
                         session.close_tab(&tab).await;
                         match signed {
-                            Ok(()) => chat::ask_full(&session, &engine, prompt, &[], timeout, progress).await,
+                            Ok(()) => chat::ask_thread_retained(&session, &engine, prompt, timeout, progress).await,
                             Err(error) => Err(error),
                         }
                     }
                     Err(e) => Err(chat::from_cdp(&e, "Opening the Claude page")),
                 };
-                session.stop().await;
+                // Keep production conversations open; the user decides when to close them.
                 answer
             }
             Err(error) => Err(error),
@@ -309,6 +313,25 @@ impl ScriptChat {
     }
 
     /// Opens the background browser on the Claude profile. The caller stops it when done (a script is rare enough that a lingering browser is not worth it).
+    pub async fn show_conversation(&self, browser: &BrowserChoice, url: &str) -> Result<(), GenError> {
+        let launch = Launch { exe: browser.exe.clone(), profile: self.profile_dir(), mode: Mode::Window, extra_args: browser.extra_args.clone() };
+        let session = Session::open(&launch).await.map_err(|e| chat::from_cdp(&e, "Opening the saved conversation"))?;
+        let targets = session.cdp.call("Target.getTargets", serde_json::json!({}), None).await.map_err(|e| chat::from_cdp(&e, "Finding the saved conversation"))?;
+        let existing = targets["targetInfos"].as_array().and_then(|items| items.iter().find(|t| t["type"] == "page" && t["url"].as_str() == Some(url))).and_then(|t| t["targetId"].as_str());
+        let target = match existing {
+            Some(id) => id.to_string(),
+            None => {
+                let tab = session.open_tab().await.map_err(|e| chat::from_cdp(&e, "Opening the saved conversation"))?;
+                session.navigate_tab(&tab, url, Duration::from_secs(60)).await.map_err(|e| chat::from_cdp(&e, "Loading the saved conversation"))?;
+                tab.target
+            }
+        };
+        session.cdp.call("Target.activateTarget", serde_json::json!({ "targetId": target }), None).await.map_err(|e| chat::from_cdp(&e, "Showing the saved conversation"))?;
+        let window = session.cdp.call("Browser.getWindowForTarget", serde_json::json!({ "targetId": target }), None).await.map_err(|e| chat::from_cdp(&e, "Showing the Claude window"))?;
+        session.cdp.call("Browser.setWindowBounds", serde_json::json!({ "windowId": window["windowId"], "bounds": { "windowState": "normal" } }), None).await.map_err(|e| chat::from_cdp(&e, "Showing the Claude window"))?;
+        Ok(())
+    }
+
     async fn open_browser(&self, browser: &BrowserChoice) -> Result<Session, GenError> {
         let launch = Launch { exe: browser.exe.clone(), profile: self.profile_dir(), mode: browser.mode, extra_args: browser.extra_args.clone() };
         let session = Session::open(&launch).await.map_err(|e| super::errors::classify_browser_error(&e.to_string(), "Starting the browser"))?;

@@ -243,19 +243,23 @@ impl ScriptAccounts {
     }
 
     pub async fn ask_preferred(&self, preferred: Option<&str>, browser: &BrowserChoice, config: &crate::imagegen::config::EngineConfig, prompt: &str, timeout: std::time::Duration, progress: chat::Progress<'_>) -> Result<ChatReply, GenError> {
+        self.ask_preferred_tracked(preferred, browser, config, prompt, timeout, progress).await.map(|(reply, _, _)| reply)
+    }
+
+    pub async fn ask_preferred_tracked(&self, preferred: Option<&str>, browser: &BrowserChoice, config: &crate::imagegen::config::EngineConfig, prompt: &str, timeout: std::time::Duration, progress: chat::Progress<'_>) -> Result<(ChatReply, String, String), GenError> {
         if !self.consent() {
             return Err(GenError::new(ErrorKind::BadRequest, "Please read and accept the notice about the script writer first (Settings, Script writer)."));
         }
         let entries: Vec<(String, std::sync::Arc<ScriptChat>)> = lock(&self.inner).accounts.iter().map(|a| (a.id.clone(), a.chat.clone())).collect();
-        let mut chats: Vec<std::sync::Arc<ScriptChat>> = Vec::with_capacity(entries.len());
+        let mut chats: Vec<(String, std::sync::Arc<ScriptChat>)> = Vec::with_capacity(entries.len());
         if let Some(wanted) = preferred {
-            if let Some((_, chat)) = entries.iter().find(|(id, _)| id.as_str() == wanted) {
-                chats.push(chat.clone());
+            if let Some((id, chat)) = entries.iter().find(|(id, _)| id.as_str() == wanted) {
+                chats.push((id.clone(), chat.clone()));
             }
         }
         for (id, chat) in &entries {
             if Some(id.as_str()) != preferred {
-                chats.push(chat.clone());
+                chats.push((id.clone(), chat.clone()));
             }
         }
         if chats.is_empty() {
@@ -266,7 +270,7 @@ impl ScriptAccounts {
         let mut tried = 0usize;
         let mut earliest: Option<u64> = None;
         let mut any_signed_out = false;
-        for chat in &chats {
+        for (id, chat) in &chats {
             let status = chat.status();
             if status.limited_until > now {
                 earliest = Some(match earliest {
@@ -276,8 +280,8 @@ impl ScriptAccounts {
                 continue;
             }
             tried += 1;
-            match chat.ask(browser, config, prompt, timeout, progress).await {
-                Ok(reply) => return Ok(reply),
+            match chat.ask_tracked(browser, config, prompt, timeout, progress).await {
+                Ok((reply, url)) => return Ok((reply, url, id.clone())),
                 Err(error) => match error.kind {
                     ErrorKind::RateLimit => {
                         let status = chat.status();
@@ -398,17 +402,19 @@ pub async fn script_account_disconnect(script: Script<'_>, id: String) -> Result
 /// person can watch it live. View-only: nothing is typed or clicked by the tool, and the
 /// window stays open for the person to close. Uses the account's own browser profile.
 #[tauri::command]
-pub async fn script_open_live(script: Script<'_>, ig: State<'_, std::sync::Arc<ImageGen>>, account_id: Option<String>) -> Result<(), AppError> {
+pub async fn script_open_live(script: Script<'_>, ig: State<'_, std::sync::Arc<ImageGen>>, account_id: Option<String>, conversation_url: Option<String>) -> Result<(), AppError> {
     let browser = browser_of(&ig).map_err(|e| to_app_error(&e))?;
     let config = ig.engine.config();
     let id = match account_id {
         Some(id) => id,
         None => lock(&script.inner).accounts.first().map(|a| a.id.clone()).ok_or_else(|| AppError::new("No Claude account has been added yet. Add one in Settings, Script writer.", "no Claude accounts"))?,
     };
-    let profile = script.profile_dir_for(&id)?;
-    let window = crate::imagegen::browser::signin::PlainWindow::open(&browser.exe, &profile, &config.script.url).await.map_err(|e| AppError::new("The Claude page could not be opened.", e))?;
-    // The window is left open for the person (dropping the handle does not close the browser).
-    drop(window);
+    let url = match conversation_url.as_deref() {
+        Some(url) if valid_conversation_url(url) => url,
+        Some(_) => return Err(AppError::new("This video has no valid saved Claude conversation.", "invalid Claude conversation URL")),
+        None => &config.script.url,
+    };
+    script.get(&id)?.show_conversation(&browser, url).await.map_err(|e| to_app_error(&e))?;
     Ok(())
 }
 
@@ -465,6 +471,11 @@ pub async fn script_disconnect(script: Script<'_>) -> Result<ScriptStatus, AppEr
     Ok(script.combined_status())
 }
 
+
+fn valid_conversation_url(value: &str) -> bool {
+    value.strip_prefix("https://claude.ai/chat/").map(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')).unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -484,6 +495,8 @@ mod tests {
 #[serde(rename_all = "camelCase")]
 pub struct ScriptAnswer {
     pub text: String,
+    pub conversation_url: String,
+    pub account_id: String,
 }
 
 /// Writes one script: the prompt goes into a fresh Claude chat and the finished answer comes back. Can be cancelled.
@@ -496,9 +509,9 @@ pub async fn script_ask(app: AppHandle, jobs: State<'_, JobRegistry>, script: Sc
     job.progress("Asking Claude to write the script", 5.0);
     let report = |msg: String| job.progress(&msg, 30.0);
     let timeout = std::time::Duration::from_secs(MIN_ANSWER_WAIT_SECS);
-    let reply = tokio::select! {
+    let (reply, conversation_url, account_id) = tokio::select! {
         () = job.cancelled() => return Err(AppError::cancelled()),
-        reply = script.ask_preferred(account_id.as_deref(), &browser, &config, &prompt, timeout, Some(&report)) => reply.map_err(|e| to_app_error(&e))?,
+        reply = script.ask_preferred_tracked(account_id.as_deref(), &browser, &config, &prompt, timeout, Some(&report)) => reply.map_err(|e| to_app_error(&e))?,
     };
-    Ok(ScriptAnswer { text: reply.text })
+    Ok(ScriptAnswer { text: reply.text, conversation_url, account_id })
 }

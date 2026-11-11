@@ -56,7 +56,7 @@ export function nextWaitingApproval(state: ApprovalState, pauses: Pauses): Stage
 }
 
 /** Reads the approval of every step out of a run view, so the store never has to keep a second copy:
-waiting = pending, running/done/skipped = approved (a running step already passed its pause),
+waiting = pending, done/skipped = approved; running output is not yet reviewed,
 error = needs-attention, the step a run stopped at = rejected, everything else = pending. */
 export function approvalFromView(view: RunView): ApprovalState {
   const state = initialApprovals();
@@ -65,7 +65,6 @@ export function approvalFromView(view: RunView): ApprovalState {
       case "waiting":
         state[row.id] = "pending";
         break;
-      case "running":
       case "done":
       case "skipped":
         state[row.id] = "approved";
@@ -78,7 +77,7 @@ export function approvalFromView(view: RunView): ApprovalState {
     }
   }
   if (view.status === "stopped") {
-    const stopped = view.rows.find((row) => row.detail === "Stopped before this step");
+    const stopped = view.rows.find((row) => row.detail === "Stopped after review");
     if (stopped) state[stopped.id] = "rejected";
   }
   return state;

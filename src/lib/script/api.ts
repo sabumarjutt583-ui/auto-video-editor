@@ -34,10 +34,14 @@ export const scriptAccountConfirmSignedIn = (id: string): Promise<void> => invok
 export const scriptAccountCheck = (id: string): Promise<ScriptAccountStatus> => invoke<ScriptAccountStatus>("script_account_check", { id });
 export const scriptAccountDisconnect = (id: string): Promise<ScriptAccountStatus> => invoke<ScriptAccountStatus>("script_account_disconnect", { id });
 /** Opens one Claude account's chat page in the person's own browser window, view-only. */
-export const scriptOpenLive = (accountId?: string | null): Promise<void> => invoke<void>("script_open_live", { accountId: accountId ?? null });
+export const scriptOpenLive = (accountId?: string | null, conversationUrl?: string | null): Promise<void> => invoke<void>("script_open_live", { accountId: accountId ?? null, conversationUrl: conversationUrl ?? null });
 export const scriptAccountSetLimit = (id: string, untilMs: number): Promise<ScriptAccountStatus> => invoke<ScriptAccountStatus>("script_account_set_limit", { id, untilMs });
 
 /** Claude's answer to one question, in a fresh chat. Can be cancelled like other jobs. */
+export interface ScriptAnswer { text: string; conversationUrl: string; accountId: string }
+export async function scriptAskTracked(prompt: string, accountId?: string | null): Promise<ScriptAnswer> {
+  return runJob("script", "Writing the script", (jobId) => invoke<ScriptAnswer>("script_ask", { prompt, jobId, accountId: accountId ?? null }));
+}
 export async function scriptAsk(prompt: string, accountId?: string | null): Promise<string> {
   const answer = await runJob("script", "Writing the script", (jobId) => invoke<{ text: string }>("script_ask", { prompt, jobId, accountId: accountId ?? null }));
   return answer.text;

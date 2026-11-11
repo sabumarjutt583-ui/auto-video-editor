@@ -1,4 +1,4 @@
-/** Step 0 — Script Writing, the first step of a new video (pure).
+/** Step 0 â€” Script Writing, the first step of a new video (pure).
 
 The script is written BEFORE the runner starts, so it is not one of the runner's
 8 steps and it is not folded into Scenes any more: on the Dashboard bar it has
@@ -40,6 +40,8 @@ export interface ScriptRecord {
   /** A fingerprint of the master prompt used, so a later audit can show which
   channel prompt produced the script. Changes whenever the master prompt changes. */
   masterPromptVersion: string;
+  claudeConversationUrl?: string;
+  claudeAccountId?: string;
 }
 
 /** Word counts the person may ask for. Outside this range the number is clamped. */
@@ -129,6 +131,8 @@ export function recordFromProject(project: {
   scriptTopic?: string;
   scriptWordsRequested?: number;
   scriptMasterPromptVersion?: string;
+  claudeConversationUrl?: string;
+  claudeAccountId?: string;
 }): ScriptRecord | null {
   if (project.scriptSource !== "claude" && project.scriptSource !== "typed") return null;
   return {
@@ -140,5 +144,6 @@ export function recordFromProject(project: {
     wordCountActual: countScriptWords(project.script),
     source: project.scriptSource,
     masterPromptVersion: project.scriptMasterPromptVersion ?? "",
+    ...(project.claudeConversationUrl ? { claudeConversationUrl: project.claudeConversationUrl, claudeAccountId: project.claudeAccountId } : {}),
   };
 }

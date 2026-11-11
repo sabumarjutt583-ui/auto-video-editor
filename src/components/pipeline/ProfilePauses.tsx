@@ -10,7 +10,7 @@ interface Props {
 /** Steps where "Make video" stops and waits for you. Everything else runs by itself. */
 export function ProfilePauses({ profile, onChange }: Props) {
   return (
-    <Card title="Ask me before…" description="Tick a step to check it before it starts (for example to listen to the voice). Unticked steps run by themselves.">
+    <Card title="Ask me before…" description="Tick a step to review its completed output before the next step starts. Unticked steps continue automatically.">
       <div className="grid gap-3 sm:grid-cols-2">
         {STAGES.map((stage) => (
           <Checkbox key={stage.id} label={stage.label} checked={profile.pauses[stage.id]} onChange={(e) => onChange({ ...profile, pauses: { ...profile.pauses, [stage.id]: e.target.checked } })} />

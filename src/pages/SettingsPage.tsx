@@ -1,3 +1,4 @@
+import { GoogleDriveCard } from "../components/settings/GoogleDriveCard";
 import { ShieldCheck } from "lucide-react";
 import { GraphicCacheCard } from "../components/graphics/cache/GraphicCacheCard";
 import { useEffect } from "react";
@@ -68,6 +69,7 @@ export function SettingsPage() {
       <ImageGeneratorCard />
 
       <ScriptWriterCard />
+      <GoogleDriveCard />
 
       <ChatGptCard />
 

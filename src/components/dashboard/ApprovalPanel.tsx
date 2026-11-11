@@ -1,3 +1,4 @@
+import { useProjectStore } from "../../store/projectStore";
 import { AlertTriangle, Play } from "lucide-react";
 
 import { approvalFromView, stagesNeedingAttention } from "../../lib/pipeline/approval";
@@ -35,6 +36,7 @@ which scenes failed, and the five pause toggles. Nothing here runs a step: Appro
 and Stop go to the store's existing answer, and Resume is the store's existing resume path
 (finished steps are skipped, missing scenes are sent again). */
 export function ApprovalPanel({ view, waiting, finished, pauses, onPausesChange, onAnswer, onResume, failedScenes, failedProjectName }: Props) {
+  const script = useProjectStore((state) => state.project?.script ?? "");
   const summary = runSummary(view, finished);
   const approvals = approvalFromView(view);
   const attention = stagesNeedingAttention(approvals);
@@ -46,6 +48,13 @@ export function ApprovalPanel({ view, waiting, finished, pauses, onPausesChange,
         {summary.nextAction} ({summary.percent}% of the steps are finished.)
       </p>
 
+      {waiting === "script" && (
+        <div className="rounded-xl border border-border p-4">
+          <h3 className="mb-2 text-sm font-semibold">Script ready for review</h3>
+          <p className="mb-2 text-xs text-muted">Voice generation starts only after you approve this script.</p>
+          <pre className="max-h-80 overflow-y-auto whitespace-pre-wrap font-sans text-sm">{script}</pre>
+        </div>
+      )}
       {waiting ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3">
           <p className="text-sm font-medium">
@@ -111,7 +120,7 @@ export function ApprovalPanel({ view, waiting, finished, pauses, onPausesChange,
       {pauses !== null && onPausesChange && (
         <div>
           <h3 className="text-sm font-semibold">Pause for review</h3>
-          <p className="text-xs text-muted">Tick a step to check it before it starts. These change the next video, not the one running now — the running video already took its pauses when it started.</p>
+          <p className="text-xs text-muted">Tick a step to review its output before the next step starts. These change the next video, not the one running now — the running video already took its pauses when it started.</p>
           <div className="mt-2 grid gap-3 sm:grid-cols-2">
             {REVIEW_TOGGLES.map((toggle) => (
               <Checkbox

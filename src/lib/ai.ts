@@ -7,6 +7,6 @@ export interface TextAnswer {
 }
 
 /** Asks Gemini (with the optional Groq backup from Settings) and returns the answer text. */
-export function generateText(prompt: string, system: string | null, json: boolean, jobId: string): Promise<TextAnswer> {
-  return invoke<TextAnswer>("generate_text", { system, prompt, json, jobId });
+export function generateText(prompt: string, system: string | null, json: boolean, jobId: string, options?: Pick<import("./pipeline/providers.ts").ProviderSnapshot, "textProvider" | "geminiModel" | "groqTextModel" | "fallbackToGroq">): Promise<TextAnswer> {
+  return invoke<TextAnswer>("generate_text", { system, prompt, json, jobId, options: options ?? null });
 }

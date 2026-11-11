@@ -3,6 +3,23 @@
 All notable changes to Auto Video Editor are written here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [0.7.5] - 2026-11-03
+
+### Added
+- Channel settings with explicit save, provider-specific voices, favourites, and readable language labels.
+- Multi-instruction Claude script jobs with saved conversation links and approval-aware browser lifetime.
+- Google Drive/Docs connection and per-project script document support. Live account verification remains pending; media and final video storage remain local.
+- Custom timing ranges and duration-based scene scheduling using cached word timings.
+
+### Improved
+- Production dashboard, channel navigation, job progress, and pipeline resume handling.
+- Voice-provider validation and Microsoft Edge TTS audio processing, chunk handling, and overflow protection.
+- Scene duration handling, short final scenes, and timing validation.
+
+## [0.7.4] - 2026-10-31
+
+### Fixed
+- Release version increased to avoid overwriting the existing published v0.7.3 release.
 ## [0.7.3] - 2026-10-28
 
 ### Fixed

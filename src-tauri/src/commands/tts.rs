@@ -128,7 +128,7 @@ fn checked(request: &TtsRequest) -> Result<Checked, AppError> {
         }
         return Ok(Checked {
             provider,
-            model_key: "edge-tts".to_string(),
+            model_key: "edge-tts-audio-v2".to_string(),
             rate: request.rate,
             volume: request.volume,
             style: String::new(),
@@ -151,6 +151,7 @@ async fn speak_with_tries(model: &str, voice: &str, text: &str) -> Result<Spoken
     let mut last = ApiError::BadResponse("no try".to_string());
     for attempt in 0..TRIES {
         // Every saved Gemini key is tried before a limit is reported.
+        crate::logging::info("tts", &format!("provider=gemini attempt={}", attempt + 1));
         match rotate::run_api(Provider::Gemini, |key| async move { speak(&key, model, voice, text).await }).await {
             Ok(spoken) => return Ok(spoken),
             // A wrong key or a full quota will not get better by asking again.
@@ -175,6 +176,7 @@ async fn speak_piece(check: &Checked, voice: &str, text: &str) -> Result<Spoken,
     if check.provider == "edge" {
         let mut last = ApiError::BadResponse("no try".to_string());
         for attempt in 0..TRIES {
+            crate::logging::info("tts", &format!("provider=edge attempt={}", attempt + 1));
             match edge_tts::speak(voice, check.rate, check.volume, text).await {
                 Ok(spoken) => return Ok(spoken),
                 Err(error @ ApiError::RateLimited(_)) => return Err(error),
@@ -224,6 +226,7 @@ pub async fn tts_preview_full(
 /// Speaks the whole script piece by piece and joins the pieces into `audio/tts/voice.wav` of the project.
 #[tauri::command]
 pub async fn tts_generate(app: AppHandle, jobs: State<'_, JobRegistry>, project_id: String, request: TtsRequest, job_id: String) -> Result<TtsResult, AppError> {
+    let generation_started = std::time::Instant::now();
     let check = checked(&request)?;
     let folder: PathBuf = project_folder(&app, &project_id)?.join("audio").join("tts");
     let job = jobs.begin(&job_id, "tts", event_sink(app.clone()))?;
@@ -254,6 +257,7 @@ pub async fn tts_generate(app: AppHandle, jobs: State<'_, JobRegistry>, project_
             reused += 1;
         }
     }
+    crate::logging::info("tts", &format!("start provider={} pieces={total} reused={reused} workers={AT_ONCE}", check.provider));
     let mut done = reused;
     job.progress(&format!("Voice: piece {done} of {total}"), done as f64 / total as f64 * 95.0);
 
@@ -277,7 +281,10 @@ pub async fn tts_generate(app: AppHandle, jobs: State<'_, JobRegistry>, project_
         running.spawn(async move {
             let _slot = limit.acquire_owned().await;
             let piece_check = Checked { provider, model_key, rate, volume, style };
-            (index, speak_piece(&piece_check, &voice, &text).await)
+            let started = std::time::Instant::now();
+            let result = speak_piece(&piece_check, &voice, &text).await;
+            crate::logging::info("tts", &format!("piece={} elapsed_ms={} success={}", index + 1, started.elapsed().as_millis(), result.is_ok()));
+            (index, result)
         });
     }
     while !running.is_empty() {
@@ -293,6 +300,8 @@ pub async fn tts_generate(app: AppHandle, jobs: State<'_, JobRegistry>, project_
         match outcome {
             Ok(spoken) => {
                 let samples = wav::samples_from_pcm(&spoken.pcm);
+                let clipped = samples.iter().filter(|s| **s == i16::MIN || **s == i16::MAX).count();
+                crate::logging::info("tts", &format!("piece={} audio_seconds={:.2} full_scale_samples={clipped}", index + 1, wav::seconds(&samples, spoken.rate)));
                 let (saving, name) = (folder.clone(), names[index].clone());
                 let to_save = samples.clone();
                 run_blocking(move || tts::save_piece(&saving, index, &name, &to_save, spoken.rate).map_err(|e| AppError::new("A finished piece of the voice could not be saved.", e.to_string()))).await?;
@@ -313,6 +322,7 @@ pub async fn tts_generate(app: AppHandle, jobs: State<'_, JobRegistry>, project_
         }
     }
 
+    let joining_started = std::time::Instant::now();
     job.progress("Joining the pieces", 97.0);
     let rate = pieces.iter().flatten().map(|(_, r)| *r).next().unwrap_or(wav::SAMPLE_RATE);
     let ordered: Vec<(Vec<i16>, bool)> = pieces.into_iter().zip(chunks.iter()).map(|(p, c)| (p.map(|(s, _)| s).unwrap_or_default(), c.paragraph_end)).collect();
@@ -330,6 +340,7 @@ pub async fn tts_generate(app: AppHandle, jobs: State<'_, JobRegistry>, project_
         })
         .await?
     };
+    crate::logging::info("tts", &format!("done elapsed_ms={} joining_ms={} audio_seconds={duration:.2} pieces={total} reused={reused}", generation_started.elapsed().as_millis(), joining_started.elapsed().as_millis()));
     job.progress("Done", 100.0);
     Ok(TtsResult { path: out_path.to_string_lossy().into_owned(), duration, pieces: total, reused })
 }
@@ -376,7 +387,7 @@ mod tests {
     fn an_edge_request_needs_no_gemini_model_and_drops_the_style_note() {
         let check = checked(&edge_request("Hello.", "ko-KR-SunHiNeural")).unwrap();
         assert_eq!(check.provider, "edge");
-        assert_eq!(check.model_key, "edge-tts");
+        assert_eq!(check.model_key, "edge-tts-audio-v2");
         assert_eq!(check.style, "");
         assert_eq!((check.rate, check.volume), (20, -10));
         assert!(checked(&edge_request("Hello.", "Kore")).is_err());

@@ -1,5 +1,5 @@
 import { Merge, Scissors } from "lucide-react";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { cn } from "../../lib/cn";
 import { LONG_IMAGE_SECONDS } from "../../lib/scenes/edit";
@@ -32,6 +32,25 @@ function preview(words: readonly Word[], from: number): string {
 
 /** One scene: timecode, length, editable text, image/video toggle, merge and split. */
 export function SceneRow({ scene, words, isLast, choices, characters, locations, onToggleCharacter, onLocation, onMedia, onMerge, onSplit, onText }: SceneRowProps) {
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const node = textRef.current;
+    if (!node) return;
+    const resize = () => {
+      node.style.height = "auto";
+      node.style.height = `${node.scrollHeight}px`;
+    };
+    resize();
+    let lastWidth = node.parentElement?.clientWidth;
+    const observer = new ResizeObserver(() => {
+      const width = node.parentElement?.clientWidth;
+      if (width !== lastWidth) { lastWidth = width; resize(); }
+    });
+    // Observe the parent width; observing the textarea height itself causes a resize loop.
+    if (node.parentElement) observer.observe(node.parentElement);
+    return () => observer.disconnect();
+  }, [scene.text]);
+  const displayedDuration = (Math.round(scene.end * 10) - Math.round(scene.start * 10)) / 10;
   const [splitting, setSplitting] = useState(false);
   const longImage = scene.mediaType === "image" && scene.duration > LONG_IMAGE_SECONDS;
 
@@ -40,15 +59,16 @@ export function SceneRow({ scene, words, isLast, choices, characters, locations,
       <div className="grid grid-cols-[minmax(11rem,13rem)_4.5rem_1fr_auto] items-start gap-3">
         <div className="font-mono text-xs leading-6 tabular-nums">{formatTimecode(scene.id, scene.start, scene.end)}</div>
         <div className={cn("text-sm leading-6 tabular-nums", longImage ? "font-medium text-warning" : "text-muted")} title={longImage ? "An image this long may feel static. Consider splitting it." : undefined}>
-          {scene.duration.toFixed(1)} s
+          {displayedDuration.toFixed(1)} s
         </div>
         <textarea
+          ref={textRef}
           aria-label={`Text of ${scene.id}`}
           dir="auto"
           rows={Math.max(1, Math.min(5, Math.ceil(scene.text.length / 90)))}
           value={scene.text}
           onChange={(event) => onText(event.target.value)}
-          className="w-full resize-y rounded-lg border border-transparent bg-transparent px-2 py-0.5 text-sm hover:border-line focus:border-accent"
+          className="w-full resize-none overflow-hidden rounded-lg border border-transparent bg-transparent px-2 py-0.5 text-sm hover:border-line focus:border-accent"
         />
         <div className="flex items-center gap-1">
           <div role="radiogroup" aria-label={`Media of ${scene.id}`} className="mr-1 inline-flex gap-0.5 rounded-lg border border-line bg-surface p-0.5">

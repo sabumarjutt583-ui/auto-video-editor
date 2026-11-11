@@ -7,6 +7,7 @@ import type { ChannelProfile } from "../profile.ts";
 export interface StageContext {
   projectId: string;
   profile: ChannelProfile;
+  providers: import("../providers.ts").ProviderSnapshot;
   /** The person's own voice file (full path), or null to make the voice from the script. */
   voiceFile: string | null;
   /** Shows a short line under the step on the run screen. */

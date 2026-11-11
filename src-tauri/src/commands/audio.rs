@@ -29,6 +29,42 @@ fn audio_folder(project_dir: &Path) -> PathBuf {
     project_dir.join("audio")
 }
 
+// Stage and flush the new audio before replacing any existing recording.
+fn install_voice(source: &Path, target: &Path, folder: &Path) -> std::io::Result<()> {
+    if source.canonicalize()? == target.canonicalize().unwrap_or_else(|_| target.to_path_buf()) {
+        return Ok(());
+    }
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos();
+    let stage = folder.join(format!("voice-{stamp}.tmp"));
+    let backup = folder.join(format!("voice-{stamp}.backup"));
+    let result = (|| {
+        let mut input = std::fs::File::open(source)?;
+        let mut output = std::fs::OpenOptions::new().write(true).create_new(true).open(&stage)?;
+        std::io::copy(&mut input, &mut output)?;
+        output.sync_all()?;
+        drop(output);
+        let had_target = target.exists();
+        if had_target { std::fs::rename(target, &backup)?; }
+        if let Err(error) = std::fs::rename(&stage, target) {
+            if had_target { std::fs::rename(&backup, target)?; }
+            return Err(error);
+        }
+        if had_target { let _ = std::fs::remove_file(&backup); }
+        if let Ok(entries) = std::fs::read_dir(folder) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if path != target && (is_voice_file(&name) || name == TEMP_FILE) {
+                    let _ = std::fs::remove_file(path);
+                }
+            }
+        }
+        Ok(())
+    })();
+    let _ = std::fs::remove_file(stage);
+    result
+}
+
 /// Copies a voice file into the project as `audio/original.<ext>` and reads its details.
 /// Any earlier voice files of the project are removed.
 #[tauri::command]
@@ -53,17 +89,8 @@ pub async fn import_voice(app: AppHandle, project_id: String, source_path: Strin
     let target = folder.join(format!("{ORIGINAL_STEM}.{extension}"));
     run_blocking(move || {
         std::fs::create_dir_all(&folder).map_err(|e| AppError::new("The audio folder could not be created.", e.to_string()))?;
-        if let Ok(entries) = std::fs::read_dir(&folder) {
-            for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().into_owned();
-                if name.starts_with(&format!("{ORIGINAL_STEM}.")) || name == PROCESSED_FILE || name == TEMP_FILE {
-                    let _ = std::fs::remove_file(entry.path());
-                }
-            }
-        }
-        std::fs::copy(&source, &target)
-            .map(|_| ())
-            .map_err(|e| AppError::new("The voice file could not be copied into the project.", format!("{e} ({})", target.display())))
+        install_voice(&source, &target, &folder)
+            .map_err(|e| AppError::new("The voice file could not be saved into the project. Check available disk space and try again.", format!("{e} ({})", target.display())))
     })
     .await?;
 

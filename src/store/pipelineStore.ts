@@ -1,14 +1,17 @@
+import { voiceProviderMismatch, captureProviders, type ProviderSnapshot } from "../lib/pipeline/providers";
+import { ttsOptions } from "../lib/tts/api";
+import { useSettingsStore } from "./settingsStore";
 import { create } from "zustand";
 import { acquireProject } from "../lib/pipeline/activity.ts";
 
 import { isCancelled, toAppError } from "../lib/errors";
-import { stageDone } from "../lib/pipeline/plan";
+import { pictureScenes, stageDone } from "../lib/pipeline/plan";
 import { profileProblems, type ChannelProfile } from "../lib/pipeline/profile";
 import { runPipeline } from "../lib/pipeline/runner";
 import { STAGE_IDS, type StageId } from "../lib/pipeline/stages";
 import { initialView, reduceView, withDetail, type RunView } from "../lib/pipeline/view";
 import { runStage } from "../lib/pipeline/impl";
-import { writeScript, writeScriptForStep0 } from "../lib/script/write";
+import { writeScriptForStep0 } from "../lib/script/write";
 import { recordFromProject, scriptRecordFor, type ScriptRecord } from "../lib/script/step0.ts";
 import { applyChannelProfile } from "../lib/pipeline/impl/applyProfile";
 import { createProject } from "../lib/projects";
@@ -18,8 +21,10 @@ import { useProjectStore } from "./projectStore";
 
 export interface MakeVideoInput {
   profile: ChannelProfile;
+  providers?: ProviderSnapshot;
   name: string;
   script: string;
+  scriptRecord?: ScriptRecord;
   /** What the video is about. When the script is empty and the channel has a script writer, the script is written from this. */
   topic?: string;
   /** Step 0 word count asked for from Claude, or undefined when none was asked. */
@@ -77,7 +82,7 @@ async function persistRun(projectId: string, status: string, currentStage: strin
   if (!project || project.id !== projectId) throw new Error("The running project is no longer open.");
   const completedStages = STAGE_IDS.filter((stage) => stageDone(project, stage));
   useProjectStore.getState().update({
-    makeVideoRun: { status, currentStage: currentStage ?? "", completedStages, failedScenes, updatedAt: new Date().toISOString() },
+    makeVideoRun: { ...project.makeVideoRun, status, currentStage: currentStage ?? "", completedStages, failedScenes, updatedAt: new Date().toISOString() },
   });
   await useProjectStore.getState().flush();
   const saved = useProjectStore.getState();
@@ -87,19 +92,36 @@ async function persistRun(projectId: string, status: string, currentStage: strin
 function failedSceneIds(projectId: string): string[] {
   const project = useProjectStore.getState().project;
   if (!project || project.id !== projectId) return [];
-  return project.scenes.filter((scene) => scene.prompt.trim() !== "" && !project.mediaMap[scene.id]).map((scene) => scene.id);
+  return pictureScenes(project).filter((scene) => !project.mediaMap[scene.id]).map((scene) => scene.id);
 }
 let answerFn: ((go: boolean) => void) | null = null;
 let last: { input: MakeVideoInput; projectId: string } | null = null;
 let currentStage: StageId | null = null;
 
+async function providerChoices(profile: ChannelProfile): Promise<ProviderSnapshot> {
+  if (!useSettingsStore.getState().settings) await useSettingsStore.getState().load();
+  const settings = useSettingsStore.getState().settings;
+  if (!settings) throw new Error("Your provider settings could not be loaded.");
+  return captureProviders(settings, profile, await ttsOptions());
+}
+
 export const usePipelineStore = create<PipelineState>((set, get) => {
   async function execute(input: MakeVideoInput, id: string): Promise<void> {
+    input = { ...input, profile: structuredClone(input.profile) };
+    const savedProject = useProjectStore.getState().project;
+    if (!Object.prototype.hasOwnProperty.call(input.profile.pauses, "script")) {
+      input.profile.pauses = { ...input.profile.pauses, script: input.profile.pauses.scenes, scenes: false };
+    }
+    const providers = savedProject?.makeVideoRun?.providerSnapshot ?? input.providers ?? await providerChoices(input.profile);
+    if (savedProject?.id === id) {
+      useProjectStore.getState().update({ makeVideoRun: { status: "running", currentStage: "", completedStages: [], failedScenes: [], updatedAt: new Date().toISOString(), ...savedProject.makeVideoRun, profileSnapshot: input.profile, providerSnapshot: providers } });
+    }
     pauseFlag = false;
     set({ running: true, paused: false, error: null, finished: null, view: initialView() });
     const ctx = {
       projectId: id,
       profile: input.profile,
+      providers,
       voiceFile: input.voiceFile,
       say: (text: string) => {
         const stage = currentStage;
@@ -114,10 +136,16 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
         stages: STAGE_IDS,
         isDone: (stage) => {
           const project = useProjectStore.getState().project;
-          return project !== null && project.id === id && stageDone(project, stage);
+          return project !== null && project.id === id && (stage === "script" && !project.script.trim() && (input.voiceFile !== null || Boolean(project.voiceOriginalPath)) || stageDone(project, stage));
         },
         run: async (stage) => {
           currentStage = stage;
+          const project = useProjectStore.getState().project;
+          if (project?.makeVideoRun) {
+            const index = STAGE_IDS.indexOf(stage);
+            useProjectStore.getState().update({ makeVideoRun: { ...project.makeVideoRun,
+              approvedStages: (project.makeVideoRun.approvedStages ?? []).filter((item) => STAGE_IDS.indexOf(item as StageId) < index) } });
+          }
           await persistRun(id, pauseFlag ? "paused" : "running", stage, failedSceneIds(id));
           // Pause takes effect between steps: wait here until resumed or cancelled.
           while (pauseFlag && !cancelFlag) {
@@ -129,16 +157,27 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
           await runStage(stage, ctx);
           await persistRun(id, "running", stage, failedSceneIds(id));
         },
-        pauses: input.profile.pauses,
-        confirm: (stage) =>
-          new Promise<boolean>((resolve) => {
+        pauses: { ...input.profile.pauses, script: input.profile.pauses.script && Boolean(useProjectStore.getState().project?.script.trim()) },
+        isApproved: (stage) => useProjectStore.getState().project?.makeVideoRun?.approvedStages?.includes(stage) ?? false,
+        onApproved: async (stage) => {
+          const project = useProjectStore.getState().project;
+          if (!project?.makeVideoRun || project.id !== id) throw new Error("The running project is no longer open.");
+          useProjectStore.getState().update({ makeVideoRun: { ...project.makeVideoRun,
+            approvedStages: [...new Set([...(project.makeVideoRun.approvedStages ?? []), stage])] } });
+          await persistRun(id, "running", stage, failedSceneIds(id));
+        },
+        confirm: async (stage) => {
+          currentStage = stage;
+          await persistRun(id, "waiting", stage, failedSceneIds(id));
+          return new Promise<boolean>((resolve) => {
             set({ waiting: stage });
             answerFn = (go) => {
               set({ waiting: null });
               answerFn = null;
               resolve(go);
             };
-          }),
+          });
+        },
         cancelRequested: () => cancelFlag,
         isCancel: isCancelled,
         onEvent: (event) => {
@@ -147,6 +186,9 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
         },
       });
       await persistRun(id, outcome === "cancelled" ? "stopped" : outcome, outcome === "finished" ? null : currentStage, failedSceneIds(id));
+    } catch (caught) {
+      await persistRun(id, "failed", currentStage, failedSceneIds(id));
+      throw caught;
     } finally {
       currentStage = null;
       pauseFlag = false;
@@ -179,23 +221,19 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
       if (found.length > 0) return;
       set({ running: true, view: initialView(), error: null, finished: null, projectId: null, channelId: null, scriptRecord: null });
       try {
+        input = { ...input, profile: structuredClone(input.profile), providers: await providerChoices(input.profile) };
         // Step 0: the script is settled before any project is made, so a failed
         // writer leaves no empty project behind. A typed script is used as-is
         // and never calls Claude; an empty script with a topic calls Claude.
         let record: ScriptRecord | null = null;
         if (input.script.trim() !== "") {
-          record = scriptRecordFor({ profile: input.profile, title: input.name.trim() || input.profile.name, topic: input.topic ?? "", wordCount: input.wordCount ?? null, script: input.script, source: "typed" });
+          record = input.scriptRecord?.channelId === input.profile.id ? input.scriptRecord : scriptRecordFor({ profile: input.profile, title: input.name.trim() || input.profile.name, topic: input.topic ?? "", wordCount: input.wordCount ?? null, script: input.script, source: "typed" });
         } else if (input.voiceFile === null) {
           set({ writing: true });
           try {
-            if (input.wordCount !== undefined) {
-              const written = await writeScriptForStep0(input.profile, { title: input.name, topic: input.topic ?? "", wordCount: input.wordCount });
-              input = { ...input, script: written.script };
-              record = written.record;
-            } else {
-              input = { ...input, script: await writeScript(input.profile, input.topic ?? "") };
-              record = scriptRecordFor({ profile: input.profile, title: input.name.trim() || input.profile.name, topic: input.topic ?? "", wordCount: null, script: input.script, source: "claude" });
-            }
+            const written = await writeScriptForStep0(input.profile, { title: input.name, topic: input.topic ?? "", wordCount: input.wordCount ?? null });
+            input = { ...input, script: written.script };
+            record = written.record;
           } catch (caught) {
             set({ error: toAppError(caught, "The script could not be written.") });
             return;
@@ -213,6 +251,9 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
         const project = useProjectStore.getState().project;
         if (!project) throw new Error("The new project could not be opened.");
         applyChannelProfile(input.profile, input.script, record ?? undefined);
+        useProjectStore.getState().update({ makeVideoRun: { status: "running", currentStage: "", completedStages: [],
+          failedScenes: [], approvedStages: [], updatedAt: new Date().toISOString(),
+          profileSnapshot: input.profile, providerSnapshot: input.providers } });
         // Publish the queue's resume target only after its script/settings are
         // durable; otherwise a restart could reopen an empty created project.
         await persistRun(created.id, "running", null, []);
@@ -258,7 +299,16 @@ export const usePipelineStore = create<PipelineState>((set, get) => {
         if (cancelFlag) return;
         const project = useProjectStore.getState().project;
         if (!project) throw new Error("The project could not be opened.");
-        const input: MakeVideoInput = { profile, name: project.name, script: project.script, voiceFile, ensureConsent };
+        let runProfile = project.makeVideoRun?.profileSnapshot ?? profile;
+        const savedProviders = project.makeVideoRun?.providerSnapshot;
+        // Repair only an invalid cross-provider snapshot, after an explicit channel choice.
+        if (savedProviders && voiceProviderMismatch(savedProviders.voice) && !project.voiceOriginalPath && voiceFile === null) {
+          if (!profile.voice.provider) throw new Error("This video's saved voice belongs to a different provider. In Channels > Settings, choose Microsoft or Gemini, select its voice, save, then continue this video.");
+          runProfile = { ...runProfile, voice: structuredClone(profile.voice) };
+          const corrected = await providerChoices(runProfile);
+          useProjectStore.getState().update({ makeVideoRun: { ...project.makeVideoRun!, profileSnapshot: runProfile, providerSnapshot: { ...savedProviders, voice: corrected.voice } } });
+        }
+        const input: MakeVideoInput = { profile: runProfile, name: project.name, script: project.script, voiceFile, ensureConsent };
         last = { input, projectId };
         set({ projectId, channelId: profile.id, view: initialView(), error: null, finished: null, problems: [], scriptRecord: recordFromProject(project) });
         await execute(input, projectId);

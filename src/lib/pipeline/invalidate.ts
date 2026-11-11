@@ -26,6 +26,13 @@ export function invalidateProject(project: Project, patch: ProjectPatch): Projec
   const renderKeys: (keyof ProjectPatch)[] = ["script", "voicePath", "voiceDuration", "voiceOriginalPath", "voiceCleanup", "words", "scenes", "sceneSettings", "styleId", "promptSettings", "characterBible", "locationBible", "mediaMap", "settings", "editor", "captionOverrides", "language"];
   if (!renderKeys.some(changed)) return next;
 
+  if (project.makeVideoRun && !patch.makeVideoRun) {
+    const order = ["script", "voice", "timing", "scenes", "cast", "prompts", "images", "audio", "render"];
+    const first = changed("script") ? 0 : voice ? 1 : timing ? 2 : structure ? 3 : style ? 4 : changed("scenes") ? 5 : changed("mediaMap") ? 6 : 7;
+    next.makeVideoRun = { ...project.makeVideoRun,
+      approvedStages: (project.makeVideoRun.approvedStages ?? []).filter((stage) => order.indexOf(stage) >= 0 && order.indexOf(stage) < first),
+    };
+  }
   const before = readEditor(project);
   const after = readEditor({ ...project, ...next });
   const withoutMix = (audio: typeof before.audio) => { const { mix: _mix, ...inputs } = audio; return inputs; };
@@ -43,7 +50,7 @@ export function invalidateProject(project: Project, patch: ProjectPatch): Projec
   next.exportDurationSeconds = null;
   next.exportSizeBytes = null;
   if (project.makeVideoRun?.status === "finished" && !patch.makeVideoRun) {
-    next.makeVideoRun = { ...project.makeVideoRun, status: "stopped", currentStage: "", completedStages: [], updatedAt: new Date().toISOString() };
+    next.makeVideoRun = { ...(next.makeVideoRun ?? project.makeVideoRun), status: "stopped", currentStage: "", completedStages: [], updatedAt: new Date().toISOString() };
   }
   return next;
 }

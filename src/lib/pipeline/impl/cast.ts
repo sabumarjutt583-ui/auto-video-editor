@@ -10,13 +10,13 @@ export async function castStage(ctx: StageContext): Promise<void> {
   const lines = project.scenes.map((scene) => ({ id: scene.id, text: scene.text }));
   const ids = project.scenes.map((scene) => scene.id);
   const prompt = scenesPrompt(lines);
-  ctx.say("Gemini is finding characters and places");
+  ctx.say(`${ctx.providers.textProvider === "groq" ? "Groq" : "Gemini"} is finding characters and places`);
   let result: Detected | null = null;
   for (let attempt = 0; attempt < 2 && result === null; attempt += 1) {
-    const answer = await runJob("ai", "Finding characters and places", (id) => generateText(prompt, BIBLE_SYSTEM_INSTRUCTION, true, id));
+    const answer = await runJob("ai", "Finding characters and places", (id) => generateText(prompt, BIBLE_SYSTEM_INSTRUCTION, true, id, ctx.providers));
     result = parseDetected(answer.text, ids);
   }
-  if (result === null) throw new Error("Gemini's answer about the characters could not be read (tried twice).");
+  if (result === null) throw new Error("The provider's answer about the characters could not be read (tried twice).");
   patchProject(ctx, {
     characterBible: result.characters,
     locationBible: result.locations,
