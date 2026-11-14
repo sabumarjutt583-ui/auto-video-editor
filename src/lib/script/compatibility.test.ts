@@ -184,7 +184,7 @@ test("SW-02A-17 guards conflicting title/name and malformed extra settings", () 
 });
 
 test("SW-02A-18 can compile multiline quoted instructions and rejects too long ones", () => {
-  const instructions = "Keep quoted text: \\"Why?\\"\nNo scene directions. 🎬";
+  const instructions = 'Keep quoted text: "Why?"\nNo scene directions. 🎬';
   const result = prepare(makeProfile(), video({ additionalInstructions: instructions }), ctx());
   assert.equal(result.request.additionalInstructions, instructions);
   assert.match(result.compiled.promptText, /No scene directions/);
