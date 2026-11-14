@@ -176,3 +176,64 @@ test("SHA-256 matches standard vectors and Node crypto for multilingual strings"
     assert.equal(sha256Hex(value), createHash("sha256").update(value, "utf8").digest("hex"));
   }
 });
+test("legacy channel IDs from cleanId and readProfile are accepted without rewriting", () => {
+  for (const id of ["-legacy", "_legacy", "--", "__", "channel_", "-channel-1"]) {
+    const profile = readProfile({ id, language: "EN", script: { writer: "claude", masterPrompt: "Keep this." } });
+    assert.equal(profile.id, id);
+    const request = requestFromChannelProfile(profile, draft());
+    assert.equal(mustCompile(request).channelId, id);
+    assert.equal(request.masterPrompt.channelId, id);
+  }
+});
+
+test("malformed top-level runtime requests return diagnostics instead of throwing", () => {
+  const invalid: unknown[] = [undefined, null, 0, "", [], ["array"], false];
+  for (const request of invalid) {
+    const result = compileScriptPrompt(request as ScriptGenerationRequest);
+    assert.equal(result.ok, false);
+    assert.equal(result.compiled, null);
+    assert.ok(result.validation.errors.some((issue) => issue.field === "request"));
+    assert.equal(validateScriptRequest(request).valid, false);
+  }
+});
+
+test("malformed master-prompt snapshots are rejected safely", () => {
+  const good = make();
+  for (const bad of [undefined, null, [], ["not a snapshot"], 123, "text", false]) {
+    const request = { ...good, masterPrompt: bad } as unknown as ScriptGenerationRequest;
+    errorField(request, "masterPrompt");
+  }
+  errorField({ ...good, masterPrompt: { ...good.masterPrompt, content: null } } as unknown as ScriptGenerationRequest, "masterPrompt.content");
+  errorField({ ...good, masterPrompt: { ...good.masterPrompt, contentDigest: null } } as unknown as ScriptGenerationRequest, "masterPrompt.contentDigest");
+});
+
+test("malformed runtime field types produce validation errors without compilation", () => {
+  const good = make();
+  const invalid: Array<[keyof ScriptGenerationRequest, unknown]> = [
+    ["title", null], ["topic", 12], ["language", ["en"]], ["requestedWords", "1200"],
+    ["targetAudience", {}], ["narrationTone", false], ["storytellingStyle", null],
+    ["additionalInstructions", ["instructions"]], ["requestId", {}], ["channelId", null],
+    ["projectId", []], ["providerMode", null],
+  ];
+  for (const [field, bad] of invalid) {
+    const request = { ...good, [field]: bad } as ScriptGenerationRequest;
+    errorField(request, field);
+  }
+});
+
+test("invalid id symbols are rejected without weakening allowed legacy characters", () => {
+  errorField({ ...make(), channelId: "has spaces" }, "channelId");
+  errorField({ ...make(), requestId: "a/b" }, "requestId");
+  errorField({ ...make(), projectId: "has.dot" }, "projectId");
+  assert.equal(mustCompile({ ...make(), requestId: "_request", projectId: "-draft" }).requestId, "_request");
+});
+
+test("snapshot's exact content remains immutable even after nested profile replacement", () => {
+  const profile = channel();
+  const request = requestFromChannelProfile(profile, draft({ language: undefined }));
+  const compiledBefore = mustCompile(request).promptText;
+  profile.script = { writer: "claude", masterPrompt: "A totally new prompt.", claudeAccountId: null };
+  profile.language = "fr";
+  assert.equal(mustCompile(request).promptText, compiledBefore);
+  assert.equal(request.masterPrompt.contentDigest, snapshotMasterPrompt("channel-a", "  My channel rules.\nNever lose this line.  ").contentDigest);
+});
