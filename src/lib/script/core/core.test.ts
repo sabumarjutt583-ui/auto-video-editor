@@ -237,3 +237,15 @@ test("snapshot's exact content remains immutable even after nested profile repla
   assert.equal(mustCompile(request).promptText, compiledBefore);
   assert.equal(request.masterPrompt.contentDigest, snapshotMasterPrompt("channel-a", "  My channel rules.\nNever lose this line.  ").contentDigest);
 });
+
+test("SHA-256 matches Node crypto at the 8,000-character master-prompt boundary", () => {
+  const master = "🎬".repeat(4000);
+  assert.equal(master.length, 8000);
+  const expected = createHash("sha256").update(master, "utf8").digest("hex");
+  assert.equal(sha256Hex(master), expected);
+  const snapshot = snapshotMasterPrompt("channel-a", master);
+  assert.equal(snapshot.contentDigest, `sha256:${expected}`);
+  const request = { ...make(), masterPrompt: snapshot };
+  assert.equal(validateScriptRequest(request).valid, true);
+  assert.equal(mustCompile(request).masterPrompt.content, master);
+});
