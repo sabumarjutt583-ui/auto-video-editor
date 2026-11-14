@@ -1,0 +1,29 @@
+name: Frontend PR validation
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Typecheck, TypeScript tests and Vite build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: TypeScript typecheck
+        run: npx tsc -b
+      - name: TypeScript test suite
+        run: npm run test:ts
+      - name: Frontend production build
+        run: npm run build
