@@ -38,7 +38,8 @@ test("SW-02B-01 both formats are prepared from the same validated legacy profile
   const profile = channel();
   const result = good(profile);
   assert.equal(result.legacyPrompt, buildStep0Question(profile.script.masterPrompt, "Why people trust money", "Human motivation", 1200));
-  assert.equal(result.newPrompt, result.request.masterPrompt.content ? result.newPrompt : "");
+  assert.match(result.newPrompt, /"title": "Why people trust money"/);
+  assert.match(result.newPrompt, /"topic": "Human motivation"/);
   assert.equal(result.report.channelId, profile.id);
   assert.equal(result.report.requestId, "comparison-01");
   assert.notEqual(result.legacyPrompt, result.newPrompt);
