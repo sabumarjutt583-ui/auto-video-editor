@@ -13,7 +13,7 @@ pub enum ProviderMode {
     LocalModel,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MasterPromptSnapshot {
     pub channel_id: String,
@@ -24,7 +24,7 @@ pub struct MasterPromptSnapshot {
     pub created_at: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ScriptGenerationRequest {
     pub request_id: String,
@@ -49,7 +49,7 @@ pub enum ScriptJobState {
     Created,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ScriptJobRecord {
     pub schema_version: u32,
@@ -118,7 +118,7 @@ pub fn valid_iso_utc(s: &str) -> bool {
     s.len() >= 20 && s.len() <= 40 && s.as_bytes().get(4) == Some(&b'-')
         && s.as_bytes().get(7) == Some(&b'-') && s.as_bytes().get(10) == Some(&b'T')
         && s.chars().all(|c| c.is_ascii_digit() || matches!(c, '-' | ':' | '+' | '.' | 'T' | 'Z'))
-        && (s.ends_with('Z') || s.rfind(['+','-']).is_some_and(|idx| idx > 18))
+        && (s.ends_with('Z') || s.rfind(|c| c == '+' || c == '-').is_some_and(|idx| idx > 18))
 }
 impl ScriptJobRecord {
     pub fn validate(&self, folder_id: &str) -> Result<(), &'static str> {
