@@ -523,3 +523,17 @@ fn sw_03d_20_response_read_rejects_other_channel_and_id() {
     assert_eq!(store.read_response(&job.job_id,"another-channel",&job.request_id,revision).err().unwrap().code,StoreErrorCode::InvalidOperation);
     assert_eq!(store.read_response(&job.job_id,&job.channel_id,&job.request_id,"../bad").err().unwrap().code,StoreErrorCode::InvalidOperation);
 }
+
+#[test]
+fn sw_03d_21_shared_imported_v1_fixture_decodes_and_roundtrips_with_exact_fields() {
+    let fixture=include_str!("../../../src/lib/script/jobs/fixtures/imported-job-v1.json");
+    let record:ScriptJobRecord=serde_json::from_str(fixture).unwrap();
+    assert!(record.validate(&record.job_id).is_ok());
+    assert_eq!(record.state,ScriptJobState::ResponseReceived);
+    assert_eq!(record.revisions.len(),1);
+    assert_eq!(record.revisions[0].content_digest,
+        digest("A complete imported response.\nاردو 🎬".as_bytes()));
+    assert_eq!(record.revisions[0].source,super::model::ScriptRevisionSource::ManualImport);
+    let parsed:serde_json::Value=serde_json::from_str(fixture).unwrap();
+    assert_eq!(serde_json::to_value(record).unwrap(),parsed);
+}
