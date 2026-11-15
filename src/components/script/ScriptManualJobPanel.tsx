@@ -8,6 +8,7 @@ import {
   parseScriptJobCommandError, prepareScriptJob, readImportedScript, transitionScriptJob,
 } from "../../lib/script/jobs/api.ts";
 import type { DurableScriptJobV1, JobTransitionIdentity, LocalScriptJobAction } from "../../lib/script/jobs/types.ts";
+import { copyPreparedPromptWithCheckpoint, validateManualResponse } from "../../lib/script/jobs/manual.ts";
 import { copyScriptPreviewText } from "../../lib/script/previewSafety.ts";
 import { Button } from "../ui";
 
@@ -102,20 +103,19 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
 
   async function copy() {
     if (!job?.preparedPrompt) return;
-    await run(async () => {
-      // Durable copy_intent must exist before touching the clipboard.
-      const started = await transitionScriptJob({ ...identity(job), action: { type: "begin_copy" } });
-      setJob(started);
-      const result = await copyScriptPreviewText(started.preparedPrompt!.content, navigator.clipboard, () => {
+    await run(() => copyPreparedPromptWithCheckpoint(job,
+      async (current, action) => {
+        const saved = await transitionScriptJob({ ...identity(current), action });
+        setJob(saved);
+        return saved;
+      },
+      async text => copyScriptPreviewText(text, navigator.clipboard, () => {
         const area = promptRef.current;
         if (!area) return false;
         area.focus(); area.select();
         return document.execCommand("copy");
-      });
-      if (result !== "copied") return { saved: started, copied: false };
-      const saved = await transitionScriptJob({ ...identity(started), action: { type: "confirm_copy" } });
-      return { saved, copied: true };
-    }, outcome => {
+      }),
+    ), outcome => {
       setJob(outcome.saved);
       setNotice(outcome.copied
         ? "Clipboard copy confirmed. Submission is NOT confirmed."
@@ -125,9 +125,12 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
 
   async function importText() {
     if (!job) return;
-    if (!response.trim()) { setError("Paste a non-empty completed response."); return; }
-    if (new TextEncoder().encode(response).length > 2_097_152) {
-      setError("The maximum response size is 2 MiB."); return;
+    const check = validateManualResponse(response);
+    if (!check.valid) {
+      setError(check.code === "response_too_large"
+        ? "The maximum response size is 2 MiB."
+        : "Paste a valid non-empty response without null characters.");
+      return;
     }
     await run(() => importScriptResponse({ ...identity(job), text: response }), saved => {
       setJob(saved); setResponse("");
