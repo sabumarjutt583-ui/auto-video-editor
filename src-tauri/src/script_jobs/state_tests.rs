@@ -283,3 +283,243 @@ fn sw_03c_17_abrupt_independent_process_termination_releases_lock() {
     let writer=ScriptJobStore::new(tmp.0.clone()).unwrap();
     assert!(writer.recover().unwrap().issues.is_empty());
 }
+
+
+fn import_action(text: &str) -> ScriptJobAction {
+    ScriptJobAction::ImportResponse { text: text.to_owned() }
+}
+fn imported_path(tmp: &Sandbox, job: &ScriptJobRecord, revision_id: &str) -> PathBuf {
+    tmp.0.join("jobs").join(&job.job_id).join("revisions").join(format!("{revision_id}.txt"))
+}
+#[test]
+fn sw_03d_01_old_jobs_and_prepared_checkpoints_still_load() {
+    sw_03c_01_old_phase_03b_fixture_remains_schema_v1_compatible();
+    let tmp = Sandbox::new();
+    let before = { let store=tmp.store(); let job=store.create(request("legacy_prepared")).unwrap(); prepare(&store,&job) };
+    let store = tmp.store();
+    assert!(store.get(&before.job_id).unwrap() == before);
+    assert!(store.get(&before.job_id).unwrap().revisions.is_empty());
+}
+#[test]
+fn sw_03d_02_copy_intent_is_durable_before_clipboard_activity() {
+    let tmp=Sandbox::new(); let store=tmp.store();
+    let job=store.create(request("copy_intent")).unwrap(); let prepared=prepare(&store,&job);
+    let copying=store.transition(input(&prepared,"begin-copy",ScriptJobAction::BeginCopy)).unwrap();
+    assert_eq!(copying.state,ScriptJobState::CopyIntent);
+    drop(store);
+    assert_eq!(tmp.store().get(&job.job_id).unwrap().state, ScriptJobState::CopyIntent);
+}
+#[test]
+fn sw_03d_03_successful_copy_confirmation_only_after_explicit_action() {
+    let tmp=Sandbox::new(); let store=tmp.store();
+    let job=store.create(request("copy_success")).unwrap(); let ready=prepare(&store,&job);
+    let intent=store.transition(input(&ready,"copy-intent",ScriptJobAction::BeginCopy)).unwrap();
+    assert_eq!(intent.state,ScriptJobState::CopyIntent);
+    let copied=store.transition(input(&intent,"confirmed-copy",ScriptJobAction::ConfirmCopy)).unwrap();
+    assert_eq!(copied.state,ScriptJobState::Copied);
+}
+#[test]
+fn sw_03d_04_clipboard_failure_does_not_claim_copied() {
+    let tmp=Sandbox::new(); let store=tmp.store();
+    let job=store.create(request("clipboard_failure")).unwrap();let ready=prepare(&store,&job);
+    let intent=store.transition(input(&ready,"clipboard-intent",ScriptJobAction::BeginCopy)).unwrap();
+    assert_eq!(store.get(&job.job_id).unwrap().state,ScriptJobState::CopyIntent);
+    let waiting=store.transition(input(&intent,"manual-copy",ScriptJobAction::AwaitUserAction {
+        reason: super::state::WaitingReason::ManualAction
+    })).unwrap();
+    assert_eq!(waiting.state,ScriptJobState::AwaitingUserAction);
+    assert_eq!(waiting.recovery_action.as_deref(),Some("manual_action"));
+}
+#[test]
+fn sw_03d_05_explicit_manual_submission_user_confirmed() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("submit")).unwrap();
+    let prepared=prepare(&store,&job);
+    let copied_intent=store.transition(input(&prepared,"copy",ScriptJobAction::BeginCopy)).unwrap();
+    let copied=store.transition(input(&copied_intent,"copied",ScriptJobAction::ConfirmCopy)).unwrap();
+    let sent_intent=store.transition(input(&copied,"intent",ScriptJobAction::BeginManualSubmission)).unwrap();
+    assert_eq!(sent_intent.state,ScriptJobState::SubmissionIntent);
+    assert!(sent_intent.submission_evidence.is_none());
+    let confirmed=store.transition(input(&sent_intent,"user-confirm",ScriptJobAction::ConfirmSubmitted)).unwrap();
+    assert_eq!(confirmed.state,ScriptJobState::Submitted);
+    assert_eq!(confirmed.submission_evidence,Some(super::model::ManualSubmissionEvidence::UserConfirmed));
+    drop(store);
+    assert_eq!(tmp.store().get(&job.job_id).unwrap().state,ScriptJobState::Submitted);
+}
+#[test]
+fn sw_03d_06_uncertain_submission_remains_uncertain_until_explicit_user_choice() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("uncertain_manual")).unwrap();
+    let prepared=prepare(&store,&job);
+    let waiting=store.transition(input(&prepared,"wait",ScriptJobAction::AwaitUserAction {
+        reason:super::state::WaitingReason::ManualAction })).unwrap();
+    let intent=store.transition(input(&waiting,"intent",ScriptJobAction::BeginManualSubmission)).unwrap();
+    let uncertain=store.transition(input(&intent,"uncertain",ScriptJobAction::MarkSubmissionUncertain)).unwrap();
+    drop(store);
+    let store=tmp.store();
+    let reloaded=store.get(&job.job_id).unwrap();
+    assert!(reloaded==uncertain);
+    assert_eq!(store.transition(input(&reloaded,"no-retry",ScriptJobAction::BeginManualSubmission)).err().unwrap().code,
+        StoreErrorCode::InvalidTransition);
+    let confirmed=store.transition(input(&reloaded,"explicit-confirm",ScriptJobAction::ConfirmSubmitted)).unwrap();
+    assert_eq!(confirmed.submission_evidence,Some(super::model::ManualSubmissionEvidence::UserConfirmed));
+}
+#[test]
+fn sw_03d_07_user_can_explicitly_confirm_no_submission_took_place() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("no_submission")).unwrap();
+    let prepared=prepare(&store,&job);
+    let waiting=store.transition(input(&prepared,"wait",ScriptJobAction::AwaitUserAction{
+        reason:super::state::WaitingReason::ManualAction })).unwrap();
+    let intent=store.transition(input(&waiting,"intent",ScriptJobAction::BeginManualSubmission)).unwrap();
+    let not_sent=store.transition(input(&intent,"not-sent",ScriptJobAction::ConfirmNotSubmitted)).unwrap();
+    assert_eq!(not_sent.state,ScriptJobState::Copied);
+    assert_eq!(not_sent.submission_evidence,Some(super::model::ManualSubmissionEvidence::UserConfirmedNotSubmitted));
+}
+#[test]
+fn sw_03d_08_unicode_response_import_preserves_every_character_and_hash() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("unicode")).unwrap();
+    let ready=prepare(&store,&job);
+    let text="\n한글 🎬 Urdu: اردو\n“Quotes” — apostrophes ' \r\n final  \n";
+    let saved=store.transition(input(&ready,"import-1",import_action(text))).unwrap();
+    assert_eq!(saved.state,ScriptJobState::ResponseReceived);
+    assert_eq!(saved.revisions.len(),1);
+    assert_eq!(saved.revisions[0].content_digest,digest(text.as_bytes()));
+    assert_eq!(saved.revisions[0].byte_length,text.len() as u64);
+    assert_eq!(saved.revisions[0].source,super::model::ScriptRevisionSource::ManualImport);
+    assert!(saved.approved_revision_id.is_none());
+    let path=imported_path(&tmp,&job,&saved.revisions[0].revision_id);
+    assert_eq!(fs::read(&path).unwrap(),text.as_bytes());
+    let read=store.read_response(&job.job_id,&job.channel_id,&job.request_id,&saved.revisions[0].revision_id).unwrap();
+    assert_eq!(read.text,text);
+}
+#[test]
+fn sw_03d_09_empty_and_oversized_responses_rejected_without_files() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("badresponse")).unwrap();
+    let ready=prepare(&store,&job);
+    for text in ["", " \n \t", "contains\0nul"] {
+        assert_eq!(store.transition(input(&ready,"invalid",import_action(text))).err().unwrap().code,StoreErrorCode::InvalidResponse);
+    }
+    let too_large="x".repeat(super::model::MAX_IMPORT_BYTES+1);
+    assert_eq!(store.transition(input(&ready,"too-large",import_action(&too_large))).err().unwrap().code,StoreErrorCode::InvalidResponse);
+    assert!(store.get(&job.job_id).unwrap()==ready);
+}
+#[test]
+fn sw_03d_10_import_channel_and_request_isolation() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("isolation")).unwrap();
+    let ready=prepare(&store,&job);
+    let mut bad=input(&ready,"bad-channel",import_action("Valid response"));
+    bad.channel_id="other-channel".into();
+    assert_eq!(store.transition(bad).err().unwrap().code,StoreErrorCode::InvalidOperation);
+    let mut bad=input(&ready,"bad-request",import_action("Valid response"));
+    bad.request_id="other-request".into();
+    assert_eq!(store.transition(bad).err().unwrap().code,StoreErrorCode::InvalidOperation);
+    assert!(store.get(&job.job_id).unwrap()==ready);
+}
+#[test]
+fn sw_03d_11_immutable_response_is_not_overwritten_by_second_import() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("immutable")).unwrap();
+    let ready=prepare(&store,&job);
+    let saved=store.transition(input(&ready,"first-import",import_action("Original response"))).unwrap();
+    let path=imported_path(&tmp,&job,&saved.revisions[0].revision_id);
+    let original=fs::read(&path).unwrap();
+    assert_eq!(store.transition(input(&saved,"second-import",import_action("Different response"))).err().unwrap().code,StoreErrorCode::InvalidTransition);
+    assert_eq!(fs::read(path).unwrap(),original);
+}
+#[test]
+fn sw_03d_12_duplicate_import_idempotent_even_after_process_restart() {
+    let tmp=Sandbox::new();
+    let (job,ready,saved)={let store=tmp.store();let job=store.create(request("retry_import")).unwrap();
+        let ready=prepare(&store,&job);
+        let saved=store.transition(input(&ready,"repeat-import",import_action("First complete script"))).unwrap();
+        (job,ready,saved)};
+    let store=tmp.store();
+    let repeated=store.transition(input(&ready,"repeat-import",import_action("First complete script"))).unwrap();
+    assert!(repeated==saved);
+    assert_eq!(store.get(&job.job_id).unwrap().revisions.len(),1);
+}
+#[test]
+fn sw_03d_13_conflicting_operation_id_and_stale_revision_fail_closed() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("import_conflict")).unwrap();
+    let ready=prepare(&store,&job);
+    store.transition(input(&ready,"same-id",import_action("Text A"))).unwrap();
+    assert_eq!(store.transition(input(&ready,"same-id",import_action("Text B"))).err().unwrap().code,StoreErrorCode::OperationConflict);
+    assert_eq!(store.transition(input(&ready,"fresh-id",import_action("Text C"))).err().unwrap().code,StoreErrorCode::StaleRevision);
+}
+#[test]
+fn sw_03d_14_crash_before_text_publication_keeps_last_checkpoint() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("before_revision")).unwrap();
+    let ready=prepare(&store,&job);
+    let result=store.inject_import_fault(input(&ready,"fault-import",import_action("Recoverable response")),
+        super::store::ImportFault::BeforeRevision);
+    assert_eq!(result.err().unwrap().code,StoreErrorCode::StorageFailure);
+    let report=store.recover().unwrap();
+    assert_eq!(report.jobs[0].state,ScriptJobState::Prepared);
+    assert!(report.issues.iter().any(|issue|issue.kind==RecoveryKind::IncompleteRecord));
+}
+#[test]
+fn sw_03d_15_crash_after_text_before_metadata_reports_orphan_without_deleting_it() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("orphan_revision")).unwrap();
+    let ready=prepare(&store,&job);
+    let result=store.inject_import_fault(input(&ready,"orphan-action",import_action("Unreferenced but saved response")),
+        super::store::ImportFault::AfterRevision);
+    assert_eq!(result.err().unwrap().code,StoreErrorCode::StorageFailure);
+    let report=store.recover().unwrap();
+    assert_eq!(report.jobs[0].state,ScriptJobState::Prepared);
+    assert!(report.issues.iter().any(|issue|issue.kind==RecoveryKind::OrphanRevision));
+    assert_eq!(store.get(&job.job_id).err().unwrap().code,StoreErrorCode::RecoveryBlocked);
+    let directory=tmp.0.join("jobs").join(&job.job_id).join("revisions");
+    assert_eq!(fs::read_dir(directory).unwrap().count(),1);
+}
+#[test]
+fn sw_03d_16_crash_after_metadata_commit_retry_returns_exact_saved_response() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("after_checkpoint")).unwrap();
+    let ready=prepare(&store,&job);
+    let action=input(&ready,"crash-after",import_action("Response survives acknowledgement failure"));
+    assert_eq!(store.inject_import_fault(action.clone(),super::store::ImportFault::AfterCheckpoint).err().unwrap().code,StoreErrorCode::StorageFailure);
+    let saved=store.get(&job.job_id).unwrap();
+    assert_eq!(saved.state,ScriptJobState::ResponseReceived);
+    assert!(store.transition(action).unwrap()==saved);
+}
+#[test]
+fn sw_03d_17_corruption_is_detected_and_previous_state_survives() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("corrupt_text")).unwrap();
+    let ready=prepare(&store,&job);
+    let saved=store.transition(input(&ready,"import",import_action("Original UTF-8"))).unwrap();
+    let file=imported_path(&tmp,&job,&saved.revisions[0].revision_id);
+    fs::write(&file,b"modified text").unwrap();
+    let report=store.recover().unwrap();
+    assert_eq!(report.jobs[0].state,ScriptJobState::Prepared);
+    assert!(report.issues.iter().any(|issue|issue.kind==RecoveryKind::CorruptRecord));
+    assert_eq!(store.get(&job.job_id).err().unwrap().code,StoreErrorCode::RecoveryBlocked);
+    assert_eq!(fs::read(file).unwrap(),b"modified text");
+}
+#[test]
+fn sw_03d_18_orphaned_response_after_restart_does_not_auto_submit_or_delete() {
+    let tmp=Sandbox::new();
+    let job={let store=tmp.store();let job=store.create(request("orphan_restart")).unwrap();
+        let ready=prepare(&store,&job);
+        store.inject_import_fault(input(&ready,"orphan",import_action("Retain me")),
+            super::store::ImportFault::AfterRevision).err().unwrap();
+        job};
+    let store=tmp.store();
+    let report=store.recover().unwrap();
+    assert_eq!(report.jobs[0].state,ScriptJobState::Prepared);
+    assert!(report.issues.iter().any(|issue|issue.kind==RecoveryKind::OrphanRevision));
+    assert!(tmp.0.join("jobs").join(&job.job_id).join("revisions").is_dir());
+}
+#[test]
+fn sw_03d_19_import_requires_manual_action_and_never_approves_or_runs_provider() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("no_provider")).unwrap();
+    let ready=prepare(&store,&job);
+    let imported=store.transition(input(&ready,"user_import",import_action("Only a manually pasted response"))).unwrap();
+    assert_eq!(imported.state,ScriptJobState::ResponseReceived);
+    assert!(imported.approved_revision_id.is_none());
+    assert!(imported.request.provider_mode==ProviderMode::ClaudeBrowserAssisted);
+}
+#[test]
+fn sw_03d_20_response_read_rejects_other_channel_and_id() {
+    let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("read_privacy")).unwrap();
+    let ready=prepare(&store,&job);
+    let saved=store.transition(input(&ready,"import",import_action("Private response"))).unwrap();
+    let revision=&saved.revisions[0].revision_id;
+    assert_eq!(store.read_response(&job.job_id,"another-channel",&job.request_id,revision).err().unwrap().code,StoreErrorCode::InvalidOperation);
+    assert_eq!(store.read_response(&job.job_id,&job.channel_id,&job.request_id,"../bad").err().unwrap().code,StoreErrorCode::InvalidOperation);
+}
