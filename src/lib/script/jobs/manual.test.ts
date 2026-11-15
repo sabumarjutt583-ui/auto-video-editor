@@ -123,3 +123,22 @@ test("SW-03D-TS-11 pure manual checks work offline without browser, Claude or ne
     assert.equal(prepared().state, "prepared");
   } finally { globalThis.fetch = original; }
 });
+
+
+test("SW-03D-TS-12 shared imported Rust fixture preserves exact revision fields and content digest", () => {
+  const imported = JSON.parse(readFileSync(fileURLToPath(
+    new URL("./fixtures/imported-job-v1.json", import.meta.url)), "utf8")) as DurableScriptJobV1;
+  assert.equal(imported.schemaVersion, 1);
+  assert.equal(imported.state, "response_received");
+  assert.equal(imported.stateRevision, 2);
+  assert.equal(imported.revisions[0]?.source, "manual_import");
+  assert.equal(imported.revisions[0]?.byteLength, new TextEncoder().encode("A complete imported response.\nاردو 🎬").length);
+  assert.deepEqual(Object.keys(imported.revisions[0] ?? {}), [
+    "revisionId", "contentDigest", "byteLength", "createdAt", "source",
+  ]);
+  assert.deepEqual(Object.keys(imported.preparedPrompt ?? {}), [
+    "requestId", "channelId", "formatVersion", "content", "contentDigest",
+    "masterPromptDigest", "preparedAt",
+  ]);
+  assert.equal(imported.approvedRevisionId, null);
+});
