@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 
 import type { ChannelProfile } from "../../lib/pipeline/profile.ts";
 import { compareScriptPromptFormats, type ScriptPromptComparisonResult } from "../../lib/script/comparison.ts";
+import { copyScriptPreviewText } from "../../lib/script/previewSafety.ts";
 import { Button } from "../ui";
 
 interface Props {
@@ -19,6 +20,8 @@ type Preview = { signature: string; result: ScriptPromptComparisonResult };
 export function ScriptPromptComparisonPreview({ profile, title, topic, wordCountText, script }: Props) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [copyMessage, setCopyMessage] = useState("");
+  const legacyTextarea = useRef<HTMLTextAreaElement>(null);
+  const newTextarea = useRef<HTMLTextAreaElement>(null);
   // A result is visible only for the exact inputs that produced it.
   // No prompt or account details are written to logs or persistent storage.
   const signature = JSON.stringify([
@@ -42,13 +45,17 @@ export function ScriptPromptComparisonPreview({ profile, title, topic, wordCount
     setCopyMessage("");
   }
 
-  async function copyPrompt(value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopyMessage("Copied to clipboard. Nothing was sent.");
-    } catch {
-      setCopyMessage("Clipboard permission was denied. Select the text and copy it manually.");
-    }
+  async function copyPrompt(value: string, ref: RefObject<HTMLTextAreaElement | null>) {
+    const result = await copyScriptPreviewText(value, navigator.clipboard, () => {
+      const textarea = ref.current;
+      if (!textarea) return false;
+      textarea.focus();
+      textarea.select();
+      return document.execCommand("copy");
+    });
+    setCopyMessage(result === "copied"
+      ? "Copied to clipboard. Nothing was sent."
+      : "Automatic copy is unavailable. The prompt is selected; press Ctrl+C to copy it manually.");
   }
 
   return (
@@ -108,16 +115,16 @@ export function ScriptPromptComparisonPreview({ profile, title, topic, wordCount
               <div>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <label htmlFor="script-legacy-preview" className="text-sm font-medium">Legacy prompt — existing Step 0 format</label>
-                  <Button onClick={() => void copyPrompt(current.legacyPrompt)}>Copy legacy</Button>
+                  <Button onClick={() => void copyPrompt(current.legacyPrompt, legacyTextarea)}>Copy legacy</Button>
                 </div>
-                <textarea id="script-legacy-preview" readOnly value={current.legacyPrompt} rows={9} className="w-full rounded-lg border border-line bg-surface p-2 font-mono text-xs" />
+                <textarea ref={legacyTextarea} id="script-legacy-preview" readOnly value={current.legacyPrompt} rows={9} className="w-full rounded-lg border border-line bg-surface p-2 font-mono text-xs" />
               </div>
               <div>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <label htmlFor="script-core-preview" className="text-sm font-medium">New prompt — script-prompt-v1</label>
-                  <Button onClick={() => void copyPrompt(current.newPrompt)}>Copy new</Button>
+                  <Button onClick={() => void copyPrompt(current.newPrompt, newTextarea)}>Copy new</Button>
                 </div>
-                <textarea id="script-core-preview" readOnly value={current.newPrompt} rows={9} className="w-full rounded-lg border border-line bg-surface p-2 font-mono text-xs" />
+                <textarea ref={newTextarea} id="script-core-preview" readOnly value={current.newPrompt} rows={9} className="w-full rounded-lg border border-line bg-surface p-2 font-mono text-xs" />
               </div>
               {copyMessage && <p role="status" className="text-xs text-muted">{copyMessage}</p>}
             </>
