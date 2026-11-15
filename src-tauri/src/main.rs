@@ -150,6 +150,13 @@ macro_rules! handler {
             commands::script::script_account_disconnect,
             commands::script::script_account_set_limit,
             commands::script::script_open_live,
+            commands::script_jobs::script_job_create,
+            commands::script_jobs::script_job_get,
+            commands::script_jobs::script_job_list,
+            commands::script_jobs::script_job_recovery,
+            commands::script_jobs::script_job_prepare,
+            commands::script_jobs::script_job_transition,
+            commands::script_jobs::script_job_cancel,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -306,6 +313,13 @@ macro_rules! handler {
             commands::script::script_account_disconnect,
             commands::script::script_account_set_limit,
             commands::script::script_open_live,
+            commands::script_jobs::script_job_create,
+            commands::script_jobs::script_job_get,
+            commands::script_jobs::script_job_list,
+            commands::script_jobs::script_job_recovery,
+            commands::script_jobs::script_job_prepare,
+            commands::script_jobs::script_job_transition,
+            commands::script_jobs::script_job_cancel,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -400,6 +414,9 @@ fn main() {
                 }
                 Err(error) => logging::error("chatgpt", &error.details),
             }
+            // A failed store initialization never disables existing production tools.
+            // All new commands then return a typed unavailable/lock error.
+            app.manage(commands::script_jobs::ScriptJobService::initialize(app.handle()));
             match commands::script::create(app.handle()) {
                 Ok(script) => {
                     app.manage(script);
