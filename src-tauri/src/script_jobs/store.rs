@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use super::lock;
 use super::model::{
-    request_digest, valid_id, valid_job_id, ScriptGenerationRequest, ScriptJobRecord, ScriptJobState,
+    request_digest, valid_job_id, ScriptGenerationRequest, ScriptJobRecord, ScriptJobState,
     SCHEMA_VERSION,
 };
 
@@ -84,13 +84,6 @@ fn check_directory(path: &Path) -> Result<(), StoreError> {
         }
         Err(_) => Err(storage()),
     }
-}
-fn regular_file(path: &Path) -> Result<(), StoreError> {
-    let meta = fs::symlink_metadata(path).map_err(|_| storage())?;
-    if !meta.is_file() || meta.file_type().is_symlink() || meta.len() > MAX_RECORD_BYTES {
-        return Err(bad_record());
-    }
-    Ok(())
 }
 fn load_record(folder: &Path, id: &str) -> Result<ScriptJobRecord, StoreError> {
     let file = folder.join("job.json");
