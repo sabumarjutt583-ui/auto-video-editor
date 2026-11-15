@@ -47,7 +47,49 @@ pub struct ScriptGenerationRequest {
 #[serde(rename_all = "snake_case")]
 pub enum ScriptJobState {
     Created,
+    Prepared,
+    AwaitingUserAction,
+    CopyIntent,
+    Copied,
+    SubmissionIntent,
+    SubmissionUncertain,
+    Submitted,
+    AwaitingResponse,
+    ResponseReceived,
+    Validating,
+    DraftSaved,
+    ReviewPending,
+    Approved,
+    Failed,
+    Cancelled,
 }
+
+/// Extra fields are additive under schemaVersion=1. Older Phase 03B JSON has
+/// preparedPrompt:null and omits appliedOperations; both remain valid.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PreparedPromptSnapshot {
+    pub request_id: String,
+    pub channel_id: String,
+    pub format_version: String,
+    pub content: String,
+    pub content_digest: String,
+    pub master_prompt_digest: String,
+    pub prepared_at: String,
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AppliedJobOperation {
+    pub operation_id: String,
+    pub action_digest: String,
+    pub expected_revision: u64,
+    pub result_revision: u64,
+    pub result_state: ScriptJobState,
+}
+
+pub const MAX_OPERATIONS: usize = 256;
+pub const MAX_PROMPT_BYTES: usize = 120_000;
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -63,11 +105,13 @@ pub struct ScriptJobRecord {
     pub state_revision: u64,
     pub created_at: String,
     pub updated_at: String,
-    pub prepared_prompt: Option<String>,
+    pub prepared_prompt: Option<PreparedPromptSnapshot>,
     pub revisions: Vec<String>,
     pub approved_revision_id: Option<String>,
     pub error_code: Option<String>,
     pub recovery_action: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub applied_operations: Vec<AppliedJobOperation>,
 }
 
 pub fn valid_id(value: &str) -> bool {
@@ -81,6 +125,9 @@ fn utf16_len(text: &str) -> usize { text.encode_utf16().count() }
 fn sized(text: &str, max: usize) -> bool { utf16_len(text) <= max }
 fn nonempty(text: &str, max: usize) -> bool { !text.trim().is_empty() && sized(text, max) }
 pub fn digest(text: &[u8]) -> String { format!("sha256:{:x}", Sha256::digest(text)) }
+pub fn valid_digest(text: &str) -> bool {
+    text.len() == 71 && text.starts_with("sha256:") && text[7..].bytes().all(|b| b.is_ascii_hexdigit())
+}
 pub fn request_digest(request: &ScriptGenerationRequest) -> Result<String, &'static str> {
     // Explicit typed order and normalized Option projectId make this independent
     // from object key insertion order or incoming JSON whitespace.
@@ -128,9 +175,52 @@ impl ScriptJobRecord {
         if self.request_id != self.request.request_id || self.channel_id != self.request.channel_id
             || self.project_id != self.request.project_id { return Err("identity_mismatch"); }
         if self.request_digest != request_digest(&self.request)? { return Err("request_digest_mismatch"); }
-        if self.state != ScriptJobState::Created || self.state_revision != 0
-            || self.prepared_prompt.is_some() || !self.revisions.is_empty()
-            || self.approved_revision_id.is_some() { return Err("unsupported_job_state"); }
+        if self.applied_operations.len() > MAX_OPERATIONS
+            || self.state_revision != self.applied_operations.len() as u64 {
+            return Err("operation_history_mismatch");
+        }
+        let mut seen = std::collections::HashSet::new();
+        for (i, op) in self.applied_operations.iter().enumerate() {
+            if !valid_id(&op.operation_id) || !seen.insert(&op.operation_id)
+                || !valid_digest(&op.action_digest)
+                || op.expected_revision != i as u64
+                || op.result_revision != (i + 1) as u64 {
+                return Err("invalid_operation_history");
+            }
+        }
+        if self.applied_operations.last().is_some_and(|op| op.result_state != self.state) {
+            return Err("operation_state_mismatch");
+        }
+        if self.state_revision == 0 && self.state != ScriptJobState::Created {
+            return Err("invalid_initial_state");
+        }
+        if !self.revisions.is_empty() || self.approved_revision_id.is_some() {
+            return Err("unsupported_revision_data");
+        }
+        match self.state {
+            ScriptJobState::Created => {
+                if self.prepared_prompt.is_some() || self.state_revision != 0 { return Err("created_state_inconsistent"); }
+            }
+            ScriptJobState::Cancelled => {}
+            ScriptJobState::Prepared | ScriptJobState::AwaitingUserAction
+            | ScriptJobState::CopyIntent | ScriptJobState::Copied
+            | ScriptJobState::SubmissionIntent | ScriptJobState::SubmissionUncertain => {
+                if self.prepared_prompt.is_none() { return Err("missing_prepared_prompt"); }
+            }
+            // Cannot claim a response, approval or confirmed external send
+            // before the relevant provider/revision features are implemented.
+            _ => return Err("unimplemented_lifecycle_state"),
+        }
+        if let Some(prompt) = &self.prepared_prompt {
+            if prompt.request_id != self.request_id || prompt.channel_id != self.channel_id
+                || prompt.master_prompt_digest != self.request.master_prompt.content_digest
+                || prompt.format_version != "script-prompt-v1"
+                || prompt.content.trim().is_empty() || prompt.content.len() > MAX_PROMPT_BYTES
+                || prompt.content_digest != digest(prompt.content.as_bytes())
+                || !valid_iso_utc(&prompt.prepared_at) {
+                return Err("invalid_prepared_prompt");
+            }
+        }
         if !valid_iso_utc(&self.created_at) || !valid_iso_utc(&self.updated_at) { return Err("invalid_job_timestamp"); }
         Ok(())
     }
