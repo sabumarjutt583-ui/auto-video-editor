@@ -6,7 +6,8 @@ import type { ScriptGenerationRequest } from "../core/types.ts";
 import type {
   DurableScriptJobV1, ScriptJobCommandError, ScriptJobRecoveryReport,
   PrepareScriptJobInput, LocalScriptJobTransitionInput, JobTransitionIdentity,
-  ScriptJobStoreErrorCode,
+  ScriptJobStoreErrorCode, ImportScriptResponseInput, ReadImportedScriptInput,
+  ImportedScriptResponse,
 } from "./types.ts";
 
 export const createScriptJob = (request: ScriptGenerationRequest): Promise<DurableScriptJobV1> =>
@@ -23,12 +24,17 @@ export const transitionScriptJob = (input: LocalScriptJobTransitionInput): Promi
   invoke<DurableScriptJobV1>("script_job_transition", { input });
 export const cancelScriptJob = (input: JobTransitionIdentity): Promise<DurableScriptJobV1> =>
   invoke<DurableScriptJobV1>("script_job_cancel", { input });
+export const importScriptResponse = (input: ImportScriptResponseInput): Promise<DurableScriptJobV1> =>
+  invoke<DurableScriptJobV1>("script_job_import_response", { input });
+export const readImportedScript = (input: ReadImportedScriptInput): Promise<ImportedScriptResponse> =>
+  invoke<ImportedScriptResponse>("script_job_read_response", { input });
 
 const CODES: readonly ScriptJobStoreErrorCode[] = [
   "invalid_request", "invalid_job_id", "request_conflict", "writer_busy",
   "storage_failure", "recovery_blocked", "job_not_found", "corrupt_record",
   "unsupported_version", "stale_revision", "invalid_transition",
   "invalid_operation", "operation_conflict", "operation_history_full",
+  "invalid_response", "revision_not_found",
 ];
 
 /** Tauri may reject with a structured error, a string, or a transport error.
