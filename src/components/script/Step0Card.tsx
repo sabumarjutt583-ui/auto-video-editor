@@ -8,6 +8,7 @@ import { canWriteScript } from "../../lib/pipeline/profile";
 import { countScriptWords, type ScriptRecord } from "../../lib/script/step0";
 import { scriptCheck, scriptConfirmSignedIn, scriptSignIn, scriptStatus, type ScriptStatus } from "../../lib/script/api";
 import { writeScriptForStep0 } from "../../lib/script/write";
+import { ScriptPromptComparisonPreview } from "./ScriptPromptComparisonPreview";
 import type { MakeVideoInput } from "../../store/pipelineStore";
 import type { AppError } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
@@ -178,6 +179,9 @@ export function Step0Card({ profiles, busy, onMakeVideo, ensureConsent }: Props)
           Make video from this script
         </Button>
       </div>
+      {import.meta.env.DEV && (
+        <ScriptPromptComparisonPreview profile={profile} title={title} topic={topic} wordCountText={wordCountText} script={script} />
+      )}
     </Card>
   );
 }
