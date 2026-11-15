@@ -41,6 +41,13 @@ rand = "0.9"
 sha2 = "0.10"
 base64 = "0.22"
 
+# OS-native cross-process lock functions. Both crates are already present in Cargo.lock.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+
 [dev-dependencies]
 # Local mock server used by the API helper tests.
 tokio = { version = "1", features = ["rt", "macros", "net", "io-util"] }
