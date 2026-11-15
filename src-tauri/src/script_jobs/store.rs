@@ -50,7 +50,7 @@ pub struct RecoveryIssue {
     pub job_id: String,
     pub kind: RecoveryKind,
     /// Fixed diagnostic, never a copied prompt or private OS error path.
-    pub message: &'static str,
+    pub message: String,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,7 +60,7 @@ pub struct RecoveryReport {
 }
 
 fn make_issue(id: String, kind: RecoveryKind, message: &'static str) -> RecoveryIssue {
-    RecoveryIssue { job_id: id, kind, message }
+    RecoveryIssue { job_id: id, kind, message: message.to_string() }
 }
 fn now_iso() -> String {
     let millis = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis();
