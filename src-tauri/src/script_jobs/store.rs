@@ -287,7 +287,7 @@ impl ScriptJobStore {
         apply_transition(&mut next, &input.action, &stamp).map_err(|e| match e {
             TransitionError::InvalidTransition => StoreError::new(StoreErrorCode::InvalidTransition, "Action is not allowed in the current job state."),
             TransitionError::InvalidPreparedPrompt => StoreError::new(
-                if matches!(input.action, ScriptJobAction::ImportResponse { .. }) {
+                if matches!(&input.action, ScriptJobAction::ImportResponse { .. }) {
                     StoreErrorCode::InvalidResponse
                 } else { StoreErrorCode::InvalidOperation },
                 "Prompt or response content is invalid, oversized or belongs to another request."),
@@ -295,7 +295,7 @@ impl ScriptJobStore {
         next.state_revision = current.state_revision.checked_add(1).ok_or_else(storage)?;
         next.updated_at = stamp;
         next.applied_operations.push(AppliedJobOperation {
-            operation_id: input.operation_id,
+            operation_id: input.operation_id.clone(),
             action_digest: signature,
             expected_revision: input.expected_revision,
             result_revision: next.state_revision,
@@ -408,6 +408,117 @@ fn state_path(folder: &Path, revision: u64) -> PathBuf {
     folder.join(format!("state-{revision:020}.json"))
 }
 
+fn revision_path(folder: &Path, id: &str) -> PathBuf {
+    folder.join("revisions").join(format!("{id}.txt"))
+}
+
+/// Read exact UTF-8 with no trimming, normalization, replacement or newline conversion.
+fn read_revision(folder: &Path, reference: &ScriptRevisionRef) -> Result<String, StoreError> {
+    if !valid_revision_id(&reference.revision_id) { return Err(bad_record()); }
+    let revisions = folder.join("revisions");
+    let directory = fs::symlink_metadata(&revisions).map_err(|_| storage())?;
+    if !directory.is_dir() || directory.file_type().is_symlink() { return Err(bad_record()); }
+    let path = revision_path(folder, &reference.revision_id);
+    let meta = fs::symlink_metadata(&path).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound { bad_record() } else { storage() }
+    })?;
+    if !meta.is_file() || meta.file_type().is_symlink()
+        || meta.len() != reference.byte_length || meta.len() > MAX_IMPORT_BYTES as u64 {
+        return Err(bad_record());
+    }
+    let mut bytes = Vec::new();
+    File::open(&path).map_err(|_| storage())?
+        .take(MAX_IMPORT_BYTES as u64 + 1).read_to_end(&mut bytes).map_err(|_| storage())?;
+    if bytes.len() as u64 != reference.byte_length
+        || digest(&bytes) != reference.content_digest {
+        return Err(bad_record());
+    }
+    String::from_utf8(bytes).map_err(|_| bad_record())
+}
+
+/// Complete response is committed separately, *before* its state reference.
+/// A crash between publication and state commit leaves a reported orphan, not
+/// lost text. Never overwrite an existing revision or delete any response data.
+fn publish_revision(folder: &Path, reference: &ScriptRevisionRef, text: &str, fault: ImportFault) -> Result<(), StoreError> {
+    if text.is_empty() || text.len() > MAX_IMPORT_BYTES
+        || text.len() as u64 != reference.byte_length
+        || digest(text.as_bytes()) != reference.content_digest {
+        return Err(StoreError::new(StoreErrorCode::InvalidResponse, "Imported response has invalid content or integrity."));
+    }
+    let directory = folder.join("revisions");
+    check_directory(&directory)?;
+    let dest = revision_path(folder, &reference.revision_id);
+    // Never replace existing committed content, even on Linux.
+    match fs::symlink_metadata(&dest) {
+        Ok(_) => return Err(storage()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(storage()),
+    }
+    let temp = directory.join(format!("revision-{}.tmp", random_suffix()));
+    let mut file = OpenOptions::new().create_new(true).write(true)
+        .open(&temp).map_err(|_| storage())?;
+    file.write_all(text.as_bytes()).map_err(|_| storage())?;
+    file.flush().map_err(|_| storage())?;
+    file.sync_all().map_err(|_| storage())?;
+    if matches!(fault, ImportFault::BeforeRevision) {
+        // Keep potentially recoverable text even when publication did not occur.
+        return Err(storage());
+    }
+    fs::rename(&temp, &dest).map_err(|_| storage())?;
+    #[cfg(unix)]
+    File::open(&directory).and_then(|dir| dir.sync_all()).map_err(|_| storage())?;
+    if matches!(fault, ImportFault::AfterRevision) { return Err(storage()); }
+    Ok(())
+}
+
+/// Validate a candidate state's immutable text before treating the snapshot
+/// as the latest recoverable committed state.
+fn verify_revisions(folder: &Path, snapshot: &ScriptJobRecord) -> Result<(), StoreError> {
+    for reference in &snapshot.revisions { read_revision(folder, reference)?; }
+    Ok(())
+}
+
+/// Detect orphaned imports and unsafe entries. Do not remove any evidence.
+fn collect_revision_issues(folder: &Path, job: &ScriptJobRecord) -> Result<Vec<RecoveryIssue>, StoreError> {
+    let mut issues = Vec::new();
+    let directory = folder.join("revisions");
+    let meta = match fs::symlink_metadata(&directory) {
+        Ok(meta) => meta,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(issues),
+        Err(_) => return Err(storage()),
+    };
+    if !meta.is_dir() || meta.file_type().is_symlink() {
+        issues.push(make_issue(job.job_id.clone(), RecoveryKind::UnsafeEntry, "Unsafe revisions directory preserved."));
+        return Ok(issues);
+    }
+    for result in fs::read_dir(&directory).map_err(|_| storage())? {
+        let entry = result.map_err(|_| storage())?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let ty = match entry.file_type() {
+            Ok(ty) => ty,
+            Err(_) => {
+                issues.push(make_issue(job.job_id.clone(), RecoveryKind::IoError, "Revision entry could not be inspected."));
+                continue;
+            }
+        };
+        if ty.is_symlink() || !ty.is_file() {
+            issues.push(make_issue(job.job_id.clone(), RecoveryKind::UnsafeEntry, "Unsafe revision file preserved."));
+        } else if name.starts_with("revision-") && name.ends_with(".tmp") {
+            issues.push(make_issue(job.job_id.clone(), RecoveryKind::IncompleteRecord, "Uncommitted response text preserved for recovery."));
+        } else if let Some(id) = name.strip_suffix(".txt") {
+            if !valid_revision_id(id) {
+                issues.push(make_issue(job.job_id.clone(), RecoveryKind::UnsafeEntry, "Invalid revision filename preserved."));
+            } else if !job.revisions.iter().any(|r| r.revision_id == id) {
+                issues.push(make_issue(job.job_id.clone(), RecoveryKind::OrphanRevision, "Unreferenced response text preserved for reconciliation."));
+            }
+        } else {
+            issues.push(make_issue(job.job_id.clone(), RecoveryKind::UnsafeEntry, "Unexpected revision artifact preserved."));
+        }
+    }
+    Ok(issues)
+}
+
+
 /// Read the entire contiguous generation chain. A damaged future checkpoint
 /// never overwrites or silently hides the last known-good record. Every problem
 /// becomes a recovery issue and makes future mutations fail closed.
@@ -420,6 +531,7 @@ fn load_latest(folder: &Path, id: &str) -> Result<(ScriptJobRecord, Vec<Recovery
         let e = e.map_err(|_| storage())?;
         let file_name = e.file_name().to_string_lossy().into_owned();
         if file_name == "job.json" { continue; }
+        if file_name == "revisions" { continue; }
         if file_name.starts_with("job-") && file_name.ends_with(".tmp")
             || file_name.starts_with("state-") && file_name.ends_with(".tmp") {
             issues.push(make_issue(id.to_string(), RecoveryKind::IncompleteRecord, "Uncommitted temporary file preserved for inspection."));
@@ -451,8 +563,13 @@ fn load_latest(folder: &Path, id: &str) -> Result<(ScriptJobRecord, Vec<Recovery
                 if snapshot.state_revision != revision
                     || snapshot.request != latest.request || snapshot.request_digest != latest.request_digest
                     || snapshot.created_at != latest.created_at
-                    || snapshot.applied_operations[..snapshot.applied_operations.len()-1] != latest.applied_operations[..] {
+                    || snapshot.applied_operations[..snapshot.applied_operations.len()-1] != latest.applied_operations[..]
+                    || !snapshot.revisions.starts_with(&latest.revisions) {
                     issues.push(make_issue(id.to_string(), RecoveryKind::CorruptRecord, "State checkpoint violates immutable job history."));
+                    break;
+                }
+                if let Err(error) = verify_revisions(folder, &snapshot) {
+                    issues.push(issue_from_load(id.to_string(), &error));
                     break;
                 }
                 latest = snapshot;
@@ -463,6 +580,7 @@ fn load_latest(folder: &Path, id: &str) -> Result<(ScriptJobRecord, Vec<Recovery
             }
         }
     }
+    issues.extend(collect_revision_issues(folder, &latest)?);
     Ok((latest, issues))
 }
 
