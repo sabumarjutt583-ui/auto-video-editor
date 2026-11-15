@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "jobId": "sj_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "requestId": "req_fixture_001",
+  "channelId": "_legacy-channel",
+  "projectId": null,
+  "request": {
+    "requestId": "req_fixture_001",
+    "channelId": "_legacy-channel",
+    "projectId": null,
+    "title": "A Test Story",
+    "topic": "Human history",
+    "language": "en",
+    "requestedWords": 1200,
+    "targetAudience": "US adults",
+    "narrationTone": "calm",
+    "storytellingStyle": "documentary",
+    "providerMode": "claude_browser_assisted",
+    "additionalInstructions": "No headings.",
+    "masterPrompt": {
+      "channelId": "_legacy-channel",
+      "content": "Write calm narration.",
+      "versionId": "sha256:8de81089093e0bc23b560c8e644abe617068416b1c9156013de1a859a8a8b41e",
+      "contentDigest": "sha256:8de81089093e0bc23b560c8e644abe617068416b1c9156013de1a859a8a8b41e"
+    }
+  },
+  "requestDigest": "sha256:f9b0e67f0679d745e3945f9fe8b6854e664e43f41d5937c75b3a0b45d6c65349",
+  "state": "response_received",
+  "stateRevision": 2,
+  "createdAt": "2026-11-15T00:00:00.000Z",
+  "updatedAt": "2026-11-15T00:02:00.000Z",
+  "preparedPrompt": {
+    "requestId": "req_fixture_001",
+    "channelId": "_legacy-channel",
+    "formatVersion": "script-prompt-v1",
+    "content": "Write an educational narration.\n한국어 🎬",
+    "contentDigest": "sha256:2aae4b1df2f0e86d84c1b68fa08f9bc8356e0f6cd606b702800d3518bc2b8b99",
+    "masterPromptDigest": "sha256:8de81089093e0bc23b560c8e644abe617068416b1c9156013de1a859a8a8b41e",
+    "preparedAt": "2026-11-15T00:01:00.000Z"
+  },
+  "revisions": [
+    {
+      "revisionId": "rev_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "contentDigest": "sha256:33dd9ea1c657026f9834d4299f570a537287985db1815f4af0d1041b81afd3f4",
+      "byteLength": 43,
+      "createdAt": "2026-11-15T00:02:00.000Z",
+      "source": "manual_import"
+    }
+  ],
+  "approvedRevisionId": null,
+  "errorCode": null,
+  "recoveryAction": "manual_response_imported_unreviewed",
+  "appliedOperations": [
+    {
+      "operationId": "fixture-prepare",
+      "actionDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedRevision": 0,
+      "resultRevision": 1,
+      "resultState": "prepared"
+    },
+    {
+      "operationId": "fixture-import",
+      "actionDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expectedRevision": 1,
+      "resultRevision": 2,
+      "resultState": "response_received"
+    }
+  ]
+}

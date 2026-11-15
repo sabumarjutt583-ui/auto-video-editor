@@ -2,6 +2,18 @@
  * No Zustand integration or Tauri commands are exposed yet. */
 import type { ScriptGenerationRequest } from "../core/types.ts";
 
+export interface ImportedScriptRevisionRef {
+  readonly revisionId: string;
+  readonly contentDigest: string;
+  readonly byteLength: number;
+  readonly createdAt: string;
+  readonly source: "manual_import";
+}
+export type ManualSubmissionEvidence = "user_confirmed" | "user_confirmed_not_submitted";
+export interface ImportedScriptResponse {
+  readonly revision: ImportedScriptRevisionRef;
+  readonly text: string;
+}
 export type DurableScriptJobState =
   | "created" | "prepared" | "awaiting_user_action" | "copy_intent" | "copied"
   | "submission_intent" | "submission_uncertain" | "submitted"
@@ -43,12 +55,14 @@ export interface DurableScriptJobV1 {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly preparedPrompt: PreparedScriptPromptSnapshot | null;
-  readonly revisions: readonly string[];
+  readonly revisions: readonly ImportedScriptRevisionRef[];
   readonly approvedRevisionId: string | null;
   readonly errorCode: string | null;
   readonly recoveryAction: string | null;
   /** Absent in valid Phase 03B v1 files; serialized after first transition. */
   readonly appliedOperations?: readonly AppliedScriptJobOperation[];
+  /** Missing from valid Phase 03B/C snapshots. User-confirmed, never provider-confirmed. */
+  readonly submissionEvidence?: ManualSubmissionEvidence | null;
 }
 
 export type ScriptJobRecoveryKind =
@@ -69,7 +83,8 @@ export type ScriptJobStoreErrorCode =
   | "invalid_request" | "invalid_job_id" | "request_conflict" | "writer_busy"
   | "storage_failure" | "recovery_blocked" | "job_not_found" | "corrupt_record"
   | "unsupported_version" | "stale_revision" | "invalid_transition"
-  | "invalid_operation" | "operation_conflict" | "operation_history_full";
+  | "invalid_operation" | "operation_conflict" | "operation_history_full"
+  | "invalid_response" | "revision_not_found";
 
 export interface ScriptJobCommandError {
   readonly code: ScriptJobStoreErrorCode;
@@ -92,7 +107,20 @@ export type LocalScriptJobAction =
   | { readonly type: "confirm_copy" }
   | { readonly type: "await_user_action"; readonly reason: ScriptJobWaitingReason }
   | { readonly type: "begin_manual_submission" }
-  | { readonly type: "mark_submission_uncertain" };
+  | { readonly type: "mark_submission_uncertain" }
+  | { readonly type: "confirm_submitted" }
+  | { readonly type: "confirm_not_submitted" };
 export interface LocalScriptJobTransitionInput extends JobTransitionIdentity {
   readonly action: LocalScriptJobAction;
+}
+
+// Phase 03D: text can only enter the Rust store via this explicit mutation.
+export interface ImportScriptResponseInput extends JobTransitionIdentity {
+  readonly text: string;
+}
+export interface ReadImportedScriptInput {
+  readonly jobId: string;
+  readonly channelId: string;
+  readonly requestId: string;
+  readonly revisionId: string;
 }

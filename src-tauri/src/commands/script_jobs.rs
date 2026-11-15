@@ -128,6 +128,8 @@ pub enum LocalJobAction {
     AwaitUserAction { reason: WaitingReason },
     BeginManualSubmission,
     MarkSubmissionUncertain,
+    ConfirmSubmitted,
+    ConfirmNotSubmitted,
 }
 
 impl From<LocalJobAction> for ScriptJobAction {
@@ -138,6 +140,8 @@ impl From<LocalJobAction> for ScriptJobAction {
             LocalJobAction::AwaitUserAction { reason } => Self::AwaitUserAction { reason },
             LocalJobAction::BeginManualSubmission => Self::BeginManualSubmission,
             LocalJobAction::MarkSubmissionUncertain => Self::MarkSubmissionUncertain,
+            LocalJobAction::ConfirmSubmitted => Self::ConfirmSubmitted,
+            LocalJobAction::ConfirmNotSubmitted => Self::ConfirmNotSubmitted,
         }
     }
 }
@@ -183,4 +187,48 @@ pub async fn script_job_cancel(
         request_id: input.request_id, expected_revision: input.expected_revision,
         operation_id: input.operation_id, action: ScriptJobAction::Cancel,
     })).await
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ImportScriptResponseInput {
+    pub job_id: String,
+    pub channel_id: String,
+    pub request_id: String,
+    pub expected_revision: u64,
+    pub operation_id: String,
+    pub text: String,
+}
+#[tauri::command]
+pub async fn script_job_import_response(
+    state: State<'_, ScriptJobService>,
+    input: ImportScriptResponseInput,
+) -> CmdResult<ScriptJobRecord> {
+    let store = state.store()?;
+    blocking(move || store.transition(JobMutation {
+        job_id: input.job_id,
+        channel_id: input.channel_id,
+        request_id: input.request_id,
+        expected_revision: input.expected_revision,
+        operation_id: input.operation_id,
+        action: ScriptJobAction::ImportResponse { text: input.text },
+    })).await
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadImportedScriptInput {
+    pub job_id: String,
+    pub channel_id: String,
+    pub request_id: String,
+    pub revision_id: String,
+}
+#[tauri::command]
+pub async fn script_job_read_response(
+    state: State<'_, ScriptJobService>,
+    input: ReadImportedScriptInput,
+) -> CmdResult<crate::script_jobs::ImportedScriptResponse> {
+    let store = state.store()?;
+    blocking(move || store.read_response(&input.job_id, &input.channel_id,
+        &input.request_id, &input.revision_id)).await
 }

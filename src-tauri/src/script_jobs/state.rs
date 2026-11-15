@@ -16,6 +16,11 @@ pub enum ScriptJobAction {
     AwaitUserAction { reason: WaitingReason },
     BeginManualSubmission,
     MarkSubmissionUncertain,
+    /// Explicit user evidence; never supplied by a provider.
+    ConfirmSubmitted,
+    ConfirmNotSubmitted,
+    /// Exact unmodified Unicode text, saved to an immutable file by store.rs.
+    ImportResponse { text: String },
     Cancel,
 }
 
@@ -98,6 +103,35 @@ pub fn apply_transition(
             if job.state != State::SubmissionIntent { return Err(TransitionError::InvalidTransition); }
             job.state = State::SubmissionUncertain;
             job.recovery_action = Some("manual_reconciliation_required".into());
+        }
+        Action::ConfirmSubmitted => {
+            if !matches!(job.state, State::SubmissionIntent | State::SubmissionUncertain) {
+                return Err(TransitionError::InvalidTransition);
+            }
+            job.state = State::Submitted;
+            job.submission_evidence = Some(super::model::ManualSubmissionEvidence::UserConfirmed);
+            job.recovery_action = Some("user_confirmed_submission".into());
+        }
+        Action::ConfirmNotSubmitted => {
+            if !matches!(job.state, State::SubmissionIntent | State::SubmissionUncertain) {
+                return Err(TransitionError::InvalidTransition);
+            }
+            job.state = State::Copied;
+            job.submission_evidence = Some(super::model::ManualSubmissionEvidence::UserConfirmedNotSubmitted);
+            job.recovery_action = Some("user_confirmed_no_submission".into());
+        }
+        Action::ImportResponse { text } => {
+            if !matches!(job.state, State::Prepared | State::CopyIntent | State::Copied
+                | State::AwaitingUserAction | State::SubmissionIntent
+                | State::SubmissionUncertain | State::Submitted) {
+                return Err(TransitionError::InvalidTransition);
+            }
+            if text.trim().is_empty() || text.len() > super::model::MAX_IMPORT_BYTES
+                || text.contains('\0') { return Err(TransitionError::InvalidPreparedPrompt); }
+            // The store must write and sync the revision file BEFORE publishing
+            // the state checkpoint; do not mark imported content here.
+            job.state = State::ResponseReceived;
+            job.recovery_action = Some("manual_response_imported_unreviewed".into());
         }
         Action::Cancel => {
             // Once external submission intent exists, cancellation cannot assert

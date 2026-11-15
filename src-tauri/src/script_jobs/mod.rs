@@ -9,5 +9,5 @@ mod tests;
 mod state_tests;
 
 pub use model::{MasterPromptSnapshot, ProviderMode, ScriptGenerationRequest, ScriptJobRecord, ScriptJobState, PreparedPromptSnapshot, AppliedJobOperation};
-pub use store::{RecoveryIssue, RecoveryKind, RecoveryReport, ScriptJobStore, StoreError, StoreErrorCode, JobMutation};
+pub use store::{RecoveryIssue, RecoveryKind, RecoveryReport, ScriptJobStore, StoreError, StoreErrorCode, JobMutation, ImportedScriptResponse};
 pub use state::{ScriptJobAction, WaitingReason};

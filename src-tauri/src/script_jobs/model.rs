@@ -90,6 +90,30 @@ pub struct AppliedJobOperation {
 
 pub const MAX_OPERATIONS: usize = 256;
 pub const MAX_PROMPT_BYTES: usize = 120_000;
+/// Response is exact UTF-8 text; 2 MiB prevents unbounded disk/memory use.
+pub const MAX_IMPORT_BYTES: usize = 2_097_152;
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScriptRevisionSource { ManualImport }
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ScriptRevisionRef {
+    pub revision_id: String,
+    pub content_digest: String,
+    pub byte_length: u64,
+    pub created_at: String,
+    pub source: ScriptRevisionSource,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ManualSubmissionEvidence {
+    UserConfirmed,
+    UserConfirmedNotSubmitted,
+}
+pub fn valid_revision_id(id: &str) -> bool {
+    id.len() == 68 && id.starts_with("rev_")
+        && id[4..].bytes().all(|b| b.is_ascii_hexdigit())
+}
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -106,12 +130,14 @@ pub struct ScriptJobRecord {
     pub created_at: String,
     pub updated_at: String,
     pub prepared_prompt: Option<PreparedPromptSnapshot>,
-    pub revisions: Vec<String>,
+    pub revisions: Vec<ScriptRevisionRef>,
     pub approved_revision_id: Option<String>,
     pub error_code: Option<String>,
     pub recovery_action: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub applied_operations: Vec<AppliedJobOperation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub submission_evidence: Option<ManualSubmissionEvidence>,
 }
 
 pub fn valid_id(value: &str) -> bool {
@@ -194,8 +220,26 @@ impl ScriptJobRecord {
         if self.state_revision == 0 && self.state != ScriptJobState::Created {
             return Err("invalid_initial_state");
         }
-        if !self.revisions.is_empty() || self.approved_revision_id.is_some() {
+        if self.approved_revision_id.is_some() || self.revisions.len() > 1 {
             return Err("unsupported_revision_data");
+        }
+        for reference in &self.revisions {
+            if !valid_revision_id(&reference.revision_id)
+                || !valid_digest(&reference.content_digest)
+                || reference.byte_length == 0 || reference.byte_length > MAX_IMPORT_BYTES as u64
+                || !valid_iso_utc(&reference.created_at) {
+                return Err("invalid_revision_reference");
+            }
+        }
+        if self.state == ScriptJobState::Submitted
+            && self.submission_evidence != Some(ManualSubmissionEvidence::UserConfirmed) {
+            return Err("missing_manual_submission_evidence");
+        }
+        if self.revisions.is_empty() && self.state == ScriptJobState::ResponseReceived {
+            return Err("missing_response_revision");
+        }
+        if !self.revisions.is_empty() && self.state != ScriptJobState::ResponseReceived {
+            return Err("unexpected_response_revision");
         }
         match self.state {
             ScriptJobState::Created => {
@@ -204,11 +248,11 @@ impl ScriptJobRecord {
             ScriptJobState::Cancelled => {}
             ScriptJobState::Prepared | ScriptJobState::AwaitingUserAction
             | ScriptJobState::CopyIntent | ScriptJobState::Copied
-            | ScriptJobState::SubmissionIntent | ScriptJobState::SubmissionUncertain => {
+            | ScriptJobState::SubmissionIntent | ScriptJobState::SubmissionUncertain
+            | ScriptJobState::Submitted | ScriptJobState::ResponseReceived => {
                 if self.prepared_prompt.is_none() { return Err("missing_prepared_prompt"); }
             }
-            // Cannot claim a response, approval or confirmed external send
-            // before the relevant provider/revision features are implemented.
+            // Phase 03E will implement validating, draft, review and approval.
             _ => return Err("unimplemented_lifecycle_state"),
         }
         if let Some(prompt) = &self.prepared_prompt {

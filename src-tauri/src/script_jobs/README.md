@@ -26,3 +26,22 @@ The record includes private channel master prompts and prepared text. Never log 
 Tauri commands are registered for both normal and admin builds but are **not invoked by existing Script Writer UI, video pipeline or Claude calls**. Initialization failure creates an unavailable service with safe typed errors; no existing Tauri feature is disabled.
 
 The Linux/Windows frontend and Rust CI uses a **non-executable placeholder FFmpeg sidecar** solely to compile/test the backend; it is neither runnable nor shipped. Installed Windows Tauri/WebView2 GUI tests and real power-loss tests remain outstanding.
+
+
+## Phase 03D: manual confirmation and immutable imported response
+
+Schema **stays version 1**. The initial Phase 03B `job.json` and Phase 03C state files continue to deserialize unchanged: `submissionEvidence` is optional/omitted, and all existing `revisions` arrays were empty. Phase 03D reuses `revisions` for typed `{revisionId, contentDigest, byteLength, createdAt, source:"manual_import"}` references. No project schema or migration is changed.
+
+Manual workflow states do **not** prove provider acknowledgment. `ConfirmSubmitted` is an explicitly user-confirmed transition from `submission_intent` or `submission_uncertain` and stores `submissionEvidence:"user_confirmed"`. `ConfirmNotSubmitted` records `user_confirmed_not_submitted` and allows the user to return to a safe copied state. Merely copying or recording submission intent never sets `submitted`.
+
+A locally imported response is accepted from a prepared or manual submission state, **not** from a cancelled/created/already-imported job. The complete exact UTF-8 text must be nonempty after whitespace checking, contain no NUL, and be <= 2,097,152 bytes. No trimming or normalization is applied to what is saved.
+
+1. Under the existing OS-held store writer lease and process mutex, create a deterministic (operation-ID-based) filesystem-safe revision ID.
+2. Create `revisions/revision-<random>.tmp` with `create_new`, write exact UTF-8 bytes, flush, `sync_all`, and publish to a never-before-existing `revisions/rev_<64hex>.txt`. Never replace committed text.
+3. Persist the next append-only `state-<revision>.json` checkpoint, referencing its SHA-256 digest, byte count, timestamp and `manual_import` origin. Return success **only after** both publications finish successfully.
+4. On every read/recover, validate referenced response content against the metadata and inspect unexpected, symlinked, partial and orphaned revision artifacts. A corrupted/imported revision never silently becomes approved; the prior valid state is retained with a recovery issue and mutation blocked.
+5. A crash after publishing text but before the state reference leaves an **orphan**; preserve the text and report `orphan_revision` for manual reconciliation. A crash after state publication but before acknowledgement is resolved with the same durable operation ID and returns the already committed outcome.
+
+Revision text files are local plaintext; SHA-256 is for accidental corruption detection, not encryption/authentication. Human-driven copy uses an explicit durably committed `copy_intent` *before* clipboard access; `copied` is committed only after a real clipboard success or an explicit user's manual-copy attestation. A failed clipboard operation leaves the job safe for a user decision.
+
+No script quality validation, approval, external AI submission, browser automation, project handoff, or voice/image/video action is implemented. The minimal manual panel is Vite-development-only and only opens through an explicit user action. Windows GUI/WebView2 runtime validation is still pending. Windows directory synchronization, adversarial filesystem races, hardware power-loss guarantees, and orphan reconciliation UI remain outside this phase.
