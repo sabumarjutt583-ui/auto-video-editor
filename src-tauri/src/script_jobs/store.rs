@@ -12,8 +12,9 @@ use serde::{Deserialize, Serialize};
 
 use super::lock;
 use super::model::{
-    request_digest, valid_id, valid_job_id, AppliedJobOperation, ScriptGenerationRequest,
-    ScriptJobRecord, ScriptJobState, MAX_OPERATIONS, SCHEMA_VERSION,
+    digest, request_digest, valid_id, valid_job_id, valid_revision_id, AppliedJobOperation,
+    ScriptGenerationRequest, ScriptJobRecord, ScriptJobState, ScriptRevisionRef,
+    ScriptRevisionSource, MAX_IMPORT_BYTES, MAX_OPERATIONS, SCHEMA_VERSION,
 };
 use super::state::{apply_transition, ScriptJobAction, TransitionError};
 
@@ -25,6 +26,7 @@ pub enum StoreErrorCode {
     InvalidRequest, InvalidJobId, RequestConflict, WriterBusy, StorageFailure,
     RecoveryBlocked, JobNotFound, CorruptRecord, UnsupportedVersion,
     StaleRevision, InvalidTransition, InvalidOperation, OperationConflict, OperationHistoryFull,
+    InvalidResponse, RevisionNotFound,
 }
 #[derive(Debug)]
 pub struct StoreError {
@@ -45,6 +47,7 @@ fn bad_record() -> StoreError { StoreError::new(StoreErrorCode::CorruptRecord, "
 #[serde(rename_all = "snake_case")]
 pub enum RecoveryKind {
     CorruptRecord, UnsupportedVersion, IncompleteRecord, UnsafeEntry, IoError, DuplicateRequest,
+    OrphanRevision,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -223,7 +226,7 @@ impl ScriptJobStore {
                         state_revision: 0, created_at: now.clone(), updated_at: now,
                         prepared_prompt: None, revisions: Vec::new(),
                         approved_revision_id: None, error_code: None, recovery_action: None,
-                        applied_operations: Vec::new(),
+                        applied_operations: Vec::new(), submission_evidence: None,
                     };
                     persist_initial(&folder, &record, false)?;
                     return Ok(record);
@@ -238,6 +241,10 @@ impl ScriptJobStore {
     /// A stale retry of a committed operation returns its *original* revision,
     /// even if other valid operations were committed later.
     pub fn transition(&self, input: JobMutation) -> Result<ScriptJobRecord, StoreError> {
+        self.transition_inner(input, ImportFault::None)
+    }
+
+    fn transition_inner(&self, input: JobMutation, fault: ImportFault) -> Result<ScriptJobRecord, StoreError> {
         if !valid_job_id(&input.job_id) || !valid_id(&input.channel_id)
             || !valid_id(&input.request_id) || !valid_id(&input.operation_id) {
             return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Invalid job transition identifiers."));
@@ -279,7 +286,11 @@ impl ScriptJobStore {
         let stamp = now_iso();
         apply_transition(&mut next, &input.action, &stamp).map_err(|e| match e {
             TransitionError::InvalidTransition => StoreError::new(StoreErrorCode::InvalidTransition, "Action is not allowed in the current job state."),
-            TransitionError::InvalidPreparedPrompt => StoreError::new(StoreErrorCode::InvalidOperation, "Prepared prompt is empty, oversized or belongs to another master prompt."),
+            TransitionError::InvalidPreparedPrompt => StoreError::new(
+                if matches!(input.action, ScriptJobAction::ImportResponse { .. }) {
+                    StoreErrorCode::InvalidResponse
+                } else { StoreErrorCode::InvalidOperation },
+                "Prompt or response content is invalid, oversized or belongs to another request."),
         })?;
         next.state_revision = current.state_revision.checked_add(1).ok_or_else(storage)?;
         next.updated_at = stamp;
@@ -290,9 +301,47 @@ impl ScriptJobStore {
             result_revision: next.state_revision,
             result_state: next.state.clone(),
         });
+        if let ScriptJobAction::ImportResponse { text } = &input.action {
+            let revision_id = format!("rev_{}", &digest(format!("{}:{}", current.job_id, input.operation_id).as_bytes())[7..]);
+            next.revisions.push(ScriptRevisionRef {
+                revision_id,
+                content_digest: digest(text.as_bytes()),
+                byte_length: text.len() as u64,
+                created_at: next.updated_at.clone(),
+                source: ScriptRevisionSource::ManualImport,
+            });
+        }
         next.validate(&next.job_id).map_err(|_| bad_record())?;
-        publish_state(&folder, &next, PublicationFault::None)?;
+        if let ScriptJobAction::ImportResponse { text } = &input.action {
+            publish_revision(&folder, &next.revisions[0], text, fault)?;
+        }
+        publish_state(&folder, &next, if matches!(fault, ImportFault::AfterCheckpoint) {
+            PublicationFault::AfterRename
+        } else { PublicationFault::None })?;
         Ok(next)
+    }
+
+    /// Read verified, committed response text; never accept caller paths.
+    pub fn read_response(&self, job_id: &str, channel_id: &str, request_id: &str,
+        revision_id: &str) -> Result<ImportedScriptResponse, StoreError> {
+        if !valid_job_id(job_id) || !valid_id(channel_id) || !valid_id(request_id)
+            || !valid_revision_id(revision_id) {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Invalid response retrieval identity."));
+        }
+        let job = self.get(job_id)?;
+        if job.channel_id != channel_id || job.request_id != request_id {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Response belongs to another request or channel."));
+        }
+        let reference = job.revisions.iter().find(|reference| reference.revision_id == revision_id)
+            .ok_or_else(|| StoreError::new(StoreErrorCode::RevisionNotFound, "Revision is not committed for this job."))?;
+        let folder = self.root.join("jobs").join(job_id);
+        let text = read_revision(&folder, reference)?;
+        Ok(ImportedScriptResponse { revision: reference.clone(), text })
+    }
+
+    #[cfg(test)]
+    pub(super) fn inject_import_fault(&self, input: JobMutation, fault: ImportFault) -> Result<ScriptJobRecord, StoreError> {
+        self.transition_inner(input, fault)
     }
 }
 impl Drop for ScriptJobStore {
@@ -327,6 +376,21 @@ fn persist_initial(folder: &Path, record: &ScriptJobRecord, interrupt_before_pub
         let _ = fs::remove_file(&temp); // never delete job.json or existing records
     }
     operation
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedScriptResponse {
+    pub revision: ScriptRevisionRef,
+    pub text: String,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum ImportFault {
+    None,
+    BeforeRevision,
+    AfterRevision,
+    AfterCheckpoint,
 }
 
 #[derive(Clone, serde::Deserialize)]
