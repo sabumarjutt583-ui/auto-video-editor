@@ -23,6 +23,7 @@ mod probe;
 mod project;
 mod render;
 mod settings;
+mod script_jobs;
 #[cfg(test)]
 mod smoke_test;
 mod sfx;
