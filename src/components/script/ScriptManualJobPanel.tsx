@@ -41,6 +41,9 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const promptRef = useRef<HTMLTextAreaElement>(null);
+  // Retain a stable request ID across ambiguous create acknowledgement failures.
+  // The parent remounts this panel when channel/video inputs change.
+  const pendingRequestId = useRef<string | null>(null);
 
   if (!import.meta.env.DEV) return null;
 
@@ -56,7 +59,8 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
     if (!profile) { setError("Choose a channel first."); return; }
     const words = wordCountText.trim() === "" ? null : Number(wordCountText);
     const prepared = prepareLegacyScriptPrompt(profile, { title, topic, wordCount: words, script }, {
-      requestId: stableId("manual"), expectedChannelId: profile.id,
+      requestId: pendingRequestId.current ?? (pendingRequestId.current = stableId("manual")),
+      expectedChannelId: profile.id,
     });
     if (!prepared.ok) {
       setError(prepared.validation.errors.map(issue => issue.message).join(" ")); return;
