@@ -74,7 +74,7 @@ fn sw_03b_04_conflicting_request_id_is_refused() {
     let tmp = Sandbox::new(); let store = tmp.store();
     store.create(request("reused")).unwrap();
     let mut altered = request("reused"); altered.title = "A different title".into();
-    assert_eq!(store.create(altered).unwrap_err().code, StoreErrorCode::RequestConflict);
+    assert_eq!(store.create(altered).err().unwrap().code, StoreErrorCode::RequestConflict);
 }
 #[test]
 fn sw_03b_05_concurrent_threads_do_not_create_duplicate_jobs() {
@@ -90,21 +90,21 @@ fn sw_03b_05_concurrent_threads_do_not_create_duplicate_jobs() {
 #[test]
 fn sw_03b_06_bad_ids_and_paths_are_rejected() {
     let tmp = Sandbox::new(); let store = tmp.store();
-    assert_eq!(store.get("../secret").unwrap_err().code, StoreErrorCode::InvalidJobId);
+    assert_eq!(store.get("../secret").err().unwrap().code, StoreErrorCode::InvalidJobId);
     let mut bad = request("bad/id");
-    assert_eq!(store.create(bad.clone()).unwrap_err().code, StoreErrorCode::InvalidRequest);
+    assert_eq!(store.create(bad.clone()).err().unwrap().code, StoreErrorCode::InvalidRequest);
     bad.request_id = "valid".into(); bad.channel_id = "other/channel".into();
-    assert_eq!(store.create(bad).unwrap_err().code, StoreErrorCode::InvalidRequest);
+    assert_eq!(store.create(bad).err().unwrap().code, StoreErrorCode::InvalidRequest);
 }
 #[test]
 fn sw_03b_07_changed_master_digest_and_channel_are_rejected() {
     let tmp = Sandbox::new(); let store = tmp.store();
     let mut bad = request("hash-invalid");
     bad.master_prompt.content.push('!');
-    assert_eq!(store.create(bad).unwrap_err().code, StoreErrorCode::InvalidRequest);
+    assert_eq!(store.create(bad).err().unwrap().code, StoreErrorCode::InvalidRequest);
     let mut changed = request("wrong-channel");
     changed.master_prompt.channel_id = "another-channel".into();
-    assert_eq!(store.create(changed).unwrap_err().code, StoreErrorCode::InvalidRequest);
+    assert_eq!(store.create(changed).err().unwrap().code, StoreErrorCode::InvalidRequest);
 }
 #[test]
 fn sw_03b_08_corrupt_neighbor_does_not_hide_healthy_job() {
@@ -118,7 +118,7 @@ fn sw_03b_08_corrupt_neighbor_does_not_hide_healthy_job() {
     assert_eq!(report.jobs[0].job_id, job.job_id);
     assert_eq!(report.issues.len(), 1);
     assert_eq!(report.issues[0].kind, RecoveryKind::CorruptRecord);
-    assert_eq!(store.create(request("new-after-damage")).unwrap_err().code, StoreErrorCode::RecoveryBlocked);
+    assert_eq!(store.create(request("new-after-damage")).err().unwrap().code, StoreErrorCode::RecoveryBlocked);
     assert!(broken.join("job.json").exists(), "do not destroy damaged evidence");
 }
 #[test]
@@ -130,7 +130,7 @@ fn sw_03b_09_future_schema_is_reported_without_rewriting() {
     data["schemaVersion"] = serde_json::json!(999);
     let bytes = serde_json::to_vec(&data).unwrap();
     fs::write(&path, &bytes).unwrap();
-    assert_eq!(store.get(&job.job_id).unwrap_err().code, StoreErrorCode::UnsupportedVersion);
+    assert_eq!(store.get(&job.job_id).err().unwrap().code, StoreErrorCode::UnsupportedVersion);
     assert_eq!(store.recover().unwrap().issues[0].kind, RecoveryKind::UnsupportedVersion);
     assert_eq!(fs::read(path).unwrap(), bytes);
 }
@@ -146,7 +146,7 @@ fn sw_03b_11_interrupted_temp_write_keeps_last_committed_json() {
     let job = store.create(request("checkpoint")).unwrap();
     let folder = tmp.0.join("jobs").join(&job.job_id);
     let original = fs::read(folder.join("job.json")).unwrap();
-    assert_eq!(super::store::injected_partial_write(&folder, &job).unwrap_err().code, StoreErrorCode::StorageFailure);
+    assert_eq!(super::store::injected_partial_write(&folder, &job).err().unwrap().code, StoreErrorCode::StorageFailure);
     assert_eq!(original, fs::read(folder.join("job.json")).unwrap());
     assert!(store.get(&job.job_id).is_ok());
 }
@@ -185,7 +185,7 @@ fn sw_03b_14_request_channel_and_project_identifiers_cannot_be_mixed() {
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     value["projectId"] = serde_json::Value::Null;
     fs::write(path, serde_json::to_vec(&value).unwrap()).unwrap();
-    assert_eq!(store.get(&job.job_id).unwrap_err().code, StoreErrorCode::CorruptRecord);
+    assert_eq!(store.get(&job.job_id).err().unwrap().code, StoreErrorCode::CorruptRecord);
 }
 #[test]
 fn sw_03b_15_random_ids_are_unique_under_many_creations() {
