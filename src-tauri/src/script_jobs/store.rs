@@ -12,9 +12,10 @@ use serde::{Deserialize, Serialize};
 
 use super::lock;
 use super::model::{
-    request_digest, valid_job_id, ScriptGenerationRequest, ScriptJobRecord, ScriptJobState,
-    SCHEMA_VERSION,
+    request_digest, valid_id, valid_job_id, AppliedJobOperation, ScriptGenerationRequest,
+    ScriptJobRecord, ScriptJobState, MAX_OPERATIONS, SCHEMA_VERSION,
 };
+use super::state::{apply_transition, ScriptJobAction, TransitionError};
 
 const MAX_RECORD_BYTES: u64 = 1_048_576;
 
@@ -23,6 +24,7 @@ const MAX_RECORD_BYTES: u64 = 1_048_576;
 pub enum StoreErrorCode {
     InvalidRequest, InvalidJobId, RequestConflict, WriterBusy, StorageFailure,
     RecoveryBlocked, JobNotFound, CorruptRecord, UnsupportedVersion,
+    StaleRevision, InvalidTransition, InvalidOperation, OperationConflict, OperationHistoryFull,
 }
 #[derive(Debug)]
 pub struct StoreError {
@@ -86,7 +88,9 @@ fn check_directory(path: &Path) -> Result<(), StoreError> {
     }
 }
 fn load_record(folder: &Path, id: &str) -> Result<ScriptJobRecord, StoreError> {
-    let file = folder.join("job.json");
+    load_committed_file(&folder.join("job.json"), id)
+}
+fn load_committed_file(file: &Path, id: &str) -> Result<ScriptJobRecord, StoreError> {
     let meta = fs::symlink_metadata(&file).map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {
         StoreError::new(StoreErrorCode::JobNotFound, "Script job record is missing.")
     } else { storage() })?;
@@ -147,7 +151,11 @@ impl ScriptJobStore {
             StoreError::new(StoreErrorCode::JobNotFound, "Script job not found.")
         } else { storage() })?;
         if meta.file_type().is_symlink() || !meta.is_dir() { return Err(bad_record()); }
-        load_record(&folder, job_id)
+        let (job, issues) = load_latest(&folder, job_id)?;
+        if !issues.is_empty() {
+            return Err(StoreError::new(StoreErrorCode::RecoveryBlocked, "Unverified state updates exist; inspect recovery findings."));
+        }
+        Ok(job)
     }
     /// Preserve every damaged/unknown-version entry. Never quarantine automatically
     /// without a separate user-approved recovery transaction.
@@ -168,8 +176,11 @@ impl ScriptJobStore {
                 report.issues.push(make_issue(id, RecoveryKind::UnsafeEntry, "Unexpected entry in jobs directory; preserved."));
                 continue;
             }
-            match load_record(&entry.path(), &id) {
-                Ok(job) => report.jobs.push(job),
+            match load_latest(&entry.path(), &id) {
+                Ok((job, issues)) => {
+                    report.jobs.push(job);
+                    report.issues.extend(issues);
+                }
                 Err(err) => report.issues.push(issue_from_load(id, &err)),
             }
         }
@@ -212,6 +223,7 @@ impl ScriptJobStore {
                         state_revision: 0, created_at: now.clone(), updated_at: now,
                         prepared_prompt: None, revisions: Vec::new(),
                         approved_revision_id: None, error_code: None, recovery_action: None,
+                        applied_operations: Vec::new(),
                     };
                     persist_initial(&folder, &record, false)?;
                     return Ok(record);
@@ -221,6 +233,66 @@ impl ScriptJobStore {
             }
         }
         Err(StoreError::new(StoreErrorCode::StorageFailure, "Could not allocate unique Script Writer job ID."))
+    }
+
+    /// A stale retry of a committed operation returns its *original* revision,
+    /// even if other valid operations were committed later.
+    pub fn transition(&self, input: JobMutation) -> Result<ScriptJobRecord, StoreError> {
+        if !valid_job_id(&input.job_id) || !valid_id(&input.channel_id)
+            || !valid_id(&input.request_id) || !valid_id(&input.operation_id) {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Invalid job transition identifiers."));
+        }
+        // Serialize a typed action plus its expected revision. This digest is
+        // private metadata, never a way to authorize otherwise invalid steps.
+        let signature = serde_json::to_vec(&(input.expected_revision, &input.action))
+            .map_err(|_| storage())?;
+        let signature = super::model::digest(&signature);
+        let _exclusive = self.operation.lock().unwrap_or_else(|p| p.into_inner());
+        let folder = self.root.join("jobs").join(&input.job_id);
+        let meta = fs::symlink_metadata(&folder).map_err(|_| storage())?;
+        if !meta.is_dir() || meta.file_type().is_symlink() { return Err(bad_record()); }
+        let (current, issues) = load_latest(&folder, &input.job_id)?;
+        if !issues.is_empty() {
+            return Err(StoreError::new(StoreErrorCode::RecoveryBlocked, "Unverified state revisions block mutation."));
+        }
+        if current.channel_id != input.channel_id || current.request_id != input.request_id {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "The job does not belong to this request and channel."));
+        }
+        if let Some(applied) = current.applied_operations.iter().find(|entry| entry.operation_id == input.operation_id) {
+            if applied.action_digest != signature || applied.expected_revision != input.expected_revision {
+                return Err(StoreError::new(StoreErrorCode::OperationConflict, "Operation ID already represents different content."));
+            }
+            let old = if applied.result_revision == 0 {
+                load_record(&folder, &input.job_id)?
+            } else {
+                load_committed_file(&state_path(&folder, applied.result_revision), &input.job_id)?
+            };
+            return Ok(old);
+        }
+        if current.state_revision != input.expected_revision {
+            return Err(StoreError::new(StoreErrorCode::StaleRevision, "Job state revision is stale."));
+        }
+        if current.applied_operations.len() == MAX_OPERATIONS {
+            return Err(StoreError::new(StoreErrorCode::OperationHistoryFull, "Durable operation history is full; an explicit migration is required."));
+        }
+        let mut next = current.clone();
+        let stamp = now_iso();
+        apply_transition(&mut next, &input.action, &stamp).map_err(|e| match e {
+            TransitionError::InvalidTransition => StoreError::new(StoreErrorCode::InvalidTransition, "Action is not allowed in the current job state."),
+            TransitionError::InvalidPreparedPrompt => StoreError::new(StoreErrorCode::InvalidOperation, "Prepared prompt is empty, oversized or belongs to another master prompt."),
+        })?;
+        next.state_revision = current.state_revision.checked_add(1).ok_or_else(storage)?;
+        next.updated_at = stamp;
+        next.applied_operations.push(AppliedJobOperation {
+            operation_id: input.operation_id,
+            action_digest: signature,
+            expected_revision: input.expected_revision,
+            result_revision: next.state_revision,
+            result_state: next.state.clone(),
+        });
+        next.validate(&next.job_id).map_err(|_| bad_record())?;
+        publish_state(&folder, &next, PublicationFault::None)?;
+        Ok(next)
     }
 }
 impl Drop for ScriptJobStore {
@@ -256,6 +328,121 @@ fn persist_initial(folder: &Path, record: &ScriptJobRecord, interrupt_before_pub
     }
     operation
 }
+
+#[derive(Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct JobMutation {
+    pub job_id: String,
+    pub channel_id: String,
+    pub request_id: String,
+    pub expected_revision: u64,
+    pub operation_id: String,
+    pub action: ScriptJobAction,
+}
+
+fn state_path(folder: &Path, revision: u64) -> PathBuf {
+    folder.join(format!("state-{revision:020}.json"))
+}
+
+/// Read the entire contiguous generation chain. A damaged future checkpoint
+/// never overwrites or silently hides the last known-good record. Every problem
+/// becomes a recovery issue and makes future mutations fail closed.
+fn load_latest(folder: &Path, id: &str) -> Result<(ScriptJobRecord, Vec<RecoveryIssue>), StoreError> {
+    let mut latest = load_record(folder, id)?;
+    let mut snapshots = Vec::<(u64, PathBuf)>::new();
+    let mut issues = Vec::new();
+    let entries = fs::read_dir(folder).map_err(|_| storage())?;
+    for e in entries {
+        let e = e.map_err(|_| storage())?;
+        let file_name = e.file_name().to_string_lossy().into_owned();
+        if file_name == "job.json" { continue; }
+        if file_name.starts_with("job-") && file_name.ends_with(".tmp")
+            || file_name.starts_with("state-") && file_name.ends_with(".tmp") {
+            issues.push(make_issue(id.to_string(), RecoveryKind::IncompleteRecord, "Uncommitted temporary file preserved for inspection."));
+            continue;
+        }
+        if file_name.starts_with("state-") && file_name.ends_with(".json") {
+            let digits = &file_name[6..file_name.len() - 5];
+            if digits.len() != 20 || !digits.bytes().all(|b| b.is_ascii_digit()) {
+                issues.push(make_issue(id.to_string(), RecoveryKind::UnsafeEntry, "Invalid state snapshot name."));
+                continue;
+            }
+            let Some(revision) = digits.parse::<u64>().ok().filter(|r| *r > 0) else {
+                issues.push(make_issue(id.to_string(), RecoveryKind::UnsafeEntry, "Invalid state snapshot revision."));
+                continue;
+            };
+            snapshots.push((revision, e.path()));
+        } else {
+            issues.push(make_issue(id.to_string(), RecoveryKind::UnsafeEntry, "Unexpected job folder entry preserved."));
+        }
+    }
+    snapshots.sort_by_key(|x| x.0);
+    for (revision, path) in snapshots {
+        if revision != latest.state_revision + 1 {
+            issues.push(make_issue(id.to_string(), RecoveryKind::IncompleteRecord, "State revision chain is incomplete or ambiguous."));
+            break;
+        }
+        match load_committed_file(&path, id) {
+            Ok(snapshot) => {
+                if snapshot.state_revision != revision
+                    || snapshot.request != latest.request || snapshot.request_digest != latest.request_digest
+                    || snapshot.created_at != latest.created_at
+                    || snapshot.applied_operations[..snapshot.applied_operations.len()-1] != latest.applied_operations[..] {
+                    issues.push(make_issue(id.to_string(), RecoveryKind::CorruptRecord, "State checkpoint violates immutable job history."));
+                    break;
+                }
+                latest = snapshot;
+            }
+            Err(error) => {
+                issues.push(issue_from_load(id.to_string(), &error));
+                break;
+            }
+        }
+    }
+    Ok((latest, issues))
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum PublicationFault {
+    None,
+    BeforeRename,
+    AfterRename,
+}
+
+/// Write-once generation snapshots avoid replacing an existing Windows file.
+fn publish_state(folder: &Path, record: &ScriptJobRecord, fault: PublicationFault) -> Result<(), StoreError> {
+    record.validate(&record.job_id).map_err(|_| bad_record())?;
+    let json = serde_json::to_vec_pretty(record).map_err(|_| storage())?;
+    if json.len() as u64 > MAX_RECORD_BYTES { return Err(storage()); }
+    let dest = state_path(folder, record.state_revision);
+    if dest.exists() { return Err(StoreError::new(StoreErrorCode::StorageFailure, "Committed revision already exists.")); }
+    let temp = folder.join(format!("state-{}.tmp", random_suffix()));
+    let mut file = OpenOptions::new().write(true).create_new(true).open(&temp).map_err(|_| storage())?;
+    let outcome = (|| {
+        file.write_all(&json).map_err(|_| storage())?;
+        file.flush().map_err(|_| storage())?;
+        file.sync_all().map_err(|_| storage())?;
+        if matches!(fault, PublicationFault::BeforeRename) { return Err(storage()); }
+        // The store-wide OS lease + process mutex enforce single-writer ownership.
+        // The committed destination is *new*, so Windows does not need
+        // ReplaceFileW/MoveFileEx replacement of an existing job.json.
+        fs::rename(&temp, &dest).map_err(|_| storage())?;
+        if matches!(fault, PublicationFault::AfterRename) { return Err(storage()); }
+        #[cfg(unix)]
+        File::open(folder).and_then(|dir| dir.sync_all()).map_err(|_| storage())?;
+        Ok(())
+    })();
+    if outcome.is_err() {
+        // Removing an uncommitted temporary file is safe. Never remove dest.
+        let _ = fs::remove_file(&temp);
+    }
+    outcome
+}
+#[cfg(test)]
+pub(super) fn injected_state_write(folder: &Path, next: &ScriptJobRecord, fault: PublicationFault) -> Result<(), StoreError> {
+    publish_state(folder, next, fault)
+}
+
 #[cfg(test)]
 pub(super) fn injected_partial_write(folder: &Path, job: &ScriptJobRecord) -> Result<(), StoreError> {
     persist_initial(folder, job, true)
