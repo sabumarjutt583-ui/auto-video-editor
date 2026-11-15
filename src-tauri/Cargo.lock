@@ -243,6 +243,7 @@ name = "auto-video-editor"
 version = "0.7.5"
 dependencies = [
  "base64 0.22.1",
+ "libc",
  "futures-util",
  "keyring",
  "rand",
@@ -258,6 +259,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "trash",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

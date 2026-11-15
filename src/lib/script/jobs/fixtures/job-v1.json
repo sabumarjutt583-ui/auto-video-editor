@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "jobId": "sj_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "requestId": "req_fixture_001",
+  "channelId": "_legacy-channel",
+  "projectId": null,
+  "request": {
+    "requestId": "req_fixture_001",
+    "channelId": "_legacy-channel",
+    "projectId": null,
+    "title": "A Test Story",
+    "topic": "Human history",
+    "language": "en",
+    "requestedWords": 1200,
+    "targetAudience": "US adults",
+    "narrationTone": "calm",
+    "storytellingStyle": "documentary",
+    "providerMode": "claude_browser_assisted",
+    "additionalInstructions": "No headings.",
+    "masterPrompt": {
+      "channelId": "_legacy-channel",
+      "content": "Write calm narration.",
+      "versionId": "sha256:8de81089093e0bc23b560c8e644abe617068416b1c9156013de1a859a8a8b41e",
+      "contentDigest": "sha256:8de81089093e0bc23b560c8e644abe617068416b1c9156013de1a859a8a8b41e"
+    }
+  },
+  "requestDigest": "sha256:f9b0e67f0679d745e3945f9fe8b6854e664e43f41d5937c75b3a0b45d6c65349",
+  "state": "created",
+  "stateRevision": 0,
+  "createdAt": "2026-11-15T00:00:00.000Z",
+  "updatedAt": "2026-11-15T00:00:00.000Z",
+  "preparedPrompt": null,
+  "revisions": [],
+  "approvedRevisionId": null,
+  "errorCode": null,
+  "recoveryAction": null
+}
