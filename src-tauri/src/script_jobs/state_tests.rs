@@ -76,7 +76,7 @@ fn sw_03c_03_prompt_and_operation_history_survive_fresh_instance() {
     let tmp=Sandbox::new();
     let saved={let store=tmp.store();let job=store.create(request("restart_prompt")).unwrap();prepare(&store,&job)};
     let store=tmp.store();
-    assert_eq!(saved,store.get(&saved.job_id).unwrap());
+    assert!(saved == store.get(&saved.job_id).unwrap());
     assert_eq!(store.recover().unwrap().jobs[0].state,ScriptJobState::Prepared);
 }
 #[test]
@@ -98,7 +98,7 @@ fn sw_03c_06_stale_expected_revision_does_not_overwrite() {
     let tmp=Sandbox::new();let store=tmp.store();let first=store.create(request("stale")).unwrap();
     let latest=prepare(&store,&first);
     assert_eq!(store.transition(input(&first,"another-op",action_prepare(&first))).err().unwrap().code,StoreErrorCode::StaleRevision);
-    assert_eq!(store.get(&first.job_id).unwrap(),latest);
+    assert!(store.get(&first.job_id).unwrap() == latest);
 }
 #[test]
 fn sw_03c_07_each_committed_transition_increments_once() {
@@ -115,11 +115,11 @@ fn sw_03c_08_repeated_operation_replays_original_outcome_after_more_updates() {
     let prepare_op=input(&first,"stable-prep",action_prepare(&first));
     let second=store.transition(prepare_op.clone()).unwrap();
     let third=store.transition(input(&second,"begin-copy",ScriptJobAction::BeginCopy)).unwrap();
-    assert_eq!(store.transition(prepare_op).unwrap(),second);
-    assert_eq!(store.get(&first.job_id).unwrap(),third);
+    assert!(store.transition(prepare_op).unwrap() == second);
+    assert!(store.get(&first.job_id).unwrap() == third);
     drop(store);
     let store=tmp.store();
-    assert_eq!(store.transition(input(&first,"stable-prep",action_prepare(&first))).unwrap(),second);
+    assert!(store.transition(input(&first,"stable-prep",action_prepare(&first))).unwrap() == second);
 }
 #[test]
 fn sw_03c_09_reused_operation_id_with_conflicting_content_fails() {
@@ -168,7 +168,7 @@ fn sw_03c_12_crash_before_publication_retains_previous_valid_state() {
     let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("before")).unwrap();
     let next=make_next(&job);let folder=tmp.0.join("jobs").join(&job.job_id);
     assert_eq!(injected_state_write(&folder,&next,PublicationFault::BeforeRename).err().unwrap().code,StoreErrorCode::StorageFailure);
-    assert_eq!(store.get(&job.job_id).unwrap(),job);
+    assert!(store.get(&job.job_id).unwrap() == job);
     assert!(!checkpoint(&tmp.0,&job,1).exists());
 }
 #[test]
@@ -176,8 +176,8 @@ fn sw_03c_13_after_publication_before_ack_retry_finds_committed_state() {
     let tmp=Sandbox::new();let store=tmp.store();let job=store.create(request("after")).unwrap();
     let next=make_next(&job);let folder=tmp.0.join("jobs").join(&job.job_id);
     assert_eq!(injected_state_write(&folder,&next,PublicationFault::AfterRename).err().unwrap().code,StoreErrorCode::StorageFailure);
-    assert_eq!(store.get(&job.job_id).unwrap(),next);
-    assert_eq!(store.transition(input(&job,"fault-injected",action_prepare(&job))).unwrap(),next);
+    assert!(store.get(&job.job_id).unwrap() == next);
+    assert!(store.transition(input(&job,"fault-injected",action_prepare(&job))).unwrap() == next);
 }
 #[test]
 fn sw_03c_14_corrupted_latest_checkpoint_preserves_prior_state_with_diagnostic() {
@@ -224,9 +224,9 @@ fn sw_03c_19_cancel_preserves_approved_local_evidence_and_original_request() {
     let prepared=prepare(&store,&job);
     let cancelled=store.transition(input(&prepared,"cancel",ScriptJobAction::Cancel)).unwrap();
     assert_eq!(cancelled.state,ScriptJobState::Cancelled);
-    assert_eq!(cancelled.request,job.request);
-    assert_eq!(cancelled.prepared_prompt,prepared.prepared_prompt);
-    assert_eq!(store.get(&job.job_id).unwrap(),cancelled);
+    assert!(cancelled.request == job.request);
+    assert!(cancelled.prepared_prompt == prepared.prepared_prompt);
+    assert!(store.get(&job.job_id).unwrap() == cancelled);
 }
 #[test]
 fn sw_03c_20_schema_v1_roundtrip_and_non_sending_contract() {
@@ -237,7 +237,7 @@ fn sw_03c_20_schema_v1_roundtrip_and_non_sending_contract() {
     assert_eq!(serialized["state"],"prepared");
     assert!(serialized["preparedPrompt"]["contentDigest"].as_str().unwrap().starts_with("sha256:"));
     assert_eq!(serialized["appliedOperations"].as_array().unwrap().len(),1);
-    assert_eq!(serde_json::from_value::<ScriptJobRecord>(serialized).unwrap(),prepared);
+    assert!(serde_json::from_value::<ScriptJobRecord>(serialized).unwrap() == prepared);
 }
 // A real independent OS process (the same test binary running a filtered helper)
 // holds or releases writer.lock. This is not a second store in one process.
