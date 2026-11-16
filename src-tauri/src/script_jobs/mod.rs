@@ -1,6 +1,6 @@
 //! Durable local Script Writer job foundation (Phase 03B). Not connected to providers or UI.
 pub(crate) mod lock;
-mod model;
+pub(crate) mod model;
 mod store;
 mod state;
 mod validation;
