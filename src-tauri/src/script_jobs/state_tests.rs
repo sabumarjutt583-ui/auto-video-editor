@@ -777,3 +777,18 @@ fn sw_03e_16_approval_never_follows_validation_or_review_automatically() {
     drop(store);
     assert_eq!(temp.store().get(&pending.job_id).unwrap().state,ScriptJobState::ReviewPending);
 }
+
+
+#[test]
+fn sw_03e_17_approved_schema_v1_fixture_roundtrips_without_changing_old_jobs() {
+    let raw=include_str!("../../../src/lib/script/jobs/fixtures/approved-job-v1.json");
+    let saved:ScriptJobRecord=serde_json::from_str(raw).unwrap();
+    assert!(saved.validate(&saved.job_id).is_ok());
+    assert_eq!(saved.state,ScriptJobState::Approved);
+    assert_eq!(saved.review_report.as_ref().unwrap().actual_word_count,6);
+    assert_eq!(saved.approval_record.as_ref().unwrap().source,"user_confirmed");
+    let expected:serde_json::Value=serde_json::from_str(raw).unwrap();
+    assert_eq!(serde_json::to_value(saved).unwrap(),expected);
+    sw_03c_01_old_phase_03b_fixture_remains_schema_v1_compatible();
+    sw_03d_21_shared_imported_v1_fixture_decodes_and_roundtrips_with_exact_fields();
+}
