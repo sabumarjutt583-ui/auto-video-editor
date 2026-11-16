@@ -46,7 +46,7 @@ impl PlanningDefaults {
         self.default_total_words>=50 && self.default_total_words<=MAX_TOTAL_WORDS
             && self.default_part_count>=1 && self.default_part_count<=MAX_PARTS
             && self.default_total_words>=50*self.default_part_count
-            && self.target_words_per_part.is_none_or(|n| n>=50 && n<=MAX_TOTAL_WORDS)
+            && self.target_words_per_part.map_or(true, |n| n>=50 && n<=MAX_TOTAL_WORDS)
     }
 }
 /// Structured preference override, never guessed by parsing natural-language instructions.
@@ -261,8 +261,8 @@ impl ChannelStudioConfigV1 {
             ||!good_text(&self.review.final_script_instructions,MAX_TEXT_BYTES,false) {
             return Err("invalid_review")
         }
-        if !self.accounts.claude_account_id.as_ref().is_none_or(|s|valid_id(s)) ||
-            !self.accounts.chatgpt_review_account_id.as_ref().is_none_or(|s|valid_id(s)) ||
+        if !self.accounts.claude_account_id.as_ref().map_or(true, |s|valid_id(s)) ||
+            !self.accounts.chatgpt_review_account_id.as_ref().map_or(true, |s|valid_id(s)) ||
             self.accounts.allowed_claude_account_ids.len()>32 ||
             self.accounts.allowed_chatgpt_account_ids.len()>32 ||
             !self.accounts.allowed_claude_account_ids.iter()
@@ -285,7 +285,7 @@ impl LegacyChannelSeed {
     pub fn validate(&self)->Result<(),&'static str>{
         if !valid_id(&self.channel_id)||!good_text(&self.channel_name,60,true)
             ||!good_text(&self.language,120,false)||!good_text(&self.master_prompt,8000,false)
-            ||!self.claude_account_id.as_ref().is_none_or(|id|valid_id(id)){return Err("invalid_legacy_profile")}
+            ||!self.claude_account_id.as_ref().map_or(true, |id|valid_id(id)){return Err("invalid_legacy_profile")}
         Ok(())
     }
 }
