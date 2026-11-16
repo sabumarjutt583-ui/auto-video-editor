@@ -8,6 +8,8 @@ export interface ImportedScriptRevisionRef {
   readonly byteLength: number;
   readonly createdAt: string;
   readonly source: "manual_import";
+  /** Absent in original Phase 03D imported revisions. */
+  readonly originRevisionId?: string | null;
 }
 export type ManualSubmissionEvidence = "user_confirmed" | "user_confirmed_not_submitted";
 export interface ImportedScriptResponse {
@@ -87,11 +89,16 @@ export interface DurableScriptJobV1 {
   /** Absent from all valid Phase 03B/C/D snapshots until a review exists. */
   readonly reviewReport?: ScriptValidationReport | null;
   readonly approvalRecord?: ScriptApprovalRecord | null;
+  /** Legacy single-revision snapshots omit selectedRevisionId. */
+  readonly selectedRevisionId?: string | null;
+  readonly validationHistory?: readonly ScriptValidationReport[];
+  readonly approvalHistory?: readonly ScriptApprovalRecord[];
 }
 
 export type ScriptJobRecoveryKind =
   | "corrupt_record" | "unsupported_version" | "incomplete_record"
-  | "unsafe_entry" | "io_error" | "duplicate_request";
+  | "unsafe_entry" | "io_error" | "duplicate_request"
+  | "orphan_revision";
 
 export interface ScriptJobRecoveryIssue {
   readonly jobId: string;
@@ -108,7 +115,7 @@ export type ScriptJobStoreErrorCode =
   | "storage_failure" | "recovery_blocked" | "job_not_found" | "corrupt_record"
   | "unsupported_version" | "stale_revision" | "invalid_transition"
   | "invalid_operation" | "operation_conflict" | "operation_history_full"
-  | "invalid_response" | "revision_not_found";
+  | "invalid_response" | "revision_not_found" | "comparison_too_large";
 
 export interface ScriptJobCommandError {
   readonly code: ScriptJobStoreErrorCode;
@@ -157,4 +164,34 @@ export interface ReviewScriptJobInput extends JobTransitionIdentity {
 /** Separate explicit approval; never a generic state setter. */
 export interface ApproveScriptJobInput extends ReviewScriptJobInput {
   readonly validationVersion: "script-rules-v1";
+}
+
+/** Rust-owned and idempotent manual-version mutation. */
+export interface CreateManualRevisionInput extends JobTransitionIdentity {
+  readonly originRevisionId: string;
+  readonly text: string;
+}
+export interface SelectScriptRevisionInput extends JobTransitionIdentity {
+  readonly revisionId: string;
+}
+export interface ReadScriptRevisionsInput {
+  readonly jobId: string;
+  readonly channelId: string;
+  readonly requestId: string;
+}
+export interface CompareScriptRevisionsInput extends ReadScriptRevisionsInput {
+  readonly revisionA: string;
+  readonly revisionB: string;
+}
+export type ScriptDiffKind = "unchanged" | "added" | "removed";
+export interface ScriptRevisionDiffLine {
+  readonly kind: ScriptDiffKind;
+  readonly text: string;
+}
+export interface ScriptRevisionComparison {
+  readonly revisionA: ImportedScriptRevisionRef;
+  readonly revisionB: ImportedScriptRevisionRef;
+  readonly wordCountA: number;
+  readonly wordCountB: number;
+  readonly lines: readonly ScriptRevisionDiffLine[];
 }

@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "jobId": "sj_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "requestId": "req_fixture_001",
+  "channelId": "_legacy-channel",
+  "projectId": null,
+  "request": {
+    "requestId": "req_fixture_001",
+    "channelId": "_legacy-channel",
+    "projectId": null,
+    "title": "A Test Story",
+    "topic": "Human history",
+    "language": "en",
+    "requestedWords": 1200,
+    "targetAudience": "US adults",
+    "narrationTone": "calm",
+    "storytellingStyle": "documentary",
+    "providerMode": "claude_browser_assisted",
+    "additionalInstructions": "No headings.",
+    "masterPrompt": {
+      "channelId": "_legacy-channel",
+      "content": "Write calm narration.",
+      "versionId": "sha256:8de81089093e0bc23b560c8e644abe617068416b1c9156013de1a859a8a8b41e",
+      "contentDigest": "sha256:8de81089093e0bc23b560c8e644abe617068416b1c9156013de1a859a8a8b41e"
+    }
+  },
+  "requestDigest": "sha256:f9b0e67f0679d745e3945f9fe8b6854e664e43f41d5937c75b3a0b45d6c65349",
+  "state": "response_received",
+  "stateRevision": 7,
+  "createdAt": "2026-11-15T00:00:00.000Z",
+  "updatedAt": "2026-11-16T12:07:00.000Z",
+  "preparedPrompt": {
+    "requestId": "req_fixture_001",
+    "channelId": "_legacy-channel",
+    "formatVersion": "script-prompt-v1",
+    "content": "Write an educational narration.\n한국어 🎬",
+    "contentDigest": "sha256:2aae4b1df2f0e86d84c1b68fa08f9bc8356e0f6cd606b702800d3518bc2b8b99",
+    "masterPromptDigest": "sha256:8de81089093e0bc23b560c8e644abe617068416b1c9156013de1a859a8a8b41e",
+    "preparedAt": "2026-11-15T00:01:00.000Z"
+  },
+  "revisions": [
+    {
+      "revisionId": "rev_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "contentDigest": "sha256:33dd9ea1c657026f9834d4299f570a537287985db1815f4af0d1041b81afd3f4",
+      "byteLength": 43,
+      "createdAt": "2026-11-15T00:02:00.000Z",
+      "source": "manual_import"
+    },
+    {
+      "revisionId": "rev_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "contentDigest": "sha256:dbaa9e7fad1982af9c2e45f7fba30fc7c9b73ec19b51d08c69851f99e9a373d5",
+      "byteLength": 24,
+      "createdAt": "2026-11-16T12:07:00.000Z",
+      "source": "manual_import",
+      "originRevisionId": "rev_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "approvedRevisionId": null,
+  "errorCode": null,
+  "recoveryAction": "manual_revision_created_unreviewed",
+  "appliedOperations": [
+    {
+      "operationId": "fixture-prepare",
+      "actionDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expectedRevision": 0,
+      "resultRevision": 1,
+      "resultState": "prepared"
+    },
+    {
+      "operationId": "fixture-import",
+      "actionDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expectedRevision": 1,
+      "resultRevision": 2,
+      "resultState": "response_received"
+    },
+    {
+      "operationId": "fixture-review-0",
+      "actionDigest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "expectedRevision": 2,
+      "resultRevision": 3,
+      "resultState": "validating"
+    },
+    {
+      "operationId": "fixture-review-1",
+      "actionDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "expectedRevision": 3,
+      "resultRevision": 4,
+      "resultState": "draft_saved"
+    },
+    {
+      "operationId": "fixture-review-2",
+      "actionDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "expectedRevision": 4,
+      "resultRevision": 5,
+      "resultState": "review_pending"
+    },
+    {
+      "operationId": "fixture-review-3",
+      "actionDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "expectedRevision": 5,
+      "resultRevision": 6,
+      "resultState": "approved"
+    },
+    {
+      "operationId": "fixture_new_manual_revision",
+      "actionDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "expectedRevision": 6,
+      "resultRevision": 7,
+      "resultState": "response_received"
+    }
+  ],
+  "selectedRevisionId": "rev_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "approvalHistory": [
+    {
+      "revisionId": "rev_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "contentDigest": "sha256:33dd9ea1c657026f9834d4299f570a537287985db1815f4af0d1041b81afd3f4",
+      "validationVersion": "script-rules-v1",
+      "approvedAt": "2026-11-15T00:06:00.000Z",
+      "source": "user_confirmed"
+    }
+  ],
+  "validationHistory": [
+    {
+      "validationVersion": "script-rules-v1",
+      "revisionId": "rev_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "contentDigest": "sha256:33dd9ea1c657026f9834d4299f570a537287985db1815f4af0d1041b81afd3f4",
+      "actualWordCount": 6,
+      "requestedWordCount": 1200,
+      "findings": [
+        {
+          "code": "very_short",
+          "severity": "warning",
+          "message": "Script has fewer than 30 whitespace-separated words; check that it is complete."
+        },
+        {
+          "code": "below_requested_length",
+          "severity": "warning",
+          "message": "Word count is more than 20% below the requested target."
+        }
+      ]
+    }
+  ]
+}

@@ -61,3 +61,18 @@ The separate script_job_approve command accepts only a direct explicit user acti
 UI is development-only in the existing Manual Script Job panel. The user can read the full imported text, run/finish validation with recoverable checkpoints, view persistent findings, open review, and explicitly approve the saved revision. Existing production Write with Claude and Make Video handlers remain untouched.
 
 The local store still uses plaintext JSON, authenticated OS user access is assumed and SHA-256 is not encryption. Windows directory sync and universal hardware power-failure protection are not claimed. Running the installed Windows Tauri/WebView2 UI must be tested separately; CI Rust compilation does not establish runtime UX acceptance.
+
+## Phase 03F: immutable manual revision history and reapproval
+
+Schema remains version 1, additive and non-migrating. Phase 03B–03E records are never rewritten on read. Older jobs omit selectedRevisionId; their sole original revision is selected implicitly. Optional validationHistory, approvalHistory, and originRevisionId are omitted from older serialized records. A 64-revision limit and 256-operation durable idempotency limit are enforced.
+
+- Create manually: require committed parent revision and explicit request/channel/job identity, stable operation ID and expected state revision. Exact UTF-8 up to 2 MiB; no trimming, rewriting, normalization, deletions or provider calls. A new unique rev_<hash> file is flushed and synchronized before publishing the new append-only state checkpoint. The parent ID, digest, timestamp and manual_import provenance are preserved.
+- Select version: choose any previously committed revision without modifying its bytes or order. Creating or reselecting any revision clears current validation and approval; even historically approved revisions must be freshly validated, reviewed and explicitly approved.
+- Historical evidence: prior validation reports and superseded approvals are recorded in append-only history arrays, with exact revision ID, digest, rule version, user-confirmed source and approval timestamp. approvedRevisionId and approvalRecord indicate only the active current approval; historical proof is not active authorization.
+- Revision-specific validation: Rust always recomputes findings from the selected revision's integrity-verified text; it never silently reuses a prior revision's report. The existing script-rules-v1 lifecycle and explicit approval boundary remain unchanged.
+- Offline comparison: ownership and SHA-256 validated for both selected IDs. Deterministic line LCS is bounded to 128 KiB and 400 lines per revision. Larger scripts remain separately readable but comparison returns comparison_too_large. Word counts are Unicode whitespace tokens, not morphology-aware.
+- Recovery: lifetime OS writer lease, in-process mutex, append-only checkpoints, same-directory temporary persistence, fsync and unique new file publication. Interrupted temporary files/orphaned revisions/corruption are reported without erasing user content. Fail-closed recovery and durable operation replay survive restart. No universal power-loss, Windows directory-fsync, or encryption guarantee.
+
+The opt-in Vite-development-only UI can list/read/compare versions, paste manual edits, select prior versions, inspect historical approvals/findings, and explicitly reapprove the current selected revision. Nothing is sent to Claude/ChatGPT or video production. Existing Write with Claude, Make Video, browser/CDP, accounts, image, voice, renderer, and project JSON remain unchanged.
+
+Installed Windows Tauri/WebView2 GUI acceptance, full unfiltered Rust suite, and real hardware power-loss behavior are not established by PR-only CI.

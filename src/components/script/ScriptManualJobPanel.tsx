@@ -10,7 +10,8 @@ import {
 } from "../../lib/script/jobs/api.ts";
 import type { DurableScriptJobV1, JobTransitionIdentity, LocalScriptJobAction } from "../../lib/script/jobs/types.ts";
 import { copyPreparedPromptWithCheckpoint, validateManualResponse } from "../../lib/script/jobs/manual.ts";
-import { canApproveScriptJob } from "../../lib/script/jobs/review.ts";
+import { canApproveScriptJob, currentSelectedScriptRevision } from "../../lib/script/jobs/review.ts";
+import { ScriptRevisionManager } from "./ScriptRevisionManager";
 import { copyScriptPreviewText } from "../../lib/script/previewSafety.ts";
 import { Button } from "../ui";
 
@@ -46,6 +47,7 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
   // Retain a stable request ID across ambiguous create acknowledgement failures.
   // The parent remounts this panel when channel/video inputs change.
   const pendingRequestId = useRef<string | null>(null);
+  const activeRevision = job ? currentSelectedScriptRevision(job) : undefined;
 
   if (!import.meta.env.DEV) return null;
 
@@ -147,8 +149,8 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
 
   /** Explicit transitions persist independently so a crash can resume validation. */
   async function advanceReview(step: "start" | "complete" | "review" | "approve") {
-    if (!job?.revisions[0]) { setError("No committed script revision is available."); return; }
-    const reference = job.revisions[0];
+    if (!job || !activeRevision) { setError("No selected script revision is available."); return; }
+    const reference = activeRevision;
     const data = {
       ...identity(job),
       revisionId: reference.revisionId,
@@ -172,8 +174,8 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
   }
 
   async function showSaved() {
-    if (!job?.revisions[0]) return;
-    const reference = job.revisions[0];
+    if (!job || !activeRevision) return;
+    const reference = activeRevision;
     await run(() => readImportedScript({
       jobId: job.jobId, channelId: job.channelId,
       requestId: job.requestId, revisionId: reference.revisionId,
@@ -267,10 +269,11 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
               </div>
             </div>
           )}
-          {job.revisions[0] && (
+          {activeRevision && (
             <div className="space-y-2">
               <p className="break-all text-xs text-muted">
-                Origin: {job.revisions[0].source} · SHA-256: {job.revisions[0].contentDigest} ·
+                Selected: {activeRevision.revisionId} · Origin: {activeRevision.source} ·
+                SHA-256: {activeRevision.contentDigest} ·
                 {job.state === "approved" ? " Explicitly approved" : " Not approved"}
               </p>
               <Button disabled={busy} onClick={() => void showSaved()}>Read saved response</Button>
@@ -328,6 +331,10 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
                 className="w-full rounded border border-line bg-surface p-2 text-sm" />}
             </div>
           )}
+          <ScriptRevisionManager job={job} onCommitted={next => {
+            setJob(next);
+            setSavedText("");
+          }} />
         </div>
       )}
     </section>

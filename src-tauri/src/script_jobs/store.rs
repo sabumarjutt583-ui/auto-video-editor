@@ -11,6 +11,7 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
 use super::lock;
+use super::comparison::{self, ScriptRevisionComparison};
 use super::model::{
     digest, request_digest, valid_id, valid_job_id, valid_revision_id, AppliedJobOperation,
     ScriptGenerationRequest, ScriptJobRecord, ScriptJobState, ScriptRevisionRef,
@@ -27,7 +28,7 @@ pub enum StoreErrorCode {
     InvalidRequest, InvalidJobId, RequestConflict, WriterBusy, StorageFailure,
     RecoveryBlocked, JobNotFound, CorruptRecord, UnsupportedVersion,
     StaleRevision, InvalidTransition, InvalidOperation, OperationConflict, OperationHistoryFull,
-    InvalidResponse, RevisionNotFound,
+    InvalidResponse, RevisionNotFound, ComparisonTooLarge,
 }
 #[derive(Debug)]
 pub struct StoreError {
@@ -228,6 +229,7 @@ impl ScriptJobStore {
                         prepared_prompt: None, revisions: Vec::new(),
                         approved_revision_id: None, error_code: None, recovery_action: None,
                         applied_operations: Vec::new(), submission_evidence: None, review_report: None, approval_record: None,
+                        selected_revision_id: None, validation_history: Vec::new(), approval_history: Vec::new(),
                     };
                     persist_initial(&folder, &record, false)?;
                     return Ok(record);
@@ -288,11 +290,29 @@ impl ScriptJobStore {
         apply_transition(&mut next, &input.action, &stamp).map_err(|e| match e {
             TransitionError::InvalidTransition => StoreError::new(StoreErrorCode::InvalidTransition, "Action is not allowed in the current job state."),
             TransitionError::InvalidPreparedPrompt => StoreError::new(
-                if matches!(&input.action, ScriptJobAction::ImportResponse { .. }) {
+                if matches!(&input.action, ScriptJobAction::ImportResponse { .. }
+                    | ScriptJobAction::CreateRevision { .. }) {
                     StoreErrorCode::InvalidResponse
                 } else { StoreErrorCode::InvalidOperation },
                 "Prompt or response content is invalid, oversized or belongs to another request."),
         })?;
+        if matches!(&input.action, ScriptJobAction::CreateRevision { .. }
+            | ScriptJobAction::SelectRevision { .. }) {
+            // Archive prior evidence without assigning it to the new selection.
+            if let Some(report) = current.review_report.clone() {
+                if !next.validation_history.contains(&report) {
+                    next.validation_history.push(report);
+                }
+            }
+            if let Some(proof) = current.approval_record.clone() {
+                if !next.approval_history.contains(&proof) {
+                    next.approval_history.push(proof);
+                }
+            }
+            next.review_report = None;
+            next.approval_record = None;
+            next.approved_revision_id = None;
+        }
         next.state_revision = current.state_revision.checked_add(1).ok_or_else(storage)?;
         next.updated_at = stamp;
         next.applied_operations.push(AppliedJobOperation {
@@ -303,25 +323,40 @@ impl ScriptJobStore {
             result_state: next.state.clone(),
         });
         if let ScriptJobAction::CompleteValidation { .. } = &input.action {
-            let reference = next.revisions.first().ok_or_else(bad_record)?;
+            // The review target may be any selected immutable revision, not just
+            // the original import. Never attach first-revision findings to a new edit.
+            let reference = next.selected_revision().ok_or_else(bad_record)?;
             let text = read_revision(&folder, reference)?;
-            next.review_report = Some(validation::analyze(
-                &text, reference, next.request.requested_words,
-            ));
+            let report = validation::analyze(&text, reference, next.request.requested_words);
+            next.validation_history.push(report.clone());
+            next.review_report = Some(report);
         }
-        if let ScriptJobAction::ImportResponse { text } = &input.action {
+        if let ScriptJobAction::ImportResponse { text }
+            | ScriptJobAction::CreateRevision { text, .. } = &input.action {
             let revision_id = format!("rev_{}", &digest(format!("{}:{}", current.job_id, input.operation_id).as_bytes())[7..]);
+            if next.revisions.iter().any(|r| r.revision_id == revision_id) {
+                return Err(StoreError::new(StoreErrorCode::OperationConflict, "Revision identity already committed."));
+            }
+            let parent = match &input.action {
+                ScriptJobAction::CreateRevision { origin_revision_id, .. } =>
+                    Some(origin_revision_id.clone()),
+                _ => None,
+            };
             next.revisions.push(ScriptRevisionRef {
-                revision_id,
+                revision_id: revision_id.clone(),
                 content_digest: digest(text.as_bytes()),
                 byte_length: text.len() as u64,
                 created_at: next.updated_at.clone(),
                 source: ScriptRevisionSource::ManualImport,
+                origin_revision_id: parent,
             });
+            next.selected_revision_id = Some(revision_id);
         }
         next.validate(&next.job_id).map_err(|_| bad_record())?;
-        if let ScriptJobAction::ImportResponse { text } = &input.action {
-            publish_revision(&folder, &next.revisions[0], text, fault)?;
+        if let ScriptJobAction::ImportResponse { text }
+            | ScriptJobAction::CreateRevision { text, .. } = &input.action {
+            let reference = next.revisions.last().ok_or_else(bad_record)?;
+            publish_revision(&folder, reference, text, fault)?;
         }
         publish_state(&folder, &next, match fault {
             ImportFault::BeforeCheckpoint => PublicationFault::BeforeRename,
@@ -347,6 +382,32 @@ impl ScriptJobStore {
         let folder = self.root.join("jobs").join(job_id);
         let text = read_revision(&folder, reference)?;
         Ok(ImportedScriptResponse { revision: reference.clone(), text })
+    }
+
+    /// Read-only typed list with an ownership check; never exposes file paths.
+    pub fn list_revisions(&self, job_id: &str, channel_id: &str, request_id: &str)
+        -> Result<Vec<ScriptRevisionRef>, StoreError> {
+        if !valid_id(channel_id) || !valid_id(request_id) {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Invalid revision ownership."));
+        }
+        let job = self.get(job_id)?;
+        if job.channel_id != channel_id || job.request_id != request_id {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Revision owner mismatch."));
+        }
+        Ok(job.revisions)
+    }
+
+    /// All revision bytes are verified before diffing, with explicit CPU/memory bounds.
+    pub fn compare_revisions(&self, job_id: &str, channel_id: &str, request_id: &str,
+        revision_a: &str, revision_b: &str) -> Result<ScriptRevisionComparison, StoreError> {
+        if revision_a == revision_b || !valid_revision_id(revision_a) || !valid_revision_id(revision_b) {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Choose two distinct valid revisions."));
+        }
+        let one = self.read_response(job_id, channel_id, request_id, revision_a)?;
+        let two = self.read_response(job_id, channel_id, request_id, revision_b)?;
+        comparison::compare(&one.text, &two.text, one.revision, two.revision)
+            .ok_or_else(|| StoreError::new(StoreErrorCode::ComparisonTooLarge,
+                "This diff exceeds the safe comparison limit; read versions separately."))
     }
 
     #[cfg(test)]
@@ -487,7 +548,8 @@ fn publish_revision(folder: &Path, reference: &ScriptRevisionRef, text: &str, fa
 fn verify_revisions(folder: &Path, snapshot: &ScriptJobRecord) -> Result<(), StoreError> {
     for reference in &snapshot.revisions {
         let text = read_revision(folder, reference)?;
-        if let Some(report) = &snapshot.review_report {
+        for report in snapshot.validation_history.iter().chain(snapshot.review_report.iter())
+            .filter(|report| report.revision_id == reference.revision_id) {
             if report != &validation::analyze(
                 &text, reference, snapshot.request.requested_words,
             ) {
@@ -584,7 +646,15 @@ fn load_latest(folder: &Path, id: &str) -> Result<(ScriptJobRecord, Vec<Recovery
                     || snapshot.request != latest.request || snapshot.request_digest != latest.request_digest
                     || snapshot.created_at != latest.created_at
                     || snapshot.applied_operations[..snapshot.applied_operations.len()-1] != latest.applied_operations[..]
-                    || !snapshot.revisions.starts_with(&latest.revisions) {
+                    || !snapshot.revisions.starts_with(&latest.revisions)
+                    || !snapshot.validation_history.starts_with(&latest.validation_history)
+                    || !snapshot.approval_history.starts_with(&latest.approval_history)
+                    || latest.approval_record.as_ref().is_some_and(|old|
+                        snapshot.approval_record.as_ref() != Some(old)
+                        && !snapshot.approval_history.contains(old))
+                    || latest.review_report.as_ref().is_some_and(|old|
+                        snapshot.review_report.as_ref() != Some(old)
+                        && !snapshot.validation_history.contains(old)) {
                     issues.push(make_issue(id.to_string(), RecoveryKind::CorruptRecord, "State checkpoint violates immutable job history."));
                     break;
                 }
