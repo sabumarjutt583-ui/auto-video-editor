@@ -5,6 +5,7 @@ mod store;
 mod state;
 mod validation;
 mod comparison;
+mod recovery;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
@@ -15,3 +16,5 @@ pub use store::{RecoveryIssue, RecoveryKind, RecoveryReport, ScriptJobStore, Sto
 pub use state::{ScriptJobAction, WaitingReason};
 pub use model::ScriptRevisionRef;
 pub use comparison::ScriptRevisionComparison;
+
+pub use recovery::{RecoveryInspection, RecoveryArtifact, RecoveryArtifactKind, RecoveryArtifactText};
