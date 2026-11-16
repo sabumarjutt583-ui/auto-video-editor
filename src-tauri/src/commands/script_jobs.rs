@@ -232,3 +232,89 @@ pub async fn script_job_read_response(
     blocking(move || store.read_response(&input.job_id, &input.channel_id,
         &input.request_id, &input.revision_id)).await
 }
+
+
+/// Exact immutable revision identity is required for every review step.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReviewScriptJobInput {
+    pub job_id: String,
+    pub channel_id: String,
+    pub request_id: String,
+    pub expected_revision: u64,
+    pub operation_id: String,
+    pub revision_id: String,
+    pub content_digest: String,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ApproveScriptJobInput {
+    pub job_id: String,
+    pub channel_id: String,
+    pub request_id: String,
+    pub expected_revision: u64,
+    pub operation_id: String,
+    pub revision_id: String,
+    pub content_digest: String,
+    pub validation_version: String,
+}
+async fn commit_review_action(
+    state: State<'_, ScriptJobService>,
+    input: ReviewScriptJobInput,
+    action: fn(String, String) -> ScriptJobAction,
+) -> CmdResult<ScriptJobRecord> {
+    let store = state.store()?;
+    blocking(move || store.transition(JobMutation {
+        job_id: input.job_id,
+        channel_id: input.channel_id,
+        request_id: input.request_id,
+        expected_revision: input.expected_revision,
+        operation_id: input.operation_id,
+        action: action(input.revision_id, input.content_digest),
+    })).await
+}
+
+#[tauri::command]
+pub async fn script_job_start_validation(
+    state: State<'_, ScriptJobService>,
+    input: ReviewScriptJobInput,
+) -> CmdResult<ScriptJobRecord> {
+    commit_review_action(state, input, |revision_id, content_digest|
+        ScriptJobAction::StartValidation { revision_id, content_digest }).await
+}
+#[tauri::command]
+pub async fn script_job_complete_validation(
+    state: State<'_, ScriptJobService>,
+    input: ReviewScriptJobInput,
+) -> CmdResult<ScriptJobRecord> {
+    commit_review_action(state, input, |revision_id, content_digest|
+        ScriptJobAction::CompleteValidation { revision_id, content_digest }).await
+}
+#[tauri::command]
+pub async fn script_job_begin_review(
+    state: State<'_, ScriptJobService>,
+    input: ReviewScriptJobInput,
+) -> CmdResult<ScriptJobRecord> {
+    commit_review_action(state, input, |revision_id, content_digest|
+        ScriptJobAction::BeginReview { revision_id, content_digest }).await
+}
+/// Only this explicit, user-invoked command can approve a saved revision.
+#[tauri::command]
+pub async fn script_job_approve(
+    state: State<'_, ScriptJobService>,
+    input: ApproveScriptJobInput,
+) -> CmdResult<ScriptJobRecord> {
+    let store = state.store()?;
+    blocking(move || store.transition(JobMutation {
+        job_id: input.job_id,
+        channel_id: input.channel_id,
+        request_id: input.request_id,
+        expected_revision: input.expected_revision,
+        operation_id: input.operation_id,
+        action: ScriptJobAction::ApproveRevision {
+            revision_id: input.revision_id,
+            content_digest: input.content_digest,
+            validation_version: input.validation_version,
+        },
+    })).await
+}
