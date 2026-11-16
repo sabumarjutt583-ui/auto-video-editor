@@ -2,7 +2,7 @@
  //! A filename derived from job+operation ID cannot authenticate the original
  //! request, so Phase 03G NEVER attaches an orphan or fabricates job history.
 use std::collections::HashSet;
-use std::fs::{self, File};
+use std::fs;
 use std::io::Read;
 use std::path::Path;
 
@@ -120,7 +120,20 @@ pub fn inspect_revision_artifacts(
     folder: &Path, job: &ScriptJobRecord,
 ) -> Result<Vec<RecoveryArtifact>, StoreError> {
     let root = folder.join("revisions");
-    if !good_dir(&root)? { return Ok(Vec::new()); }
+    match good_dir(&root) {
+        Ok(true) => {}
+        Ok(false) => return Ok(Vec::new()),
+        Err(error) if error.code == StoreErrorCode::RecoveryBlocked => {
+            return Ok(vec![RecoveryArtifact {
+                artifact_id: "revisions".into(),
+                kind: RecoveryArtifactKind::UnsafeRevisionEntry,
+                byte_length: None, content_digest: None,
+                can_read_text: false, attachment_proven: false,
+                explanation: "Unsafe revisions directory or symlink preserved; no contents were followed.".into(),
+            }]);
+        }
+        Err(error) => return Err(error),
+    }
     let committed: HashSet<&str> = job.revisions.iter()
         .map(|reference| reference.revision_id.as_str()).collect();
     let mut seen = HashSet::<String>::new();
