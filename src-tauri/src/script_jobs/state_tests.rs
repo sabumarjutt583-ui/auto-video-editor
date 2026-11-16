@@ -537,3 +537,243 @@ fn sw_03d_21_shared_imported_v1_fixture_decodes_and_roundtrips_with_exact_fields
     let parsed:serde_json::Value=serde_json::from_str(fixture).unwrap();
     assert_eq!(serde_json::to_value(record).unwrap(),parsed);
 }
+
+
+fn imported_for_review(store: &ScriptJobStore, id: &str, text: &str) -> ScriptJobRecord {
+    let created=store.create(request(id)).unwrap();
+    let prepared=prepare(store,&created);
+    store.transition(input(&prepared,"import-review",import_action(text))).unwrap()
+}
+fn review_action(job: &ScriptJobRecord, kind: &str) -> ScriptJobAction {
+    let reference=&job.revisions[0];
+    let revision_id=reference.revision_id.clone();
+    let content_digest=reference.content_digest.clone();
+    match kind {
+        "start" => ScriptJobAction::StartValidation { revision_id, content_digest },
+        "finish" => ScriptJobAction::CompleteValidation { revision_id, content_digest },
+        "review" => ScriptJobAction::BeginReview { revision_id, content_digest },
+        "approve" => ScriptJobAction::ApproveRevision {
+            revision_id, content_digest, validation_version: "script-rules-v1".into(),
+        },
+        _ => panic!("unknown review test action"),
+    }
+}
+fn reviewed(store: &ScriptJobStore, id: &str, text: &str) -> ScriptJobRecord {
+    let imported=imported_for_review(store,id,text);
+    let validating=store.transition(input(&imported,"start-validation",review_action(&imported,"start"))).unwrap();
+    let draft=store.transition(input(&validating,"finish-validation",review_action(&validating,"finish"))).unwrap();
+    store.transition(input(&draft,"start-review",review_action(&draft,"review"))).unwrap()
+}
+
+#[test]
+fn sw_03e_01_older_json_fixtures_still_roundtrip_without_migration() {
+    sw_03c_01_old_phase_03b_fixture_remains_schema_v1_compatible();
+    sw_03d_21_shared_imported_v1_fixture_decodes_and_roundtrips_with_exact_fields();
+}
+#[test]
+fn sw_03e_02_deterministic_word_counts_and_language_preservation() {
+    let temp=Sandbox::new();let store=temp.store();
+    let imported=imported_for_review(&store,"count_unicode","One two three.\n한국어 اردو 🎬 end.");
+    let text=store.read_response(&imported.job_id,&imported.channel_id,&imported.request_id,
+        &imported.revisions[0].revision_id).unwrap().text;
+    let report=super::validation::analyze(&text,&imported.revisions[0],imported.request.requested_words);
+    assert_eq!(report.actual_word_count,7);
+    assert_eq!(report.requested_word_count,Some(1200));
+    assert_eq!(report.validation_version,"script-rules-v1");
+    assert_eq!(report.content_digest,digest(text.as_bytes()));
+    assert!(report.findings.iter().any(|x|x.code=="below_requested_length"));
+    assert!(report==super::validation::analyze(&text,&imported.revisions[0],Some(1200)));
+}
+#[test]
+fn sw_03e_03_rule_based_quality_warnings_are_not_technical_errors() {
+    let temp=Sandbox::new();let store=temp.store();
+    let imported=imported_for_review(&store,"warnings","## Introduction\n[INSERT content] to be continued...");
+    let report=super::validation::analyze("## Introduction\n[INSERT content] to be continued...",
+        &imported.revisions[0],None);
+    assert!(report.findings.iter().any(|x|x.code=="placeholder_marker"));
+    assert!(report.findings.iter().any(|x|x.code=="narration_formatting"));
+    assert!(report.findings.iter().any(|x|x.code=="possible_incomplete_ending"));
+    assert!(!super::validation::has_technical_errors(&report));
+    let failed=super::validation::analyze("   ",&imported.revisions[0],None);
+    assert!(super::validation::has_technical_errors(&failed));
+    assert!(failed.findings.iter().any(|x|x.code=="empty_script"));
+}
+#[test]
+fn sw_03e_04_validation_requires_exact_revision_and_imported_state() {
+    let temp=Sandbox::new();let store=temp.store();let raw=store.create(request("validate_preconditions")).unwrap();
+    assert_eq!(store.transition(input(&raw,"bad-start",
+        ScriptJobAction::StartValidation{revision_id:"rev_".to_owned()+"a".repeat(64).as_str(),
+        content_digest:"sha256:".to_owned()+"a".repeat(64).as_str()}))
+        .err().unwrap().code,StoreErrorCode::InvalidTransition);
+    let imported=imported_for_review(&store,"validate_identity","Verified response.");
+    let mut action=review_action(&imported,"start");
+    if let ScriptJobAction::StartValidation {ref mut content_digest,..}=action{
+        *content_digest=digest(b"wrong");
+    }
+    assert_eq!(store.transition(input(&imported,"wrong-digest",action))
+        .err().unwrap().code,StoreErrorCode::InvalidTransition);
+    assert_eq!(store.get(&imported.job_id).unwrap().state,ScriptJobState::ResponseReceived);
+}
+#[test]
+fn sw_03e_05_all_review_steps_are_durable_and_keep_exact_imported_text() {
+    let temp=Sandbox::new();let store=temp.store();
+    let imported=imported_for_review(&store,"durable_review","Intro.\nOriginal 🎬 narrative.");
+    let original=store.read_response(&imported.job_id,&imported.channel_id,&imported.request_id,
+        &imported.revisions[0].revision_id).unwrap().text;
+    let validating=store.transition(input(&imported,"start",review_action(&imported,"start"))).unwrap();
+    assert_eq!(validating.state,ScriptJobState::Validating);
+    assert!(validating.review_report.is_none());
+    let draft=store.transition(input(&validating,"finish",review_action(&validating,"finish"))).unwrap();
+    assert_eq!(draft.state,ScriptJobState::DraftSaved);
+    assert_eq!(draft.review_report.as_ref().unwrap().actual_word_count,4);
+    assert_eq!(draft.review_report.as_ref().unwrap().revision_id,imported.revisions[0].revision_id);
+    let pending=store.transition(input(&draft,"review",review_action(&draft,"review"))).unwrap();
+    assert_eq!(pending.state,ScriptJobState::ReviewPending);
+    assert!(pending.approval_record.is_none());
+    drop(store);
+    let recovered=temp.store();
+    assert!(recovered.get(&pending.job_id).unwrap()==pending);
+    let text=recovered.read_response(&pending.job_id,&pending.channel_id,&pending.request_id,
+        &pending.revisions[0].revision_id).unwrap().text;
+    assert_eq!(text,original);
+}
+#[test]
+fn sw_03e_06_approval_is_an_explicit_verified_user_action() {
+    let temp=Sandbox::new();let store=temp.store();
+    let pending=reviewed(&store,"user_approved","One two three. Complete narration.");
+    assert!(pending.approved_revision_id.is_none());
+    let approved=store.transition(input(&pending,"manual-approve",review_action(&pending,"approve"))).unwrap();
+    assert_eq!(approved.state,ScriptJobState::Approved);
+    assert_eq!(approved.approved_revision_id.as_deref(),Some(approved.revisions[0].revision_id.as_str()));
+    let proof=approved.approval_record.as_ref().unwrap();
+    assert_eq!(proof.source,"user_confirmed");
+    assert_eq!(proof.content_digest,approved.revisions[0].content_digest);
+    assert_eq!(proof.validation_version,"script-rules-v1");
+    assert!(approved==store.get(&pending.job_id).unwrap());
+}
+#[test]
+fn sw_03e_07_wrong_revision_or_rule_version_cannot_be_approved() {
+    let temp=Sandbox::new();let store=temp.store();
+    let pending=reviewed(&store,"wrong_approval","A complete example.");
+    let mut wrong=review_action(&pending,"approve");
+    if let ScriptJobAction::ApproveRevision{ref mut revision_id,..}=wrong {
+        *revision_id="rev_".to_owned()+&"a".repeat(64);
+    }
+    assert_eq!(store.transition(input(&pending,"wrong-revision",wrong)).err().unwrap().code,
+        StoreErrorCode::InvalidTransition);
+    let mut version=review_action(&pending,"approve");
+    if let ScriptJobAction::ApproveRevision{ref mut validation_version,..}=version {
+        *validation_version="outdated-rules-v0".into();
+    }
+    assert_eq!(store.transition(input(&pending,"wrong-version",version)).err().unwrap().code,
+        StoreErrorCode::InvalidTransition);
+    assert_eq!(store.get(&pending.job_id).unwrap().state,ScriptJobState::ReviewPending);
+}
+#[test]
+fn sw_03e_08_cross_channel_approval_and_stale_revisions_are_rejected() {
+    let temp=Sandbox::new();let store=temp.store();
+    let pending=reviewed(&store,"approval_isolation","A complete story.");
+    let mut input_bad=input(&pending,"other-owner",review_action(&pending,"approve"));
+    input_bad.channel_id="another-channel".into();
+    assert_eq!(store.transition(input_bad).err().unwrap().code,StoreErrorCode::InvalidOperation);
+    let approved=store.transition(input(&pending,"approval-once",review_action(&pending,"approve"))).unwrap();
+    assert_eq!(store.transition(input(&pending,"stale-approval",review_action(&pending,"approve")))
+        .err().unwrap().code,StoreErrorCode::StaleRevision);
+    assert_eq!(store.get(&pending.job_id).unwrap().state_revision,approved.state_revision);
+}
+#[test]
+fn sw_03e_09_idempotent_approval_replay_survives_restart_and_rejects_conflicts() {
+    let temp=Sandbox::new();
+    let (before,after)={let store=temp.store();let job=reviewed(&store,"approval_replay","A complete example.");
+        let after=store.transition(input(&job,"approval-key",review_action(&job,"approve"))).unwrap();
+        (job,after)};
+    let store=temp.store();
+    assert!(store.transition(input(&before,"approval-key",review_action(&before,"approve"))).unwrap()==after);
+    assert_eq!(store.transition(input(&before,"approval-key",review_action(&before,"review")))
+        .err().unwrap().code,StoreErrorCode::OperationConflict);
+}
+#[test]
+fn sw_03e_10_corrupt_import_blocks_validation_without_discarding_history() {
+    let temp=Sandbox::new();let store=temp.store();let imported=imported_for_review(&store,
+        "corrupt_before_validate","Safely imported text.");
+    let file=imported_path(&temp,&imported,&imported.revisions[0].revision_id);
+    fs::write(&file,b"tampered text").unwrap();
+    let report=store.recover().unwrap();
+    assert_eq!(report.jobs[0].state,ScriptJobState::Prepared);
+    assert!(report.issues.iter().any(|i|i.kind==RecoveryKind::CorruptRecord));
+    assert_eq!(store.transition(input(&imported,"start",review_action(&imported,"start")))
+        .err().unwrap().code,StoreErrorCode::RecoveryBlocked);
+    assert_eq!(fs::read(&file).unwrap(),b"tampered text");
+}
+#[test]
+fn sw_03e_11_altered_committed_validation_report_is_detected_on_restart() {
+    let temp=Sandbox::new();let store=temp.store();let pending=reviewed(&store,
+        "tampered_report","A trustworthy original story.");
+    let file=checkpoint(&temp.0,&pending,pending.state_revision);
+    let mut json:serde_json::Value=serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+    json["reviewReport"]["actualWordCount"]=serde_json::json!(9000);
+    fs::write(&file,serde_json::to_vec_pretty(&json).unwrap()).unwrap();
+    let report=store.recover().unwrap();
+    assert!(report.issues.iter().any(|i|i.kind==RecoveryKind::CorruptRecord));
+    assert_eq!(store.get(&pending.job_id).err().unwrap().code,StoreErrorCode::RecoveryBlocked);
+}
+#[test]
+fn sw_03e_12_review_failure_before_publication_keeps_old_snapshot() {
+    let temp=Sandbox::new();let store=temp.store();
+    let pending=reviewed(&store,"before_approval","An original response.");
+    let call=input(&pending,"crash-before",review_action(&pending,"approve"));
+    assert_eq!(store.inject_import_fault(call,super::store::ImportFault::BeforeCheckpoint)
+        .err().unwrap().code,StoreErrorCode::StorageFailure);
+    assert_eq!(store.get(&pending.job_id).unwrap().state,ScriptJobState::ReviewPending);
+}
+#[test]
+fn sw_03e_13_approval_post_publication_retry_returns_committed_result() {
+    let temp=Sandbox::new();let store=temp.store();
+    let pending=reviewed(&store,"after_approval","A complete original story.");
+    let call=input(&pending,"crash-after",review_action(&pending,"approve"));
+    assert_eq!(store.inject_import_fault(call.clone(),super::store::ImportFault::AfterCheckpoint)
+        .err().unwrap().code,StoreErrorCode::StorageFailure);
+    let approved=store.get(&pending.job_id).unwrap();
+    assert_eq!(approved.state,ScriptJobState::Approved);
+    assert!(store.transition(call).unwrap()==approved);
+}
+#[test]
+fn sw_03e_14_concurrent_approval_operations_cannot_both_commit() {
+    let temp=Sandbox::new();let store=Arc::new(temp.store());
+    let pending=reviewed(&store,"parallel_approve","Safe approved text.");
+    let tasks:Vec<_>=(0..8).map(|i| {
+        let store=Arc::clone(&store); let pending=pending.clone();
+        thread::spawn(move||store.transition(input(&pending,&format!("approval-{i}"),review_action(&pending,"approve"))))
+    }).collect();
+    let mut success=0;let mut stale=0;
+    for t in tasks { match t.join().unwrap() {
+        Ok(_)=>success+=1,
+        Err(e) if e.code==StoreErrorCode::StaleRevision => stale+=1,
+        Err(_)=>panic!("unexpected error"),
+    } }
+    assert_eq!((success,stale),(1,7));
+}
+#[test]
+fn sw_03e_15_approval_never_mutates_imported_text_or_project() {
+    let temp=Sandbox::new();let store=temp.store();let original=" \nFull response in اردو. \r\n";
+    let pending=reviewed(&store,"preserve_approval",original);
+    let file=imported_path(&temp,&pending,&pending.revisions[0].revision_id);
+    let before=fs::read(&file).unwrap();
+    let approved=store.transition(input(&pending,"authorize",review_action(&pending,"approve"))).unwrap();
+    assert_eq!(fs::read(&file).unwrap(),before);
+    assert!(approved.project_id.is_none());
+    assert_eq!(approved.approval_record.as_ref().unwrap().source,"user_confirmed");
+    assert_eq!(approved.request.master_prompt.content,pending.request.master_prompt.content);
+}
+#[test]
+fn sw_03e_16_approval_never_follows_validation_or_review_automatically() {
+    let temp=Sandbox::new();let store=temp.store();
+    let imported=imported_for_review(&store,"never_autoapprove","Human review required.");
+    let validating=store.transition(input(&imported,"start",review_action(&imported,"start"))).unwrap();
+    let draft=store.transition(input(&validating,"finish",review_action(&validating,"finish"))).unwrap();
+    assert!(draft.approved_revision_id.is_none());
+    let pending=store.transition(input(&draft,"review",review_action(&draft,"review"))).unwrap();
+    assert!(pending.approved_revision_id.is_none());
+    drop(store);
+    assert_eq!(temp.store().get(&pending.job_id).unwrap().state,ScriptJobState::ReviewPending);
+}
