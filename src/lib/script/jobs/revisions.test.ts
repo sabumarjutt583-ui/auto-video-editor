@@ -174,3 +174,21 @@ test("SW-03F-TS-14 immutable operation inputs are not mutated by read-only guard
   assert.equal(source.approvedRevisionId, null);
   assert.equal(source.revisions.length, 2);
 });
+
+
+test("SW-03F-TS-15 shared Rust v1 multi-revision fixture is backwards compatible and never auto-approved", () => {
+  const saved = fixture("revised-job-v1.json");
+  assert.equal(saved.schemaVersion, 1);
+  assert.equal(saved.state, "response_received");
+  assert.equal(saved.stateRevision, saved.appliedOperations?.length);
+  assert.equal(saved.revisions.length, 2);
+  assert.equal(saved.selectedRevisionId, saved.revisions[1]?.revisionId);
+  assert.equal(saved.revisions[1]?.originRevisionId, saved.revisions[0]?.revisionId);
+  assert.equal(saved.approvedRevisionId, null);
+  assert.equal(saved.approvalRecord, undefined);
+  assert.equal(saved.reviewReport, undefined);
+  assert.equal(saved.approvalHistory?.length, 1);
+  assert.equal(saved.validationHistory?.length, 1);
+  assert.equal(saved.approvalHistory?.[0]?.revisionId, saved.revisions[0]?.revisionId);
+  assert.equal(canApproveScriptJob(saved), false);
+});
