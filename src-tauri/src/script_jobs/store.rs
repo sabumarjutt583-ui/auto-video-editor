@@ -323,7 +323,9 @@ impl ScriptJobStore {
             result_state: next.state.clone(),
         });
         if let ScriptJobAction::CompleteValidation { .. } = &input.action {
-            let reference = next.revisions.first().ok_or_else(bad_record)?;
+            // The review target may be any selected immutable revision, not just
+            // the original import. Never attach first-revision findings to a new edit.
+            let reference = next.selected_revision().ok_or_else(bad_record)?;
             let text = read_revision(&folder, reference)?;
             let report = validation::analyze(&text, reference, next.request.requested_words);
             next.validation_history.push(report.clone());
