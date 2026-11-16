@@ -11,6 +11,7 @@ import { writeScriptForStep0 } from "../../lib/script/write";
 import { scriptPreviewKey } from "../../lib/script/previewSafety";
 import { ScriptPromptComparisonPreview } from "./ScriptPromptComparisonPreview";
 import { ScriptManualJobPanel } from "./ScriptManualJobPanel";
+import { ScriptStudioPanel } from "./ScriptStudioPanel";
 import type { MakeVideoInput } from "../../store/pipelineStore";
 import type { AppError } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
@@ -186,6 +187,9 @@ export function Step0Card({ profiles, busy, onMakeVideo, ensureConsent }: Props)
       )}
       {import.meta.env.DEV && (
         <ScriptManualJobPanel key={scriptPreviewKey(profile, { title, topic, wordCountText, script }) + "-manual"} profile={profile} title={title} topic={topic} wordCountText={wordCountText} script={script} />
+      )}
+      {import.meta.env.DEV && (
+        <ScriptStudioPanel profiles={profiles} initialChannelId={profile?.id} />
       )}
     </Card>
   );
