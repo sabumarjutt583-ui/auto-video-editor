@@ -4,7 +4,7 @@ import type { ChannelProfile } from "../../lib/pipeline/profile.ts";
 import { prepareLegacyScriptPrompt } from "../../lib/script/compatibility.ts";
 import { compileScriptPrompt } from "../../lib/script/core/compiler.ts";
 import {
-  createScriptJob, getScriptJob, importScriptResponse, listScriptJobs,
+  createScriptJob, getScriptJob, importScriptResponse, listScriptJobs, recoverScriptJobs,
   parseScriptJobCommandError, prepareScriptJob, readImportedScript, transitionScriptJob,
   startScriptValidation, completeScriptValidation, beginScriptReview, approveScriptRevision,
 } from "../../lib/script/jobs/api.ts";
@@ -12,6 +12,7 @@ import type { DurableScriptJobV1, JobTransitionIdentity, LocalScriptJobAction } 
 import { copyPreparedPromptWithCheckpoint, validateManualResponse } from "../../lib/script/jobs/manual.ts";
 import { canApproveScriptJob, currentSelectedScriptRevision } from "../../lib/script/jobs/review.ts";
 import { ScriptRevisionManager } from "./ScriptRevisionManager";
+import { ScriptRecoveryPanel } from "./ScriptRecoveryPanel";
 import { copyScriptPreviewText } from "../../lib/script/previewSafety.ts";
 import { Button } from "../ui";
 
@@ -36,6 +37,7 @@ function safeError(error: unknown): string {
 /** Development-only, explicit actions. No account, provider, browser, or pipeline calls. */
 export function ScriptManualJobPanel({ profile, title, topic, wordCountText, script }: Props) {
   const [job, setJob] = useState<DurableScriptJobV1 | null>(null);
+  const [recoveryBlocked, setRecoveryBlocked] = useState(false);
   const [jobs, setJobs] = useState<DurableScriptJobV1[]>([]);
   const [selected, setSelected] = useState("");
   const [response, setResponse] = useState("");
@@ -79,7 +81,7 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
         ...identity(created), promptText: result.compiled.promptText,
         masterPromptDigest: created.request.masterPrompt.contentDigest,
       });
-    }, saved => { setJob(saved); setNotice("Prompt saved durably. Nothing was sent."); });
+    }, saved => { setJob(saved); setRecoveryBlocked(false); setNotice("Prompt saved durably. Nothing was sent."); });
   }
 
   async function loadJobs() {
@@ -95,10 +97,25 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
 
   async function reopen() {
     if (!profile || !selected) return;
-    await run(() => getScriptJob(selected), saved => {
+    await run(async () => {
+      try {
+        return { saved: await getScriptJob(selected), blocked: false };
+      } catch (caught) {
+        if (parseScriptJobCommandError(caught)?.code !== "recovery_blocked") throw caught;
+        // The normal get command correctly fails closed. A recovery report may
+        // expose the last VERIFIED checkpoint for read-only diagnostic work.
+        const report = await recoverScriptJobs();
+        const saved = report.jobs.find(item => item.jobId === selected
+          && item.channelId === profile.id);
+        if (!saved || !report.issues.some(issue => issue.jobId === selected)) throw caught;
+        return { saved, blocked: true };
+      }
+    }, ({ saved, blocked }) => {
       if (saved.channelId !== profile.id) { setError("Wrong channel ownership."); return; }
-      setJob(saved); setResponse(""); setSavedText("");
-      setNotice("Job reopened from disk. No provider request was made.");
+      setJob(saved); setRecoveryBlocked(blocked); setResponse(""); setSavedText("");
+      setNotice(blocked
+        ? "Recovered last verified checkpoint for READ-ONLY diagnosis. Normal job mutations remain blocked."
+        : "Job reopened from disk. No provider request was made.");
     });
   }
 
@@ -213,6 +230,14 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
             <strong>Job:</strong> {job.jobId} · <strong>State:</strong> {job.state} ·
             <strong> Revision:</strong> {job.stateRevision} · <strong>Channel:</strong> {job.channelId}
           </p>
+          <ScriptRecoveryPanel job={job} />
+          {recoveryBlocked && (
+            <p role="alert" className="rounded border border-line p-2 text-xs text-danger">
+              Recovery blocked: this is the last verified checkpoint, not an authorization to continue writing.
+              No revision, validation or approval mutation is permitted until a separate provable repair is authorized.
+            </p>
+          )}
+          <fieldset disabled={recoveryBlocked} className="space-y-3">
           {job.state === "created" &&
             <Button disabled={busy} onClick={() => {
               const compiled = compileScriptPrompt(job.request);
@@ -335,6 +360,7 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
             setJob(next);
             setSavedText("");
           }} />
+          </fieldset>
         </div>
       )}
     </section>
