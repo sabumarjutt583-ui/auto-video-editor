@@ -4,7 +4,6 @@ import { studioOperationId } from "../../lib/script/studio/api.ts";
 import type {
   AccountPolicy, ChannelStudioConfigV1, SkillRegistration, SkillInstallStatus,
   StudioAccountMetadata, WritingMode, ReviewerProvider, RubricCriterion, ScriptMode,
-  PlanningOverride,
 } from "../../lib/script/studio/types.ts";
 
 interface Props {
