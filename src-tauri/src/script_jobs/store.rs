@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use super::lock;
 use super::comparison::{self, ScriptRevisionComparison};
+use super::recovery::{self, RecoveryInspection, RecoveryArtifactText};
 use super::model::{
     digest, request_digest, valid_id, valid_job_id, valid_revision_id, AppliedJobOperation,
     ScriptGenerationRequest, ScriptJobRecord, ScriptJobState, ScriptRevisionRef,
@@ -201,6 +202,52 @@ impl ScriptJobStore {
         Ok(report)
     }
     pub fn list(&self) -> Result<RecoveryReport, StoreError> { self.recover() }
+
+    /// Recovery-inspection works when ordinary get() intentionally fails closed.
+    /// The verified base snapshot establishes channel/request ownership. It
+    /// does not establish that an orphan belongs to a particular operation.
+    pub fn inspect_job_recovery(
+        &self, job_id: &str, channel_id: &str, request_id: &str,
+    ) -> Result<RecoveryInspection, StoreError> {
+        if !valid_job_id(job_id) || !valid_id(channel_id) || !valid_id(request_id) {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Invalid recovery identity."));
+        }
+        let _exclusive = self.operation.lock().unwrap_or_else(|p| p.into_inner());
+        let folder = self.root.join("jobs").join(job_id);
+        let meta = fs::symlink_metadata(&folder).map_err(|_| storage())?;
+        if !meta.is_dir() || meta.file_type().is_symlink() { return Err(bad_record()); }
+        let (job, issues) = load_latest(&folder, job_id)?;
+        if job.channel_id != channel_id || job.request_id != request_id {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Recovery data belongs to another request or channel."));
+        }
+        let artifacts = recovery::inspect_revision_artifacts(&folder, &job)?;
+        Ok(RecoveryInspection {
+            job_id: job.job_id, channel_id: job.channel_id, request_id: job.request_id,
+            last_verified_state_revision: job.state_revision,
+            blocked: !issues.is_empty(), issues, artifacts,
+            reconciliation_supported: false,
+        })
+    }
+
+    /// User-requested read-only viewing of an orphan, with strict identity and
+    /// path checks. Never attaches it or modifies historical approval evidence.
+    pub fn inspect_orphan_text(
+        &self, job_id: &str, channel_id: &str, request_id: &str, artifact_id: &str,
+    ) -> Result<RecoveryArtifactText, StoreError> {
+        if !valid_job_id(job_id) || !valid_id(channel_id) || !valid_id(request_id) {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Invalid recovery identity."));
+        }
+        let _exclusive = self.operation.lock().unwrap_or_else(|p| p.into_inner());
+        let folder = self.root.join("jobs").join(job_id);
+        let meta = fs::symlink_metadata(&folder).map_err(|_| storage())?;
+        if !meta.is_dir() || meta.file_type().is_symlink() { return Err(bad_record()); }
+        let (job, _) = load_latest(&folder, job_id)?;
+        if job.channel_id != channel_id || job.request_id != request_id {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Recovery data belongs to another request or channel."));
+        }
+        recovery::read_orphan_text(&folder, &job, artifact_id)
+    }
+
 
     pub fn create(&self, request: ScriptGenerationRequest) -> Result<ScriptJobRecord, StoreError> {
         request.validate().map_err(|_| StoreError::new(StoreErrorCode::InvalidRequest, "Invalid immutable Script Writer request."))?;
