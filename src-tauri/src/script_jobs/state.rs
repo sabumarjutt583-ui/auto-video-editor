@@ -21,6 +21,11 @@ pub enum ScriptJobAction {
     ConfirmNotSubmitted,
     /// Exact unmodified Unicode text, saved to an immutable file by store.rs.
     ImportResponse { text: String },
+    /// Local-only review stages; no AI calls and no revision edits.
+    StartValidation { revision_id: String, content_digest: String },
+    CompleteValidation { revision_id: String, content_digest: String },
+    BeginReview { revision_id: String, content_digest: String },
+    ApproveRevision { revision_id: String, content_digest: String, validation_version: String },
     Cancel,
 }
 
@@ -132,6 +137,53 @@ pub fn apply_transition(
             // the state checkpoint; do not mark imported content here.
             job.state = State::ResponseReceived;
             job.recovery_action = Some("manual_response_imported_unreviewed".into());
+        }
+        Action::StartValidation { revision_id, content_digest } => {
+            if job.state != State::ResponseReceived || job.revisions.len() != 1
+                || job.revisions[0].revision_id != *revision_id
+                || job.revisions[0].content_digest != *content_digest {
+                return Err(TransitionError::InvalidTransition);
+            }
+            job.state = State::Validating;
+        }
+        Action::CompleteValidation { revision_id, content_digest } => {
+            if job.state != State::Validating || job.revisions.len() != 1
+                || job.revisions[0].revision_id != *revision_id
+                || job.revisions[0].content_digest != *content_digest {
+                return Err(TransitionError::InvalidTransition);
+            }
+            // Store recomputes a deterministic report from verified bytes before commit.
+            job.state = State::DraftSaved;
+        }
+        Action::BeginReview { revision_id, content_digest } => {
+            if job.state != State::DraftSaved || job.revisions.len() != 1
+                || job.revisions[0].revision_id != *revision_id
+                || job.revisions[0].content_digest != *content_digest
+                || job.review_report.is_none() {
+                return Err(TransitionError::InvalidTransition);
+            }
+            job.state = State::ReviewPending;
+        }
+        Action::ApproveRevision { revision_id, content_digest, validation_version } => {
+            let report = job.review_report.as_ref().ok_or(TransitionError::InvalidTransition)?;
+            if job.state != State::ReviewPending || job.revisions.len() != 1
+                || job.revisions[0].revision_id != *revision_id
+                || job.revisions[0].content_digest != *content_digest
+                || report.revision_id != *revision_id
+                || report.content_digest != *content_digest
+                || report.validation_version != *validation_version
+                || super::validation::has_technical_errors(report) {
+                return Err(TransitionError::InvalidTransition);
+            }
+            job.approved_revision_id = Some(revision_id.clone());
+            job.approval_record = Some(super::model::ScriptApprovalRecord {
+                revision_id: revision_id.clone(),
+                content_digest: content_digest.clone(),
+                validation_version: validation_version.clone(),
+                approved_at: timestamp.into(),
+                source: "user_confirmed".into(),
+            });
+            job.state = State::Approved;
         }
         Action::Cancel => {
             // Once external submission intent exists, cancellation cannot assert
