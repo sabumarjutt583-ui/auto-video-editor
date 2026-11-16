@@ -29,7 +29,7 @@ pub fn analyze(text: &str, reference: &ScriptRevisionRef, requested: Option<u32>
     }
     let lowered = text.to_lowercase();
     if ["[insert", "[placeholder", "lorem ipsum", "[todo", "[tbd", "{{placeholder", "<placeholder>"]
-        .iter().any(|pattern| lowered.contains(pattern)) {
+        .iter().any(|pattern| lowered.contains(*pattern)) {
         findings.push(finding("placeholder_marker", ValidationSeverity::Warning, "Possible placeholder text needs human review."));
     }
     if text.lines().any(|line| {
