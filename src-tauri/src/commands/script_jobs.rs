@@ -318,3 +318,94 @@ pub async fn script_job_approve(
         },
     })).await
 }
+
+
+/// Phase 03F. Caller-supplied content only; no provider invocation.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CreateManualRevisionInput {
+    pub job_id: String,
+    pub channel_id: String,
+    pub request_id: String,
+    pub expected_revision: u64,
+    pub operation_id: String,
+    pub origin_revision_id: String,
+    pub text: String,
+}
+#[tauri::command]
+pub async fn script_job_create_revision(
+    state: State<'_, ScriptJobService>, input: CreateManualRevisionInput,
+) -> CmdResult<ScriptJobRecord> {
+    let store = state.store()?;
+    blocking(move || store.transition(JobMutation {
+        job_id: input.job_id,
+        channel_id: input.channel_id,
+        request_id: input.request_id,
+        expected_revision: input.expected_revision,
+        operation_id: input.operation_id,
+        action: ScriptJobAction::CreateRevision {
+            origin_revision_id: input.origin_revision_id,
+            text: input.text,
+        },
+    })).await
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SelectScriptRevisionInput {
+    pub job_id: String,
+    pub channel_id: String,
+    pub request_id: String,
+    pub expected_revision: u64,
+    pub operation_id: String,
+    pub revision_id: String,
+}
+#[tauri::command]
+pub async fn script_job_select_revision(
+    state: State<'_, ScriptJobService>, input: SelectScriptRevisionInput,
+) -> CmdResult<ScriptJobRecord> {
+    let store = state.store()?;
+    blocking(move || store.transition(JobMutation {
+        job_id: input.job_id,
+        channel_id: input.channel_id,
+        request_id: input.request_id,
+        expected_revision: input.expected_revision,
+        operation_id: input.operation_id,
+        action: ScriptJobAction::SelectRevision { revision_id: input.revision_id },
+    })).await
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadScriptRevisionsInput {
+    pub job_id: String,
+    pub channel_id: String,
+    pub request_id: String,
+}
+#[tauri::command]
+pub async fn script_job_list_revisions(
+    state: State<'_, ScriptJobService>, input: ReadScriptRevisionsInput,
+) -> CmdResult<Vec<crate::script_jobs::ScriptRevisionRef>> {
+    let store = state.store()?;
+    blocking(move || store.list_revisions(&input.job_id, &input.channel_id, &input.request_id)).await
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompareScriptRevisionsInput {
+    pub job_id: String,
+    pub channel_id: String,
+    pub request_id: String,
+    pub revision_a: String,
+    pub revision_b: String,
+}
+#[tauri::command]
+pub async fn script_job_compare_revisions(
+    state: State<'_, ScriptJobService>, input: CompareScriptRevisionsInput,
+) -> CmdResult<crate::script_jobs::ScriptRevisionComparison> {
+    let store = state.store()?;
+    blocking(move || store.compare_revisions(
+        &input.job_id, &input.channel_id, &input.request_id,
+        &input.revision_a, &input.revision_b,
+    )).await
+}
