@@ -195,3 +195,46 @@ export interface ScriptRevisionComparison {
   readonly wordCountB: number;
   readonly lines: readonly ScriptRevisionDiffLine[];
 }
+
+
+/** Phase 03G diagnostics do not prove an orphan's provenance or permit writes. */
+export type ScriptRecoveryArtifactKind =
+  | "orphan_revision"
+  | "incomplete_revision_temporary"
+  | "ambiguous_revision"
+  | "unsafe_revision_entry";
+export interface ScriptRecoveryArtifact {
+  readonly artifactId: string;
+  readonly kind: ScriptRecoveryArtifactKind;
+  readonly byteLength: number | null;
+  readonly contentDigest: string | null;
+  readonly canReadText: boolean;
+  readonly attachmentProven: false;
+  readonly explanation: string;
+}
+export interface ScriptJobRecoveryInspection {
+  readonly jobId: string;
+  readonly channelId: string;
+  readonly requestId: string;
+  readonly lastVerifiedStateRevision: number;
+  readonly blocked: boolean;
+  readonly issues: readonly ScriptJobRecoveryIssue[];
+  readonly artifacts: readonly ScriptRecoveryArtifact[];
+  readonly reconciliationSupported: false;
+}
+export interface ScriptRecoveryArtifactText {
+  readonly artifactId: string;
+  readonly contentDigest: string;
+  readonly byteLength: number;
+  /** Exact local script bytes, returned ONLY on explicit read; never log. */
+  readonly text: string;
+}
+export interface InspectScriptRecoveryInput {
+  readonly jobId: string;
+  readonly channelId: string;
+  readonly requestId: string;
+}
+export interface ReadOrphanScriptInput extends InspectScriptRecoveryInput {
+  /** Artifact basename, not a filesystem path. */
+  readonly artifactId: string;
+}
