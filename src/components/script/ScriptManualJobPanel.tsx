@@ -10,6 +10,7 @@ import {
 } from "../../lib/script/jobs/api.ts";
 import type { DurableScriptJobV1, JobTransitionIdentity, LocalScriptJobAction } from "../../lib/script/jobs/types.ts";
 import { copyPreparedPromptWithCheckpoint, validateManualResponse } from "../../lib/script/jobs/manual.ts";
+import { canApproveScriptJob } from "../../lib/script/jobs/review.ts";
 import { copyScriptPreviewText } from "../../lib/script/previewSafety.ts";
 import { Button } from "../ui";
 
@@ -310,8 +311,7 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
                     Approve ONLY after reading the full saved response. Warnings are not a guarantee of accuracy.
                     Approval is final for this immutable revision and will not start Make Video.
                   </p>
-                  <Button disabled={busy || !job.reviewReport ||
-                    job.reviewReport.findings.some(f => f.severity === "error")}
+                  <Button disabled={busy || !canApproveScriptJob(job)}
                     onClick={() => void advanceReview("approve")}>
                     Explicitly approve this revision
                   </Button>
