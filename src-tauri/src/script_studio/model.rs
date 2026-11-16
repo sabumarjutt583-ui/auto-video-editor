@@ -375,5 +375,5 @@ pub struct StudioPreview {
     pub review_preview:String,
 }
 #[derive(Clone,Serialize,Deserialize)]
-#[serde(rename_all="camelCase")]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct StudioBackupV1 {pub backup_version:u32,pub source_channel_id:String,pub config:ChannelStudioConfigV1}
