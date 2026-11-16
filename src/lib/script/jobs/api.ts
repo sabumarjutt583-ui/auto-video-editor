@@ -10,6 +10,8 @@ import type {
   ImportedScriptResponse, ReviewScriptJobInput, ApproveScriptJobInput,
   CreateManualRevisionInput, SelectScriptRevisionInput, ReadScriptRevisionsInput,
   CompareScriptRevisionsInput, ImportedScriptRevisionRef, ScriptRevisionComparison,
+  InspectScriptRecoveryInput, ReadOrphanScriptInput,
+  ScriptJobRecoveryInspection, ScriptRecoveryArtifactText,
 } from "./types.ts";
 
 export const createScriptJob = (request: ScriptGenerationRequest): Promise<DurableScriptJobV1> =>
@@ -47,6 +49,12 @@ export const listSavedScriptRevisions = (input: ReadScriptRevisionsInput): Promi
   invoke<readonly ImportedScriptRevisionRef[]>("script_job_list_revisions", { input });
 export const compareSavedScriptRevisions = (input: CompareScriptRevisionsInput): Promise<ScriptRevisionComparison> =>
   invoke<ScriptRevisionComparison>("script_job_compare_revisions", { input });
+/** Explicitly invoked, non-sending; works while ordinary mutations are blocked. */
+export const inspectScriptJobRecovery = (input: InspectScriptRecoveryInput): Promise<ScriptJobRecoveryInspection> =>
+  invoke<ScriptJobRecoveryInspection>("script_job_inspect_recovery", { input });
+/** Reveals private orphan text only at the user's request. Never attaches it. */
+export const inspectScriptOrphanText = (input: ReadOrphanScriptInput): Promise<ScriptRecoveryArtifactText> =>
+  invoke<ScriptRecoveryArtifactText>("script_job_inspect_orphan_text", { input });
 
 const CODES: readonly ScriptJobStoreErrorCode[] = [
   "invalid_request", "invalid_job_id", "request_conflict", "writer_busy",
