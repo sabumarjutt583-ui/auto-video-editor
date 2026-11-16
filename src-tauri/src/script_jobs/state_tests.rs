@@ -1081,7 +1081,11 @@ fn sw_03f_18_revision_selection_crash_keeps_prior_selection_and_blocks_when_unce
         .err().unwrap().code,StoreErrorCode::StorageFailure);
     let recovery=store.recover().unwrap();
     assert_eq!(recovery.jobs[0].selected_revision_id,second.selected_revision_id);
-    assert!(recovery.issues.iter().any(|issue|issue.kind==RecoveryKind::IncompleteRecord));
+    // The ordinary injected pre-rename error cleans up its uncommitted temp;
+    // no interrupted checkpoint is published or falsely reported as committed.
+    assert!(recovery.issues.is_empty());
+    let intact=store.get(&second.job_id).unwrap();
+    assert!(intact == second);
 }
 #[test]
 fn sw_03f_19_history_checkpoint_tampering_detected() {
