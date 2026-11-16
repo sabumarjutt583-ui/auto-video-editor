@@ -6,6 +6,9 @@ import {
 } from "../../lib/script/jobs/api.ts";
 import { validateManualResponse } from "../../lib/script/jobs/manual.ts";
 import {
+  canCreateScriptRevision, canSelectScriptRevision, summarizeScriptRevisionDiff,
+} from "../../lib/script/jobs/revisions.ts";
+import {
   currentSelectedScriptRevision, savedScriptApprovalHistory,
 } from "../../lib/script/jobs/review.ts";
 import type {
@@ -77,8 +80,8 @@ export function ScriptRevisionManager({ job, onCommitted }: Props) {
       return;
     }
     const parent = originId || selected.revisionId;
-    if (!job.revisions.some(revision => revision.revisionId === parent)) {
-      setError("Choose a valid saved source revision."); return;
+    if (!canCreateScriptRevision(job, parent, draftText)) {
+      setError("The manual edit requires a valid saved source and an editable job state."); return;
     }
     const key = JSON.stringify([job.jobId, job.stateRevision, parent, draftText]);
     if (pendingEdit.current?.key !== key) {
@@ -100,7 +103,7 @@ export function ScriptRevisionManager({ job, onCommitted }: Props) {
   }
 
   async function selectRevision(): Promise<void> {
-    if (!selected || !selectionId || selectionId === selected.revisionId) return;
+    if (!canSelectScriptRevision(job, selectionId)) return;
     await execute(
       () => selectScriptRevision({ ...identity(job, newOperationId()), revisionId: selectionId }),
       next => {
@@ -215,7 +218,8 @@ export function ScriptRevisionManager({ job, onCommitted }: Props) {
             onChange={event => setDraftText(event.target.value)}
             placeholder="Paste the full revised script here. Existing versions will not be overwritten."
             className="w-full rounded border border-line bg-surface p-2 text-sm"/>
-          <Button disabled={busy || !draftText.trim()} onClick={() => void createRevision()}>
+          <Button disabled={busy || !canCreateScriptRevision(job, originId || selected.revisionId, draftText)}
+            onClick={() => void createRevision()}>
             Save new immutable revision (not approved)
           </Button>
         </div>
@@ -230,7 +234,7 @@ export function ScriptRevisionManager({ job, onCommitted }: Props) {
             {job.revisions.map((revision, index) =>
               <option key={revision.revisionId} value={revision.revisionId}>Version {index + 1}</option>)}
           </select>
-          <Button disabled={busy || !selectionId || selectionId === selected.revisionId}
+          <Button disabled={busy || !canSelectScriptRevision(job, selectionId)}
             onClick={() => void selectRevision()}>
             Select for fresh validation and review
           </Button>
@@ -264,6 +268,11 @@ export function ScriptRevisionManager({ job, onCommitted }: Props) {
               <p className="break-all text-xs">
                 B: {comparison.revisionB.revisionId} · {comparison.revisionB.createdAt}
                 {" · "}{comparison.wordCountB} words
+              </p>
+              <p className="text-xs">
+                {summarizeScriptRevisionDiff(comparison).addedLines} added lines ·
+                {" "}{summarizeScriptRevisionDiff(comparison).removedLines} removed lines ·
+                {" "}{summarizeScriptRevisionDiff(comparison).unchangedLines} unchanged lines
               </p>
               <div className="max-h-96 overflow-y-auto rounded border border-line p-2 text-xs">
                 {comparison.lines.map((line, i) => (
