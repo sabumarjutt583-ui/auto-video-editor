@@ -1428,3 +1428,28 @@ fn sw_03g_15_case_colliding_artifacts_block_mutation_on_linux() {
     assert!(diag.blocked);
     assert!(store.get(&original.job_id).is_err());
 }
+
+
+#[cfg(unix)]
+#[test]
+fn sw_03g_16_unsafe_revisions_directory_is_diagnosed_without_following() {
+    use std::os::unix::fs::symlink;
+    let sandbox=Sandbox::new();
+    let store=sandbox.store();
+    let job=store.create(request("unsafe_directory")).unwrap();
+    let external=sandbox.0.join("external-private");
+    fs::create_dir(&external).unwrap();
+    fs::write(external.join("secret.txt"), "external content").unwrap();
+    let revisions=sandbox.0.join("jobs").join(&job.job_id).join("revisions");
+    symlink(&external, &revisions).unwrap();
+    let report=store.inspect_job_recovery(&job.job_id,&job.channel_id,&job.request_id).unwrap();
+    assert!(report.blocked);
+    assert!(report.issues.iter().any(|x|x.kind==RecoveryKind::UnsafeEntry));
+    assert!(report.artifacts.iter().any(|x|
+        x.artifact_id=="revisions"
+        && x.kind==super::recovery::RecoveryArtifactKind::UnsafeRevisionEntry
+        && !x.can_read_text));
+    assert!(store.inspect_orphan_text(&job.job_id,&job.channel_id,&job.request_id,
+        &format!("rev_{}.txt","a".repeat(64))).is_err());
+    assert_eq!(fs::read_to_string(external.join("secret.txt")).unwrap(),"external content");
+}
