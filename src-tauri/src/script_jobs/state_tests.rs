@@ -792,3 +792,318 @@ fn sw_03e_17_approved_schema_v1_fixture_roundtrips_without_changing_old_jobs() {
     sw_03c_01_old_phase_03b_fixture_remains_schema_v1_compatible();
     sw_03d_21_shared_imported_v1_fixture_decodes_and_roundtrips_with_exact_fields();
 }
+
+
+fn revision_action(job: &ScriptJobRecord, action: &str) -> ScriptJobAction {
+    let reference=job.selected_revision().unwrap();
+    let id=reference.revision_id.clone();
+    let hash=reference.content_digest.clone();
+    match action {
+        "start" => ScriptJobAction::StartValidation { revision_id: id, content_digest: hash },
+        "finish" => ScriptJobAction::CompleteValidation { revision_id: id, content_digest: hash },
+        "review" => ScriptJobAction::BeginReview { revision_id: id, content_digest: hash },
+        "approve" => ScriptJobAction::ApproveRevision {
+            revision_id: id, content_digest: hash, validation_version: "script-rules-v1".into(),
+        },
+        _ => panic!("unexpected review action"),
+    }
+}
+fn edit_version(store: &ScriptJobStore, original: &ScriptJobRecord,
+    operation: &str, parent: &str, text: &str) -> ScriptJobRecord {
+    store.transition(input(original,operation,ScriptJobAction::CreateRevision {
+        origin_revision_id: parent.into(),text:text.into(),
+    })).unwrap()
+}
+fn review_selected(store: &ScriptJobStore, original: &ScriptJobRecord, id: &str) -> ScriptJobRecord {
+    let running=store.transition(input(original,&format!("{id}-start"),revision_action(original,"start"))).unwrap();
+    let draft=store.transition(input(&running,&format!("{id}-finish"),revision_action(&running,"finish"))).unwrap();
+    store.transition(input(&draft,&format!("{id}-review"),revision_action(&draft,"review"))).unwrap()
+}
+
+#[test]
+fn sw_03f_01_all_older_schema_one_fixtures_remain_unchanged() {
+    sw_03c_01_old_phase_03b_fixture_remains_schema_v1_compatible();
+    sw_03d_21_shared_imported_v1_fixture_decodes_and_roundtrips_with_exact_fields();
+    sw_03e_17_approved_schema_v1_fixture_roundtrips_without_changing_old_jobs();
+}
+#[test]
+fn sw_03f_02_two_immutable_versions_preserve_exact_unicode_and_origin() {
+    let temp=Sandbox::new();let store=temp.store();
+    let original=imported_for_review(&store,"two_versions"," Original 🎬\r\nবাংলা اردو \n");
+    let parent=original.revisions[0].revision_id.clone();
+    let newer=edit_version(&store,&original,"rev-2",&parent," Updated 🎬\r\nবাংলا اردو  \n");
+    assert_eq!(newer.state,ScriptJobState::ResponseReceived);
+    assert_eq!(newer.revisions.len(),2);
+    assert_eq!(newer.revisions[0],original.revisions[0]);
+    assert_eq!(newer.revisions[1].origin_revision_id.as_deref(),Some(parent.as_str()));
+    assert_ne!(newer.revisions[0].revision_id,newer.revisions[1].revision_id);
+    assert_eq!(newer.selected_revision_id.as_deref(),Some(newer.revisions[1].revision_id.as_str()));
+    assert_eq!(store.read_response(&newer.job_id,&newer.channel_id,&newer.request_id,&parent).unwrap().text,
+        " Original 🎬\r\nবাংলা اردو \n");
+    assert_eq!(store.read_response(&newer.job_id,&newer.channel_id,&newer.request_id,
+        &newer.revisions[1].revision_id).unwrap().text," Updated 🎬\r\nবাংলا اردو  \n");
+}
+#[test]
+fn sw_03f_03_third_version_can_reference_original_and_preserve_order() {
+    let temp=Sandbox::new();let store=temp.store();
+    let first=imported_for_review(&store,"third_version","Base text");
+    let root=first.revisions[0].revision_id.clone();
+    let second=edit_version(&store,&first,"edit-two",&root,"Second version");
+    let third=edit_version(&store,&second,"edit-three",&root,"Third version based on original");
+    assert_eq!(third.revisions.len(),3);
+    assert_eq!(third.revisions[2].origin_revision_id.as_deref(),Some(root.as_str()));
+    assert_eq!(third.revisions[0],first.revisions[0]);
+    assert_eq!(third.revisions[1],second.revisions[1]);
+    assert_eq!(store.list_revisions(&third.job_id,&third.channel_id,&third.request_id).unwrap(),third.revisions);
+}
+#[test]
+fn sw_03f_04_approval_is_archived_and_not_inherited_by_edit() {
+    let temp=Sandbox::new();let store=temp.store();
+    let old=reviewed(&store,"archive_first","Original text is complete.");
+    let approved=store.transition(input(&old,"approve-one",review_action(&old,"approve"))).unwrap();
+    let old_id=approved.revisions[0].revision_id.clone();
+    let newer=edit_version(&store,&approved,"edit-after-approval",&old_id,"New draft with no approval");
+    assert_eq!(newer.state,ScriptJobState::ResponseReceived);
+    assert!(newer.approved_revision_id.is_none());
+    assert!(newer.approval_record.is_none());
+    assert!(newer.review_report.is_none());
+    assert_eq!(newer.approval_history.len(),1);
+    assert_eq!(newer.approval_history[0],approved.approval_record.clone().unwrap());
+    assert!(newer.validation_history.iter().any(|report|report.revision_id==old_id));
+}
+#[test]
+fn sw_03f_05_new_revision_requires_new_validation_and_explicit_reapproval() {
+    let temp=Sandbox::new();let store=temp.store();
+    let old=reviewed(&store,"reapprove_new","Old approved text");
+    let first_approved=store.transition(input(&old,"approve-one",review_action(&old,"approve"))).unwrap();
+    let origin=first_approved.revisions[0].revision_id.clone();
+    let created=edit_version(&store,&first_approved,"new-manual-edit",&origin,"New script must be reviewed.");
+    assert_eq!(store.transition(input(&created,"approve-without-review",
+        revision_action(&created,"approve"))).err().unwrap().code,StoreErrorCode::InvalidTransition);
+    let pending=review_selected(&store,&created,"new");
+    assert_eq!(pending.state,ScriptJobState::ReviewPending);
+    assert!(pending.approved_revision_id.is_none());
+    assert_eq!(pending.review_report.as_ref().unwrap().revision_id,pending.revisions[1].revision_id);
+    let approved=store.transition(input(&pending,"approve-two",revision_action(&pending,"approve"))).unwrap();
+    assert_eq!(approved.approved_revision_id.as_deref(),Some(approved.revisions[1].revision_id.as_str()));
+    assert_eq!(approved.approval_history.len(),1);
+    assert_eq!(approved.approval_history[0].revision_id,origin);
+}
+#[test]
+fn sw_03f_06_selecting_historically_approved_version_does_not_reapprove_it() {
+    let temp=Sandbox::new();let store=temp.store();
+    let old=reviewed(&store,"old_selection","Original reviewed");
+    let approved=store.transition(input(&old,"approve-first",review_action(&old,"approve"))).unwrap();
+    let original_id=approved.revisions[0].revision_id.clone();
+    let second=edit_version(&store,&approved,"edit-second",&original_id,"New version");
+    let selected=store.transition(input(&second,"select-first",
+        ScriptJobAction::SelectRevision { revision_id: original_id.clone() })).unwrap();
+    assert_eq!(selected.state,ScriptJobState::ResponseReceived);
+    assert_eq!(selected.selected_revision_id.as_deref(),Some(original_id.as_str()));
+    assert!(selected.approved_revision_id.is_none());
+    assert!(selected.approval_record.is_none());
+    assert_eq!(selected.approval_history.len(),1);
+    assert!(selected.review_report.is_none());
+    assert!(store.transition(input(&selected,"premature-approve",revision_action(&selected,"approve"))).is_err());
+}
+#[test]
+fn sw_03f_07_selection_and_reapproval_survive_restart_without_mutating_text() {
+    let temp=Sandbox::new();
+    let saved={let store=temp.store();
+        let old=reviewed(&store,"restart_versions","Old complete manuscript");
+        let first=store.transition(input(&old,"old-approval",review_action(&old,"approve"))).unwrap();
+        let parent=first.revisions[0].revision_id.clone();
+        let newer=edit_version(&store,&first,"edit-v2",&parent,"New complete manuscript");
+        let pending=review_selected(&store,&newer,"second");
+        store.transition(input(&pending,"approve-v2",revision_action(&pending,"approve"))).unwrap()};
+    let store=temp.store();
+    let got=store.get(&saved.job_id).unwrap();
+    assert_eq!(got,saved);
+    assert_eq!(got.approval_history.len(),1);
+    assert_eq!(got.revisions.len(),2);
+    for reference in &got.revisions {
+        let original=store.read_response(&got.job_id,&got.channel_id,&got.request_id,&reference.revision_id).unwrap();
+        assert_eq!(digest(original.text.as_bytes()),reference.content_digest);
+    }
+}
+#[test]
+fn sw_03f_08_cross_channel_and_invalid_origin_are_blocked() {
+    let temp=Sandbox::new();let store=temp.store();
+    let first=imported_for_review(&store,"cross_channel_rev","One version");
+    let parent=first.revisions[0].revision_id.clone();
+    let mut wrong=input(&first,"foreign",ScriptJobAction::CreateRevision{
+        origin_revision_id:parent.clone(),text:"No entry".into()});
+    wrong.channel_id="another_channel".into();
+    assert_eq!(store.transition(wrong).err().unwrap().code,StoreErrorCode::InvalidOperation);
+    assert_eq!(store.transition(input(&first,"invalid-parent",ScriptJobAction::CreateRevision{
+        origin_revision_id:"rev_".to_string()+&"f".repeat(64),text:"No entry".into()
+    })).err().unwrap().code,StoreErrorCode::InvalidTransition);
+    assert_eq!(store.list_revisions(&first.job_id,"other_channel",&first.request_id).err().unwrap().code,
+        StoreErrorCode::InvalidOperation);
+    assert_eq!(store.get(&first.job_id).unwrap(),first);
+}
+#[test]
+fn sw_03f_09_duplicate_revision_creation_is_idempotent_after_restart() {
+    let temp=Sandbox::new();
+    let (first,second)={let store=temp.store();
+        let first=imported_for_review(&store,"idempotent_edit","Base text");
+        let second=edit_version(&store,&first,"stable-version-op",&first.revisions[0].revision_id,"Manual edit");
+        (first,second)};
+    let store=temp.store();
+    let input=input(&first,"stable-version-op",ScriptJobAction::CreateRevision{
+        origin_revision_id:first.revisions[0].revision_id.clone(),text:"Manual edit".into()});
+    assert_eq!(store.transition(input).unwrap(),second);
+    assert_eq!(store.list_revisions(&second.job_id,&second.channel_id,&second.request_id).unwrap().len(),2);
+}
+#[test]
+fn sw_03f_10_conflicting_operation_id_and_stale_revision_rejected() {
+    let temp=Sandbox::new();let store=temp.store();
+    let first=imported_for_review(&store,"stale_edit","Original");
+    let second=edit_version(&store,&first,"same-op",&first.revisions[0].revision_id,"Second");
+    let conflicted=input(&first,"same-op",ScriptJobAction::CreateRevision{
+        origin_revision_id:first.revisions[0].revision_id.clone(),text:"Changed text".into()});
+    assert_eq!(store.transition(conflicted).err().unwrap().code,StoreErrorCode::OperationConflict);
+    let stale=input(&first,"different-id",ScriptJobAction::CreateRevision{
+        origin_revision_id:first.revisions[0].revision_id.clone(),text:"Third".into()});
+    assert_eq!(store.transition(stale).err().unwrap().code,StoreErrorCode::StaleRevision);
+    assert_eq!(store.get(&first.job_id).unwrap(),second);
+}
+#[test]
+fn sw_03f_11_parallel_versions_at_same_expected_revision_never_both_commit() {
+    let temp=Sandbox::new();let store=Arc::new(temp.store());
+    let first=imported_for_review(&store,"race_edits","Original");
+    let work:Vec<_>=(0..6).map(|i|{
+        let store=Arc::clone(&store);let first=first.clone();
+        thread::spawn(move||store.transition(input(&first,&format!("race-{i}"),
+            ScriptJobAction::CreateRevision{origin_revision_id:first.revisions[0].revision_id.clone(),
+                text:format!("Version {i}")})))
+    }).collect();
+    let mut success=0;let mut stale=0;
+    for handle in work {match handle.join().unwrap(){
+        Ok(_) => success+=1,
+        Err(e) if e.code==StoreErrorCode::StaleRevision => stale+=1,
+        Err(_) => panic!("unexpected concurrent result"),
+    }}
+    assert_eq!(success,1); assert_eq!(stale,5);
+    assert_eq!(store.get(&first.job_id).unwrap().revisions.len(),2);
+}
+#[test]
+fn sw_03f_12_comparison_reports_changed_lines_and_correct_word_counts() {
+    let temp=Sandbox::new();let store=temp.store();
+    let first=imported_for_review(&store,"compare_lines","Intro\nOld ending\n");
+    let id_a=first.revisions[0].revision_id.clone();
+    let second=edit_version(&store,&first,"new-ending",&id_a,"Intro\nNew ending\n");
+    let id_b=second.revisions[1].revision_id.clone();
+    let result=store.compare_revisions(&first.job_id,&first.channel_id,&first.request_id,
+        &id_a,&id_b).unwrap();
+    assert_eq!((result.word_count_a,result.word_count_b),(3,3));
+    let value=serde_json::to_value(&result).unwrap();
+    let kinds:Vec<&str>=value["lines"].as_array().unwrap().iter()
+        .map(|line|line["kind"].as_str().unwrap()).collect();
+    assert!(kinds.contains(&"unchanged"));
+    assert!(kinds.contains(&"added"));
+    assert!(kinds.contains(&"removed"));
+    assert_eq!(store.get(&first.job_id).unwrap(),second);
+}
+#[test]
+fn sw_03f_13_comparison_is_bounded_and_identity_checked() {
+    let temp=Sandbox::new();let store=temp.store();
+    let first=imported_for_review(&store,"compare_bound","First text");
+    let second=edit_version(&store,&first,"large-version",&first.revisions[0].revision_id,
+        &"x".repeat(131_073));
+    assert_eq!(store.compare_revisions(&second.job_id,&second.channel_id,&second.request_id,
+        &second.revisions[0].revision_id,&second.revisions[1].revision_id).err().unwrap().code,
+        StoreErrorCode::ComparisonTooLarge);
+    assert_eq!(store.compare_revisions(&second.job_id,"other",&second.request_id,
+        &second.revisions[0].revision_id,&second.revisions[1].revision_id).err().unwrap().code,
+        StoreErrorCode::InvalidOperation);
+    assert_eq!(store.compare_revisions(&second.job_id,&second.channel_id,&second.request_id,
+        &second.revisions[0].revision_id,&second.revisions[0].revision_id).err().unwrap().code,
+        StoreErrorCode::InvalidOperation);
+}
+#[test]
+fn sw_03f_14_corrupted_older_revision_blocks_job_without_deletion() {
+    let temp=Sandbox::new();let store=temp.store();
+    let first=imported_for_review(&store,"tampered_old","Original text");
+    let second=edit_version(&store,&first,"edited-second",&first.revisions[0].revision_id,"New text");
+    let old_path=imported_path(&temp,&first,&first.revisions[0].revision_id);
+    fs::write(&old_path,b"tampered old").unwrap();
+    let issues=store.recover().unwrap();
+    assert!(issues.issues.iter().any(|i|i.kind==RecoveryKind::CorruptRecord));
+    assert_eq!(store.get(&second.job_id).err().unwrap().code,StoreErrorCode::RecoveryBlocked);
+    assert_eq!(fs::read(old_path).unwrap(),b"tampered old");
+}
+#[test]
+fn sw_03f_15_crash_after_file_before_checkpoint_preserves_orphan() {
+    let temp=Sandbox::new();let store=temp.store();
+    let first=imported_for_review(&store,"orphan_new","Stable original");
+    let call=input(&first,"orphan-edit",ScriptJobAction::CreateRevision{
+        origin_revision_id:first.revisions[0].revision_id.clone(),text:"Recoverable new text".into()});
+    assert_eq!(store.inject_import_fault(call,super::store::ImportFault::AfterRevision)
+        .err().unwrap().code,StoreErrorCode::StorageFailure);
+    let recovery=store.recover().unwrap();
+    assert!(recovery.issues.iter().any(|issue|issue.kind==RecoveryKind::OrphanRevision));
+    assert_eq!(recovery.jobs[0].revisions.len(),1);
+    assert_eq!(store.get(&first.job_id).err().unwrap().code,StoreErrorCode::RecoveryBlocked);
+}
+#[test]
+fn sw_03f_16_crash_before_revision_publish_retains_temporary_text() {
+    let temp=Sandbox::new();let store=temp.store();
+    let first=imported_for_review(&store,"temp_new","Stable original");
+    let call=input(&first,"temp-edit",ScriptJobAction::CreateRevision{
+        origin_revision_id:first.revisions[0].revision_id.clone(),text:"Temporary new text".into()});
+    assert_eq!(store.inject_import_fault(call,super::store::ImportFault::BeforeRevision)
+        .err().unwrap().code,StoreErrorCode::StorageFailure);
+    let recovery=store.recover().unwrap();
+    assert!(recovery.issues.iter().any(|issue|issue.kind==RecoveryKind::IncompleteRecord));
+    assert_eq!(recovery.jobs[0].revisions.len(),1);
+}
+#[test]
+fn sw_03f_17_post_checkpoint_ack_failure_replays_identical_revision() {
+    let temp=Sandbox::new();let store=temp.store();
+    let first=imported_for_review(&store,"after_publish","Stable text");
+    let call=input(&first,"same-edit",ScriptJobAction::CreateRevision{
+        origin_revision_id:first.revisions[0].revision_id.clone(),text:"Committed new content".into()});
+    assert_eq!(store.inject_import_fault(call.clone(),super::store::ImportFault::AfterCheckpoint)
+        .err().unwrap().code,StoreErrorCode::StorageFailure);
+    let committed=store.get(&first.job_id).unwrap();
+    assert_eq!(committed.revisions.len(),2);
+    assert_eq!(store.transition(call).unwrap(),committed);
+}
+#[test]
+fn sw_03f_18_revision_selection_crash_keeps_prior_selection_and_blocks_when_uncertain() {
+    let temp=Sandbox::new();let store=temp.store();
+    let first=imported_for_review(&store,"select_crash","Stable text");
+    let second=edit_version(&store,&first,"add-second",&first.revisions[0].revision_id,"New text");
+    let call=input(&second,"select-crash",ScriptJobAction::SelectRevision{
+        revision_id:first.revisions[0].revision_id.clone()});
+    assert_eq!(store.inject_import_fault(call,super::store::ImportFault::BeforeCheckpoint)
+        .err().unwrap().code,StoreErrorCode::StorageFailure);
+    let recovery=store.recover().unwrap();
+    assert_eq!(recovery.jobs[0].selected_revision_id,second.selected_revision_id);
+    assert!(recovery.issues.iter().any(|issue|issue.kind==RecoveryKind::IncompleteRecord));
+}
+#[test]
+fn sw_03f_19_history_checkpoint_tampering_detected() {
+    let temp=Sandbox::new();let store=temp.store();
+    let approved_old=reviewed(&store,"history_tamper","Previously approved manuscript");
+    let approved=store.transition(input(&approved_old,"approval-1",review_action(&approved_old,"approve"))).unwrap();
+    let second=edit_version(&store,&approved,"revised-history",&approved.revisions[0].revision_id,"New version");
+    let path=checkpoint(&temp.0,&second,second.state_revision);
+    let mut payload:serde_json::Value=serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    payload["approvalHistory"]=serde_json::json!([]);
+    fs::write(&path,serde_json::to_vec_pretty(&payload).unwrap()).unwrap();
+    let recovery=store.recover().unwrap();
+    assert!(recovery.issues.iter().any(|issue|issue.kind==RecoveryKind::CorruptRecord));
+    assert_eq!(store.get(&second.job_id).err().unwrap().code,StoreErrorCode::RecoveryBlocked);
+}
+#[test]
+fn sw_03f_20_no_provider_or_pipeline_operations_in_manual_revision_flow() {
+    let temp=Sandbox::new();let store=temp.store();
+    let first=imported_for_review(&store,"no_ai_for_revisions","Manual text only");
+    let second=edit_version(&store,&first,"manual-second",&first.revisions[0].revision_id,"Edited locally");
+    assert_eq!(second.request.provider_mode,ProviderMode::ClaudeBrowserAssisted);
+    assert!(second.project_id.is_none());
+    assert!(second.approved_revision_id.is_none());
+    assert_eq!(second.revisions[1].source,super::model::ScriptRevisionSource::ManualImport);
+}
