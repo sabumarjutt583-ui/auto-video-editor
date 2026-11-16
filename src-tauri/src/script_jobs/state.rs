@@ -21,6 +21,10 @@ pub enum ScriptJobAction {
     ConfirmNotSubmitted,
     /// Exact unmodified Unicode text, saved to an immutable file by store.rs.
     ImportResponse { text: String },
+    /// Manual text only; origin is an immutable previously committed revision.
+    CreateRevision { origin_revision_id: String, text: String },
+    /// Re-selecting an earlier revision does not inherit historical approval.
+    SelectRevision { revision_id: String },
     /// Local-only review stages; no AI calls and no revision edits.
     StartValidation { revision_id: String, content_digest: String },
     CompleteValidation { revision_id: String, content_digest: String },
@@ -138,27 +142,53 @@ pub fn apply_transition(
             job.state = State::ResponseReceived;
             job.recovery_action = Some("manual_response_imported_unreviewed".into());
         }
+        Action::CreateRevision { origin_revision_id, text } => {
+            if !matches!(job.state, State::ResponseReceived | State::Validating
+                | State::DraftSaved | State::ReviewPending | State::Approved)
+                || !job.revisions.iter().any(|r| r.revision_id == *origin_revision_id) {
+                return Err(TransitionError::InvalidTransition);
+            }
+            if text.trim().is_empty() || text.len() > super::model::MAX_IMPORT_BYTES
+                || text.contains('\0') {
+                return Err(TransitionError::InvalidPreparedPrompt);
+            }
+            // The store publishes the immutable text before state checkpoint.
+            job.state = State::ResponseReceived;
+            job.recovery_action = Some("manual_revision_created_unreviewed".into());
+        }
+        Action::SelectRevision { revision_id } => {
+            if !matches!(job.state, State::ResponseReceived | State::Validating
+                | State::DraftSaved | State::ReviewPending | State::Approved)
+                || job.selected_revision().is_none()
+                || job.selected_revision().is_some_and(|r| r.revision_id == *revision_id)
+                || !job.revisions.iter().any(|r| r.revision_id == *revision_id) {
+                return Err(TransitionError::InvalidTransition);
+            }
+            job.selected_revision_id = Some(revision_id.clone());
+            job.state = State::ResponseReceived;
+            job.recovery_action = Some("revision_selected_requires_new_review".into());
+        }
         Action::StartValidation { revision_id, content_digest } => {
-            if job.state != State::ResponseReceived || job.revisions.len() != 1
-                || job.revisions[0].revision_id != *revision_id
-                || job.revisions[0].content_digest != *content_digest {
+            if job.state != State::ResponseReceived || !job.selected_revision().is_some_and(|reference|
+                    reference.revision_id == *revision_id
+                    && reference.content_digest == *content_digest) {
                 return Err(TransitionError::InvalidTransition);
             }
             job.state = State::Validating;
         }
         Action::CompleteValidation { revision_id, content_digest } => {
-            if job.state != State::Validating || job.revisions.len() != 1
-                || job.revisions[0].revision_id != *revision_id
-                || job.revisions[0].content_digest != *content_digest {
+            if job.state != State::Validating || !job.selected_revision().is_some_and(|reference|
+                    reference.revision_id == *revision_id
+                    && reference.content_digest == *content_digest) {
                 return Err(TransitionError::InvalidTransition);
             }
             // Store recomputes a deterministic report from verified bytes before commit.
             job.state = State::DraftSaved;
         }
         Action::BeginReview { revision_id, content_digest } => {
-            if job.state != State::DraftSaved || job.revisions.len() != 1
-                || job.revisions[0].revision_id != *revision_id
-                || job.revisions[0].content_digest != *content_digest
+            if job.state != State::DraftSaved || !job.selected_revision().is_some_and(|reference|
+                    reference.revision_id == *revision_id
+                    && reference.content_digest == *content_digest)
                 || job.review_report.is_none() {
                 return Err(TransitionError::InvalidTransition);
             }
@@ -166,9 +196,9 @@ pub fn apply_transition(
         }
         Action::ApproveRevision { revision_id, content_digest, validation_version } => {
             let report = job.review_report.as_ref().ok_or(TransitionError::InvalidTransition)?;
-            if job.state != State::ReviewPending || job.revisions.len() != 1
-                || job.revisions[0].revision_id != *revision_id
-                || job.revisions[0].content_digest != *content_digest
+            if job.state != State::ReviewPending || !job.selected_revision().is_some_and(|reference|
+                    reference.revision_id == *revision_id
+                    && reference.content_digest == *content_digest)
                 || report.revision_id != *revision_id
                 || report.content_digest != *content_digest
                 || report.validation_version != *validation_version
