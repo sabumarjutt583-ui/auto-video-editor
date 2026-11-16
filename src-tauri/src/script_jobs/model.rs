@@ -92,6 +92,7 @@ pub const MAX_OPERATIONS: usize = 256;
 pub const MAX_PROMPT_BYTES: usize = 120_000;
 /// Response is exact UTF-8 text; 2 MiB prevents unbounded disk/memory use.
 pub const MAX_IMPORT_BYTES: usize = 2_097_152;
+pub const MAX_SCRIPT_REVISIONS: usize = 64;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ScriptRevisionSource { ManualImport }
@@ -103,6 +104,8 @@ pub struct ScriptRevisionRef {
     pub byte_length: u64,
     pub created_at: String,
     pub source: ScriptRevisionSource,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin_revision_id: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -174,6 +177,14 @@ pub struct ScriptJobRecord {
     pub review_report: Option<ScriptValidationReport>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approval_record: Option<ScriptApprovalRecord>,
+    /// None in old Phase 03D/E jobs: their sole revision is selected implicitly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_revision_id: Option<String>,
+    /// Append-only findings and superseded approvals; never authorizes a new selection.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub validation_history: Vec<ScriptValidationReport>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approval_history: Vec<ScriptApprovalRecord>,
 }
 
 pub fn valid_id(value: &str) -> bool {
@@ -230,6 +241,12 @@ pub fn valid_iso_utc(s: &str) -> bool {
         && (s.ends_with('Z') || s.rfind(|c| c == '+' || c == '-').is_some_and(|idx| idx > 18))
 }
 impl ScriptJobRecord {
+    /// Old v1 jobs with one revision implicitly select that original revision.
+    pub fn selected_revision(&self) -> Option<&ScriptRevisionRef> {
+        let id = self.selected_revision_id.as_deref()
+            .or_else(|| self.revisions.first().map(|r| r.revision_id.as_str()))?;
+        self.revisions.iter().find(|r| r.revision_id == id)
+    }
     pub fn validate(&self, folder_id: &str) -> Result<(), &'static str> {
         if self.schema_version != SCHEMA_VERSION { return Err("unsupported_version"); }
         if !valid_job_id(&self.job_id) || self.job_id != folder_id { return Err("invalid_job_id"); }
@@ -256,7 +273,30 @@ impl ScriptJobRecord {
         if self.state_revision == 0 && self.state != ScriptJobState::Created {
             return Err("invalid_initial_state");
         }
-        if self.revisions.len() > 1 { return Err("unsupported_revision_data"); }
+        if self.revisions.len() > MAX_SCRIPT_REVISIONS
+            || self.validation_history.len() > MAX_OPERATIONS
+            || self.approval_history.len() > MAX_OPERATIONS {
+            return Err("revision_history_limit");
+        }
+        if self.revisions.len() > 1 && self.selected_revision_id.is_none() {
+            return Err("missing_selected_revision");
+        }
+        if self.selected_revision_id.is_some() && self.selected_revision().is_none() {
+            return Err("invalid_selected_revision");
+        }
+        let mut revision_ids = std::collections::HashSet::new();
+        for (index, reference) in self.revisions.iter().enumerate() {
+            if !revision_ids.insert(reference.revision_id.as_str()) {
+                return Err("duplicate_revision_id");
+            }
+            if index > 0 && !reference.origin_revision_id.as_ref().is_some_and(|parent|
+                self.revisions[..index].iter().any(|prior| prior.revision_id == *parent)) {
+                return Err("invalid_revision_parent");
+            }
+            if index == 0 && reference.origin_revision_id.is_some() {
+                return Err("first_revision_has_parent");
+            }
+        }
         if self.state != ScriptJobState::Approved
             && (self.approved_revision_id.is_some() || self.approval_record.is_some()) {
             return Err("unexpected_approval");
@@ -280,7 +320,7 @@ impl ScriptJobRecord {
         let requires_revision = matches!(self.state,
             ScriptJobState::ResponseReceived | ScriptJobState::Validating
             | ScriptJobState::DraftSaved | ScriptJobState::ReviewPending | ScriptJobState::Approved);
-        if requires_revision != (self.revisions.len() == 1) {
+        if requires_revision != self.selected_revision().is_some() {
             return Err("revision_state_mismatch");
         }
         let requires_report = matches!(self.state,
@@ -289,7 +329,7 @@ impl ScriptJobRecord {
             return Err("review_report_state_mismatch");
         }
         if let Some(report) = &self.review_report {
-            let reference = &self.revisions[0];
+            let reference = self.selected_revision().ok_or("missing_selected_revision")?;
             if report.revision_id != reference.revision_id
                 || report.content_digest != reference.content_digest
                 || report.validation_version != super::validation::VALIDATION_VERSION
@@ -302,7 +342,7 @@ impl ScriptJobRecord {
             }
         }
         if let Some(approval) = &self.approval_record {
-            let reference = &self.revisions[0];
+            let reference = self.selected_revision().ok_or("missing_selected_revision")?;
             let report = self.review_report.as_ref().ok_or("missing_review_report")?;
             if self.approved_revision_id.as_deref() != Some(reference.revision_id.as_str())
                 || approval.revision_id != reference.revision_id
@@ -312,6 +352,31 @@ impl ScriptJobRecord {
                 || !valid_iso_utc(&approval.approved_at)
                 || super::validation::has_technical_errors(report) {
                 return Err("invalid_approval");
+            }
+        }
+        for report in &self.validation_history {
+            if report.validation_version != super::validation::VALIDATION_VERSION
+                || report.findings.len() > 16
+                || report.requested_word_count != self.request.requested_words
+                || report.findings.iter().any(|f| !valid_id(&f.code)
+                    || f.message.trim().is_empty() || f.message.len() > 300)
+                || !self.revisions.iter().any(|revision|
+                    revision.revision_id == report.revision_id
+                    && revision.content_digest == report.content_digest) {
+                return Err("invalid_validation_history");
+            }
+        }
+        for proof in &self.approval_history {
+            if proof.source != "user_confirmed" || !valid_iso_utc(&proof.approved_at)
+                || proof.validation_version != super::validation::VALIDATION_VERSION
+                || !self.revisions.iter().any(|r| r.revision_id == proof.revision_id
+                    && r.content_digest == proof.content_digest)
+                || !self.validation_history.iter().any(|report|
+                    report.revision_id == proof.revision_id
+                    && report.content_digest == proof.content_digest
+                    && report.validation_version == proof.validation_version
+                    && !super::validation::has_technical_errors(report)) {
+                return Err("invalid_approval_history");
             }
         }
         match self.state {
