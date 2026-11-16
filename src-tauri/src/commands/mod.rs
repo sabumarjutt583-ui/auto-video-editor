@@ -27,6 +27,7 @@ pub mod quick;
 pub mod render;
 pub mod script;
 pub mod script_jobs;
+pub mod script_studio;
 pub mod settings;
 pub mod sfx;
 pub mod styles;
