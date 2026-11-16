@@ -1146,3 +1146,285 @@ fn sw_03f_22_maximum_revision_limit_is_validated_without_unbounded_storage() {
     assert_eq!(tampered.validate(&tampered.job_id),Err("revision_history_limit"));
     assert!(store.get(&imported.job_id).unwrap()==imported);
 }
+
+
+#[test]
+fn sw_03g_01_old_job_fixtures_remain_untouched() {
+    sw_03c_01_old_phase_03b_fixture_remains_schema_v1_compatible();
+    sw_03d_21_shared_imported_v1_fixture_decodes_and_roundtrips_with_exact_fields();
+    sw_03e_17_approved_schema_v1_fixture_roundtrips_without_changing_old_jobs();
+    sw_03f_21_shared_multi_revision_v1_fixture_preserves_old_approval_history();
+}
+
+#[test]
+fn sw_03g_02_healthy_job_has_empty_read_only_diagnostics() {
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let first = imported_for_review(&store, "recovery_clean", "Hello from original 🎬");
+    let diagnosis = store.inspect_job_recovery(&first.job_id, &first.channel_id, &first.request_id).unwrap();
+    assert!(!diagnosis.blocked);
+    assert!(diagnosis.issues.is_empty());
+    assert!(diagnosis.artifacts.is_empty());
+    assert!(!diagnosis.reconciliation_supported);
+    assert_eq!(diagnosis.last_verified_state_revision, first.state_revision);
+    assert!(store.get(&first.job_id).unwrap() == first);
+}
+
+#[test]
+fn sw_03g_03_published_orphan_is_inspectable_but_never_attached() {
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let original = imported_for_review(&store, "recovery_orphan", "Unchanged original");
+    let parent = original.revisions[0].revision_id.clone();
+    let text = "\nRecoverable 🎬 orphan اردو\n";
+    let call = input(&original, "uncommitted-revision", ScriptJobAction::CreateRevision {
+        origin_revision_id: parent,
+        text: text.into(),
+    });
+    assert_eq!(store.inject_import_fault(call, super::store::ImportFault::AfterRevision)
+        .err().unwrap().code, StoreErrorCode::StorageFailure);
+    let diagnosis = store.inspect_job_recovery(&original.job_id, &original.channel_id, &original.request_id).unwrap();
+    assert!(diagnosis.blocked);
+    assert!(diagnosis.issues.iter().any(|i| i.kind == RecoveryKind::OrphanRevision));
+    assert_eq!(diagnosis.last_verified_state_revision, original.state_revision);
+    let artifact = diagnosis.artifacts.iter().find(|a|
+        a.kind == super::recovery::RecoveryArtifactKind::OrphanRevision).unwrap();
+    assert!(artifact.can_read_text);
+    assert!(!artifact.attachment_proven);
+    assert_eq!(artifact.content_digest.as_deref(), Some(digest(text.as_bytes()).as_str()));
+    let read = store.inspect_orphan_text(
+        &original.job_id, &original.channel_id, &original.request_id, &artifact.artifact_id,
+    ).unwrap();
+    assert_eq!(read.text, text);
+    assert_eq!(read.byte_length, text.len() as u64);
+    assert_eq!(diagnosis.last_verified_state_revision, original.state_revision);
+    assert_eq!(store.get(&original.job_id).err().unwrap().code, StoreErrorCode::RecoveryBlocked);
+    assert_eq!(store.recover().unwrap().jobs[0].revisions.len(), 1);
+}
+
+#[test]
+fn sw_03g_04_cross_channel_and_request_orphan_inspection_rejected() {
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let first = imported_for_review(&store, "foreign_recovery", "Original manuscript");
+    let broken = input(&first, "uncertain", ScriptJobAction::CreateRevision {
+        origin_revision_id: first.revisions[0].revision_id.clone(),
+        text: "Private orphan".into(),
+    });
+    store.inject_import_fault(broken, super::store::ImportFault::AfterRevision).err().unwrap();
+    let diagnosis = store.inspect_job_recovery(&first.job_id, &first.channel_id, &first.request_id).unwrap();
+    let artifact = &diagnosis.artifacts[0].artifact_id;
+    for (channel, request) in [
+        ("other-channel", first.request_id.as_str()),
+        (first.channel_id.as_str(), "other-request"),
+    ] {
+        assert_eq!(store.inspect_job_recovery(&first.job_id, channel, request)
+            .err().unwrap().code, StoreErrorCode::InvalidOperation);
+        assert_eq!(store.inspect_orphan_text(&first.job_id, channel, request, artifact)
+            .err().unwrap().code, StoreErrorCode::InvalidOperation);
+    }
+}
+
+#[test]
+fn sw_03g_05_path_traversal_and_committed_revision_read_as_orphan_rejected() {
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let original = imported_for_review(&store, "path_recovery", "Original");
+    assert_eq!(store.inspect_job_recovery("../escape", &original.channel_id, &original.request_id)
+        .err().unwrap().code, StoreErrorCode::InvalidOperation);
+    let id = original.revisions[0].revision_id.clone();
+    let base = (&original.job_id, &original.channel_id, &original.request_id);
+    for input in ["../x", "/tmp/x", "rev_invalid.txt", "revision-failed.tmp"] {
+        assert_eq!(store.inspect_orphan_text(base.0, base.1, base.2, input)
+            .err().unwrap().code, StoreErrorCode::RecoveryBlocked);
+    }
+    assert_eq!(store.inspect_orphan_text(base.0, base.1, base.2, &format!("{id}.txt"))
+        .err().unwrap().code, StoreErrorCode::RecoveryBlocked);
+    assert!(store.get(&original.job_id).unwrap() == original);
+}
+
+#[test]
+fn sw_03g_06_incomplete_temporary_response_preserved_not_readable() {
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let original = imported_for_review(&store, "temp_recovery", "Original");
+    store.inject_import_fault(
+        input(&original, "temp-artifact", ScriptJobAction::CreateRevision {
+            origin_revision_id: original.revisions[0].revision_id.clone(),
+            text: "Temporary text that might be partial".into(),
+        }), super::store::ImportFault::BeforeRevision,
+    ).err().unwrap();
+    let diagnosis = store.inspect_job_recovery(&original.job_id, &original.channel_id, &original.request_id).unwrap();
+    assert!(diagnosis.blocked);
+    let temp = diagnosis.artifacts.iter().find(|a|
+        a.kind == super::recovery::RecoveryArtifactKind::IncompleteRevisionTemporary).unwrap();
+    assert!(!temp.can_read_text);
+    assert!(temp.content_digest.is_none());
+    assert!(store.inspect_orphan_text(&original.job_id, &original.channel_id,
+        &original.request_id, &temp.artifact_id).is_err());
+    assert!(store.get(&original.job_id).is_err());
+}
+
+#[test]
+fn sw_03g_07_invalid_utf8_or_null_orphan_remains_preserved() {
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let original = imported_for_review(&store, "bad_orphan", "Valid original");
+    let rev = "rev_".to_string() + &"7".repeat(64);
+    let path = sandbox.0.join("jobs").join(&original.job_id).join("revisions").join(format!("{rev}.txt"));
+    fs::write(&path, [0xffu8, 0x00, 0x80]).unwrap();
+    let diagnosis = store.inspect_job_recovery(&original.job_id, &original.channel_id, &original.request_id).unwrap();
+    let artifact = diagnosis.artifacts.iter().find(|a|a.artifact_id == format!("{rev}.txt")).unwrap();
+    assert!(!artifact.can_read_text);
+    assert!(artifact.content_digest.is_none());
+    assert!(store.inspect_orphan_text(&original.job_id, &original.channel_id,
+        &original.request_id, &artifact.artifact_id).is_err());
+    assert_eq!(fs::read(path).unwrap(), [0xffu8, 0x00, 0x80]);
+}
+
+#[test]
+fn sw_03g_08_healthy_neighbor_survives_damaged_job() {
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let damaged = imported_for_review(&store, "neighbor_damaged", "One");
+    let good = imported_for_review(&store, "neighbor_good", "Two");
+    store.inject_import_fault(input(&damaged, "orphan-other", ScriptJobAction::CreateRevision {
+        origin_revision_id: damaged.revisions[0].revision_id.clone(),
+        text: "Uncommitted orphan".into(),
+    }), super::store::ImportFault::AfterRevision).err().unwrap();
+    let report = store.recover().unwrap();
+    assert_eq!(report.jobs.len(), 2);
+    assert!(report.issues.iter().any(|x| x.job_id == damaged.job_id));
+    assert!(report.issues.iter().all(|x| x.job_id != good.job_id));
+    assert!(store.get(&good.job_id).unwrap() == good);
+}
+
+#[test]
+fn sw_03g_09_committed_checkpoint_before_acknowledgment_has_no_orphan() {
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let original = imported_for_review(&store, "ack_recovery", "Original text");
+    let call = input(&original, "same-commit", ScriptJobAction::CreateRevision {
+        origin_revision_id: original.revisions[0].revision_id.clone(),
+        text: "New committed text".into(),
+    });
+    assert_eq!(store.inject_import_fault(call.clone(), super::store::ImportFault::AfterCheckpoint)
+        .err().unwrap().code, StoreErrorCode::StorageFailure);
+    let committed = store.get(&original.job_id).unwrap();
+    assert!(store.transition(call).unwrap() == committed);
+    let report = store.inspect_job_recovery(&original.job_id, &original.channel_id, &original.request_id).unwrap();
+    assert!(!report.blocked);
+    assert!(report.artifacts.is_empty());
+    assert_eq!(committed.revisions.len(), 2);
+}
+
+#[test]
+fn sw_03g_10_corrupted_approval_history_remains_blocked() {
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let pending = reviewed(&store, "history_diag", "Original approved writing");
+    let approved = store.transition(input(&pending, "approve-history", review_action(&pending, "approve"))).unwrap();
+    let path = checkpoint(&sandbox.0, &approved, approved.state_revision);
+    let mut json: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    json["approvalRecord"]["source"] = serde_json::json!("provider_confirmed");
+    fs::write(&path, serde_json::to_vec_pretty(&json).unwrap()).unwrap();
+    let diagnosis = store.inspect_job_recovery(&approved.job_id, &approved.channel_id, &approved.request_id).unwrap();
+    assert!(diagnosis.blocked);
+    assert!(diagnosis.issues.iter().any(|i| i.kind==RecoveryKind::CorruptRecord));
+    assert_eq!(store.get(&approved.job_id).err().unwrap().code, StoreErrorCode::RecoveryBlocked);
+    assert!(fs::read_to_string(path).unwrap().contains("provider_confirmed"));
+}
+
+#[test]
+fn sw_03g_11_multiple_read_only_inspections_do_not_increment_state() {
+    let sandbox = Sandbox::new();
+    let store = Arc::new(sandbox.store());
+    let original = imported_for_review(&store, "parallel_read_only", "Original");
+    let readers: Vec<_> = (0..8).map(|_| {
+        let owned = Arc::clone(&store);
+        let job = original.clone();
+        thread::spawn(move || owned.inspect_job_recovery(
+            &job.job_id, &job.channel_id, &job.request_id))
+    }).collect();
+    for reader in readers {
+        let result = reader.join().unwrap().unwrap();
+        assert!(!result.blocked);
+        assert_eq!(result.last_verified_state_revision, original.state_revision);
+    }
+    assert!(store.get(&original.job_id).unwrap() == original);
+}
+
+#[test]
+fn sw_03g_12_recovery_inspection_never_recovers_or_approves_an_orphan() {
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let original = imported_for_review(&store, "no_auto_attach", "Original");
+    store.inject_import_fault(input(&original, "stopped", ScriptJobAction::CreateRevision {
+        origin_revision_id: original.revisions[0].revision_id.clone(),
+        text: "No approval may be invented".into(),
+    }), super::store::ImportFault::AfterRevision).err().unwrap();
+    for _ in 0..3 {
+        let inspection = store.inspect_job_recovery(&original.job_id, &original.channel_id, &original.request_id).unwrap();
+        assert!(!inspection.reconciliation_supported);
+        assert!(inspection.artifacts.iter().all(|a| !a.attachment_proven));
+        assert!(inspection.blocked);
+    }
+    let saved = &store.recover().unwrap().jobs[0];
+    assert!(saved.approved_revision_id.is_none());
+    assert_eq!(saved.revisions.len(), 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn sw_03g_13_symlinked_revision_file_is_never_read() {
+    use std::os::unix::fs::symlink;
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let original = imported_for_review(&store, "symlink_diagnostic", "Original");
+    let target = sandbox.0.join("private-target.txt");
+    fs::write(&target, b"private outside job").unwrap();
+    let artifact = format!("rev_{}.txt", "8".repeat(64));
+    let entry = sandbox.0.join("jobs").join(&original.job_id).join("revisions").join(&artifact);
+    symlink(&target, &entry).unwrap();
+    let diag = store.inspect_job_recovery(&original.job_id, &original.channel_id, &original.request_id).unwrap();
+    assert!(diag.artifacts.iter().any(|a| a.artifact_id==artifact
+        && a.kind==super::recovery::RecoveryArtifactKind::UnsafeRevisionEntry
+        && !a.can_read_text));
+    assert!(store.inspect_orphan_text(&original.job_id, &original.channel_id,
+        &original.request_id, &artifact).is_err());
+    assert_eq!(fs::read(&target).unwrap(), b"private outside job");
+}
+
+#[test]
+fn sw_03g_14_revision_limits_remain_unchanged_and_no_write_is_performed() {
+    assert_eq!(super::model::MAX_SCRIPT_REVISIONS, 64);
+    assert_eq!(super::model::MAX_OPERATIONS, 256);
+    assert_eq!(super::comparison::MAX_COMPARISON_TEXT_BYTES, 131_072);
+    assert_eq!(super::comparison::MAX_COMPARISON_LINES, 400);
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let original = imported_for_review(&store, "limits_inspection", "Original text");
+    let before = fs::read(checkpoint(&sandbox.0, &original, original.state_revision)).unwrap();
+    let _ = store.inspect_job_recovery(&original.job_id, &original.channel_id, &original.request_id).unwrap();
+    assert_eq!(fs::read(checkpoint(&sandbox.0, &original, original.state_revision)).unwrap(), before);
+}
+
+#[test]
+fn sw_03g_15_case_colliding_artifacts_block_mutation_on_linux() {
+    let sandbox = Sandbox::new();
+    let store = sandbox.store();
+    let original = imported_for_review(&store, "collision_recovery", "Original");
+    let directory = sandbox.0.join("jobs").join(&original.job_id).join("revisions");
+    let id = "abcdeffffa".to_string() + &"a".repeat(54);
+    let name_a = format!("rev_{id}.txt");
+    let name_b = format!("rev_{}.txt", id.to_ascii_uppercase());
+    fs::write(directory.join(&name_a), b"orphan alpha").unwrap();
+    // Windows filenames are case-insensitive; existing path must not be overwritten.
+    if directory.join(&name_b).exists() { return; }
+    fs::write(directory.join(&name_b), b"orphan beta").unwrap();
+    let diag = store.inspect_job_recovery(&original.job_id, &original.channel_id, &original.request_id).unwrap();
+    assert!(diag.artifacts.iter().any(|a|
+        a.kind==super::recovery::RecoveryArtifactKind::AmbiguousRevision));
+    assert!(diag.blocked);
+    assert!(store.get(&original.job_id).is_err());
+}
