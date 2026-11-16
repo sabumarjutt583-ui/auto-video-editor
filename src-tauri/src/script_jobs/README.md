@@ -45,3 +45,19 @@ A locally imported response is accepted from a prepared or manual submission sta
 Revision text files are local plaintext; SHA-256 is for accidental corruption detection, not encryption/authentication. Human-driven copy uses an explicit durably committed `copy_intent` *before* clipboard access; `copied` is committed only after a real clipboard success or an explicit user's manual-copy attestation. A failed clipboard operation leaves the job safe for a user decision.
 
 No script quality validation, approval, external AI submission, browser automation, project handoff, or voice/image/video action is implemented. The minimal manual panel is Vite-development-only and only opens through an explicit user action. Windows GUI/WebView2 runtime validation is still pending. Windows directory synchronization, adversarial filesystem races, hardware power-loss guarantees, and orphan reconciliation UI remain outside this phase.
+
+## Phase 03E: deterministic validation, durable review and explicit approval
+
+Existing schemaVersion 1 remains unchanged. reviewReport and approvalRecord are optional additive fields omitted in Phase 03B/C/D records; old fixtures round-trip without migration. The immutable source response is not edited or overwritten.
+
+Rust-only legal review transitions: response_received -> validating (no report yet) -> draft_saved (rule-based report committed) -> review_pending (await human) -> approved (explicit user action only). Each step uses a distinct stable operation ID, expected stateRevision, immutable channel/request/job IDs and exact script revision ID/digest. Approval additionally requires the exact validation version. Repeated committed operations replay their original checkpoint after restart; stale or conflicting operations fail closed.
+
+Validation rules version script-rules-v1 are pure and deterministic for the same saved text and requested word count. Verification reads the immutable UTF-8 response and checks its SHA-256 hash and byte length, then counts Unicode whitespace-delimited words, compares the count with the requested target (warning outside +/-20%), flags very short content, placeholder markers, Markdown-like formatting, and endings that appear incomplete. Empty text is a technical error. Warnings are advisory and do not establish factual accuracy, originality, storytelling quality, or virality. Languages with word boundaries not represented by whitespace may have misleading counts.
+
+The complete technical/warning report, version, original revision ID, digest and actual word count are stored in append-only state checkpoints. Restart recovery recomputes the exact report from the immutable saved response; altered report metadata, corrupt text or missing revision files block future mutation while preserving the previous recoverable state. No provider or network is consulted.
+
+The separate script_job_approve command accepts only a direct explicit user action. It requires review_pending, the exact validated revision/digest/rule version, no technical errors, an expected state revision and operation ID. It stores source=user_confirmed with an approval timestamp and the approvedRevisionId. No provider confirmation, automatic approval, script rewrite, voiceover, video/image integration or project handoff is implied.
+
+UI is development-only in the existing Manual Script Job panel. The user can read the full imported text, run/finish validation with recoverable checkpoints, view persistent findings, open review, and explicitly approve the saved revision. Existing production Write with Claude and Make Video handlers remain untouched.
+
+The local store still uses plaintext JSON, authenticated OS user access is assumed and SHA-256 is not encryption. Windows directory sync and universal hardware power-failure protection are not claimed. Running the installed Windows Tauri/WebView2 UI must be tested separately; CI Rust compilation does not establish runtime UX acceptance.
