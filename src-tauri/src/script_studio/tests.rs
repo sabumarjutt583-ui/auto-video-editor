@@ -265,3 +265,90 @@ fn plan_id(c:char)->String{format!("sp_{}","".to_string()+&c.to_string().repeat(
     assert_eq!(results.iter().filter(|r|r.as_ref().err()
         .is_some_and(|e|e.code==StudioErrorCode::StaleRevision)).count(),7);
 }
+
+
+#[test] fn studio_22_orphaned_temp_config_does_not_overwrite_checkpoint(){
+    let t=Temp::new();let store=t.store();let input=seed("channel-partial");
+    let saved=save(&store,&input,&edit(&store.get(&input).unwrap(),"first"));
+    let folder=t.0.join("channels").join(&input.channel_id);
+    let temp=folder.join(".studio-abcdef.tmp");
+    fs::write(&temp,b"partial uncommitted config").unwrap();
+    assert_eq!(store.get(&input).err().expect("blocked").code,StudioErrorCode::RecoveryBlocked);
+    assert_eq!(store.save(&input,&edit(&saved,"second"),&["1".into()],&[])
+        .err().expect("blocked").code,StudioErrorCode::RecoveryBlocked);
+    assert_eq!(fs::read(temp).unwrap(),b"partial uncommitted config");
+    assert!(folder.join("config-000001.json").exists());
+}
+#[test] fn studio_23_renamed_channel_keeps_identity_and_history(){
+    let t=Temp::new();let store=t.store();let original=seed("channel-renamed");
+    let old=save(&store,&original,&edit(&store.get(&original).unwrap(),"first"));
+    let mut renamed=original.clone();renamed.channel_name="Renamed display".into();
+    let mut change=edit(&old,"rename");change.channel_name=renamed.channel_name.clone();
+    let next=save(&store,&renamed,&change);
+    assert_eq!(next.channel_id,old.channel_id);
+    assert_eq!(next.channel_name,"Renamed display");
+    assert_eq!(store.history(&renamed).unwrap()[0].channel_name,original.channel_name);
+}
+#[test] fn studio_24_skill_only_plans_need_no_legacy_master_prompt(){
+    let mut c=ChannelStudioConfigV1::seed("channel-skillonly".into(),"Skill".into(),
+        "ko".into(),String::new(),Some("1".into()));
+    c.skills.push(SkillRegistration{
+        skill_id:"sk1".into(),channel_id:c.channel_id.clone(),
+        display_name:"Narration Skill".into(),exact_name:"Narration Skill".into(),
+        claude_account_id:"1".into(),description:"".into(),
+        status:SkillInstallStatus::UserConfirmedInstalled,
+        user_confirmed_at:Some("2026-11-16T00:00:00.000Z".into()),planning_override:None});
+    c.writing.instruction_mode=WritingMode::ClaudeSkill;
+    c.writing.selected_skill_id=Some("sk1".into());
+    let p=build_plan(&c,&plan(&c,&plan_id('g')),"2026-11-16T00:00:00.000Z").unwrap();
+    assert!(p.selected_prompt_version_id.is_none());
+    assert_eq!(p.selected_skill_name.as_deref(),Some("Narration Skill"));
+    assert!(p.warnings.iter().any(|w|w.contains("unverified")));
+}
+#[test] fn studio_25_malformed_or_duplicate_skill_ids_fail_validation(){
+    let mut c=ChannelStudioConfigV1::seed("channel-duplicate".into(),"Duplicate".into(),
+        "en".into(),"prompt".into(),None);
+    let skill=SkillRegistration{skill_id:"sk_1".into(),channel_id:c.channel_id.clone(),
+        display_name:"Skill".into(),exact_name:"Same name".into(),claude_account_id:"1".into(),
+        description:String::new(),status:SkillInstallStatus::RegisteredLocally,
+        user_confirmed_at:None,planning_override:None};
+    c.skills.push(skill.clone());c.skills.push(skill);
+    assert_eq!(c.validate().err(),Some("invalid_skill"));
+    c.skills[1].skill_id="sk_2".into();
+    assert!(c.validate().is_ok()); // Same name, distinct registrations.
+}
+#[test] fn studio_26_cross_channel_prompt_version_is_rejected(){
+    let mut c=ChannelStudioConfigV1::seed("channel-owner".into(),"Owner".into(),
+        "en".into(),"prompt".into(),None);
+    c.prompt_versions[0].channel_id="other-channel".into();
+    assert_eq!(c.validate().err(),Some("invalid_version"));
+}
+#[test] fn studio_27_json_backup_has_no_password_or_session_fields(){
+    let c=ChannelStudioConfigV1::seed("channel-backup-safe".into(),"Safe".into(),
+        "en".into(),"prompt".into(),Some("1".into()));
+    let backup=StudioBackupV1{backup_version:1,source_channel_id:c.channel_id.clone(),config:c};
+    let serialized=serde_json::to_string(&backup).unwrap();
+    assert!(!serialized.contains("password"));
+    assert!(!serialized.contains("browserProfile"));
+    assert!(!serialized.contains("sessionToken"));
+    let mut bad:serde_json::Value=serde_json::from_str(&serialized).unwrap();
+    bad["sessionToken"]=serde_json::json!("unexpected");
+    assert!(serde_json::from_value::<StudioBackupV1>(bad).is_err());
+}
+#[test] fn studio_28_distinct_channels_can_reuse_same_claude_account(){
+    let t=Temp::new();let store=t.store();
+    let a=seed("channel-A-account");let b=seed("channel-B-account");
+    let av=save(&store,&a,&edit(&store.get(&a).unwrap(),"a"));
+    let bv=save(&store,&b,&edit(&store.get(&b).unwrap(),"b"));
+    assert_eq!(av.accounts.claude_account_id,bv.accounts.claude_account_id);
+    assert_eq!(av.accounts.claude_account_id.as_deref(),Some("1"));
+    assert_ne!(av.channel_id,bv.channel_id);
+    assert_ne!(av.prompt_versions[0].channel_id,bv.prompt_versions[0].channel_id);
+}
+#[test] fn studio_29_writer_lock_is_released_across_store_restart(){
+    let t=Temp::new();let input=seed("channel-lock");
+    let saved={let store=t.store();
+        save(&store,&input,&edit(&store.get(&input).unwrap(),"save"))};
+    let store=t.store();
+    assert!(store.get(&input).unwrap()==saved);
+}
