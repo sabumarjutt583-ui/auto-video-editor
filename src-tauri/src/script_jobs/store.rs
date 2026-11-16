@@ -620,9 +620,15 @@ fn collect_revision_issues(folder: &Path, job: &ScriptJobRecord) -> Result<Vec<R
         issues.push(make_issue(job.job_id.clone(), RecoveryKind::UnsafeEntry, "Unsafe revisions directory preserved."));
         return Ok(issues);
     }
+    let mut seen_casefold = std::collections::HashSet::new();
     for result in fs::read_dir(&directory).map_err(|_| storage())? {
         let entry = result.map_err(|_| storage())?;
         let name = entry.file_name().to_string_lossy().into_owned();
+        if !seen_casefold.insert(name.to_ascii_lowercase()) {
+            issues.push(make_issue(job.job_id.clone(), RecoveryKind::UnsafeEntry,
+                "Case-ambiguous revision name preserved; mutations blocked."));
+            continue;
+        }
         let ty = match entry.file_type() {
             Ok(ty) => ty,
             Err(_) => {
