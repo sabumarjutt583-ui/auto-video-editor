@@ -123,7 +123,8 @@ export function ScriptRevisionManager({ job, onCommitted }: Props) {
   }
 
   async function openRevision(): Promise<void> {
-    const id = readId || selected.revisionId;
+    const id = readId || selected?.revisionId;
+    if (!id) return;
     await execute(
       () => readImportedScript({
         jobId: job.jobId, channelId: job.channelId, requestId: job.requestId,
