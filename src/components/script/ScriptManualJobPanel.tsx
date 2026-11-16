@@ -330,11 +330,11 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
               {savedText && <textarea aria-label="Saved response" readOnly value={savedText} rows={6}
                 className="w-full rounded border border-line bg-surface p-2 text-sm" />}
             </div>
+          )}
           <ScriptRevisionManager job={job} onCommitted={next => {
             setJob(next);
             setSavedText("");
           }} />
-          )}
         </div>
       )}
     </section>
