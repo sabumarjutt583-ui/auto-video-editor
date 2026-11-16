@@ -409,3 +409,42 @@ pub async fn script_job_compare_revisions(
         &input.revision_a, &input.revision_b,
     )).await
 }
+
+
+/// Read-only: allowed even when ordinary job mutations are recovery-blocked.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct InspectScriptRecoveryInput {
+    pub job_id: String,
+    pub channel_id: String,
+    pub request_id: String,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReadOrphanScriptInput {
+    pub job_id: String,
+    pub channel_id: String,
+    pub request_id: String,
+    /// A validated artifact basename only. Never accept arbitrary paths.
+    pub artifact_id: String,
+}
+#[tauri::command]
+pub async fn script_job_inspect_recovery(
+    state: State<'_, ScriptJobService>,
+    input: InspectScriptRecoveryInput,
+) -> CmdResult<crate::script_jobs::RecoveryInspection> {
+    let store = state.store()?;
+    blocking(move || store.inspect_job_recovery(
+        &input.job_id, &input.channel_id, &input.request_id,
+    )).await
+}
+#[tauri::command]
+pub async fn script_job_inspect_orphan_text(
+    state: State<'_, ScriptJobService>,
+    input: ReadOrphanScriptInput,
+) -> CmdResult<crate::script_jobs::RecoveryArtifactText> {
+    let store = state.store()?;
+    blocking(move || store.inspect_orphan_text(
+        &input.job_id, &input.channel_id, &input.request_id, &input.artifact_id,
+    )).await
+}

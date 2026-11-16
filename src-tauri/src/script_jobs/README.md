@@ -76,3 +76,36 @@ Schema remains version 1, additive and non-migrating. Phase 03B–03E records ar
 The opt-in Vite-development-only UI can list/read/compare versions, paste manual edits, select prior versions, inspect historical approvals/findings, and explicitly reapprove the current selected revision. Nothing is sent to Claude/ChatGPT or video production. Existing Write with Claude, Make Video, browser/CDP, accounts, image, voice, renderer, and project JSON remain unchanged.
 
 Installed Windows Tauri/WebView2 GUI acceptance, full unfiltered Rust suite, and real hardware power-loss behavior are not established by PR-only CI.
+
+
+## Phase 03G: read-only recovery diagnostics and orphan inspection
+
+The durable job record remains **schemaVersion 1**. This phase introduces only Rust-owned read-only commands and typed diagnostics. No job fields or project JSON are migrated or rewritten; no new provider integration, browser interaction or AI generation occurs.
+
+### What can be proven
+
+- The last contiguous, valid, immutable state checkpoint can establish a job/channel/request owner and its selected revision, validation report and approval history up to that checkpoint.
+- Committed revisions remain subject to byte-length and SHA-256 verification.
+- New recovery artifact scans identify orphan `rev_<64hex>.txt` files, incomplete `revision-<32hex>.tmp` files, symlinks, unsafe entries, and case-ambiguous names. Existing checkpoint scanning also reports interrupted state files, missing/corrupt records, unsupported future versions and inconsistent history.
+- An explicit user action may inspect valid UTF-8 orphan text **read-only** (max 2 MiB). The response contains only its basename, bytes, current SHA-256 digest and exact text. Ordinary diagnostics and logs contain no script content.
+
+### What cannot be proven, and why no reattachment command exists
+
+The earlier revision ID is derived from the job ID and operation ID, not a committed pre-publication intent record. Even when an orphan file lives under a known job folder, its exact originating request contents, parent revision, operation ID and intended state revision are not authenticated by that orphan alone. Its digest is a consistency fingerprint, not proof of authorization, provenance or identity.
+
+Consequently `reconciliationSupported=false` for every Phase 03G inspection. **No state mutation, orphan reattachment, approval, historical timestamp rewrite or cleanup is offered.** Blocked jobs remain blocked, healthy neighboring jobs remain readable. Reconciliation would need a separately authorized protocol with a durable intent and explicit proof or a safe user-export/re-import design on a new identity; neither is implemented in this phase. Do not manually alter or delete application job files to clear warnings.
+
+### Storage and UI limits
+
+- 64 immutable revisions per job.
+- 256 durable operation IDs/state checkpoints; when full, further mutations fail closed until a separately approved migration.
+- 2,097,152-byte exact UTF-8 script limit per revision, with no trimming/normalization.
+- Offline line comparison is limited to 131,072 bytes and 400 lines **per compared revision**. Multi-part manuscripts may exceed those bounds; use individual verified reads instead of pretending full comparison succeeded.
+
+The development-only UI can reopen a blocked job's last verified checkpoint for inspection. Standard write, validation and approval controls are disabled for that blocked job. The UI requires explicit acknowledgment before showing orphan text. It is not enabled in production Vite builds.
+
+### Verified and unverified assumptions
+
+The store retains an OS writer lease and in-process operation mutex. The new inspector checks job/channel/request identity, rejects arbitrary paths, disallows reading committed files as orphans, verifies file size, and uses no-follow flags for final-component file opening (Unix and Windows). A process with adversarial filesystem write privileges may still race parent-directory replacement; these operations are intended for an application-owned local data directory and do **not** claim an adversarial sandbox security boundary.
+
+Normal process crash/restart and fault injection can be tested on Linux/Windows. Directory syncing varies by OS and universal power-loss protection is **not** claimed. The full unfiltered Rust suite, installed Tauri/WebView2 GUI validation and human workflow acceptance must be reported separately from CI. Follow the precise Windows checklist in `docs/SCRIPT_WRITER_03G_WINDOWS_ACCEPTANCE.md`.
