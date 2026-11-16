@@ -106,6 +106,7 @@ pub fn inspect_revision_artifacts(
     let committed: HashSet<&str> = job.revisions.iter()
         .map(|reference| reference.revision_id.as_str()).collect();
     let mut seen = HashSet::<String>::new();
+    let mut ambiguous = HashSet::<String>::new();
     let mut entries = Vec::new();
     // First pass prevents a case-insensitive collision from being exposed as safe
     // on Windows OR Linux, regardless of directory iteration order.
@@ -118,8 +119,8 @@ pub fn inspect_revision_artifacts(
     filenames.sort();
     for name in &filenames {
         let lower = name.to_ascii_lowercase();
-        if !seen.insert(lower) {
-            return Err(unsafe_entry());
+        if !seen.insert(lower.clone()) {
+            ambiguous.insert(lower);
         }
     }
     for name in filenames {
@@ -134,7 +135,10 @@ pub fn inspect_revision_artifacts(
             continue;
         }
         let (kind, can_read_text, explanation) =
-            if !safe {
+            if ambiguous.contains(&name.to_ascii_lowercase()) {
+                (RecoveryArtifactKind::AmbiguousRevision, false,
+                    "Case-ambiguous file identity is preserved and cannot be reattached.")
+            } else if !safe {
                 (RecoveryArtifactKind::UnsafeRevisionEntry, false,
                     "Unsafe file or symlink is preserved; never follow or reattach.")
             } else if is_revision {
