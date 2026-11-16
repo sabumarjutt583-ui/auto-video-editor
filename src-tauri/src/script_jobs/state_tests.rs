@@ -1111,3 +1111,38 @@ fn sw_03f_20_no_provider_or_pipeline_operations_in_manual_revision_flow() {
     assert!(second.approved_revision_id.is_none());
     assert_eq!(second.revisions[1].source,super::model::ScriptRevisionSource::ManualImport);
 }
+
+
+#[test]
+fn sw_03f_21_shared_multi_revision_v1_fixture_preserves_old_approval_history() {
+    let raw=include_str!("../../../src/lib/script/jobs/fixtures/revised-job-v1.json");
+    let saved:ScriptJobRecord=serde_json::from_str(raw).unwrap();
+    assert!(saved.validate(&saved.job_id).is_ok());
+    assert_eq!(saved.schema_version,1);
+    assert_eq!(saved.state,ScriptJobState::ResponseReceived);
+    assert_eq!(saved.revisions.len(),2);
+    assert_eq!(saved.selected_revision_id.as_deref(),Some(saved.revisions[1].revision_id.as_str()));
+    assert_eq!(saved.revisions[1].origin_revision_id.as_deref(),
+        Some(saved.revisions[0].revision_id.as_str()));
+    assert!(saved.approval_record.is_none());
+    assert!(saved.approved_revision_id.is_none());
+    assert_eq!(saved.approval_history.len(),1);
+    assert_eq!(saved.approval_history[0].revision_id,saved.revisions[0].revision_id);
+    let parsed:serde_json::Value=serde_json::from_str(raw).unwrap();
+    assert_eq!(serde_json::to_value(saved).unwrap(),parsed);
+}
+#[test]
+fn sw_03f_22_maximum_revision_limit_is_validated_without_unbounded_storage() {
+    let temp=Sandbox::new();let store=temp.store();
+    let imported=imported_for_review(&store,"maximum_versions","Original text");
+    let mut tampered=imported.clone();
+    for index in 1..=super::model::MAX_SCRIPT_REVISIONS {
+        let mut reference=imported.revisions[0].clone();
+        reference.revision_id=format!("rev_{index:064x}");
+        reference.origin_revision_id=Some(imported.revisions[0].revision_id.clone());
+        tampered.revisions.push(reference);
+    }
+    tampered.selected_revision_id=Some(tampered.revisions.last().unwrap().revision_id.clone());
+    assert_eq!(tampered.validate(&tampered.job_id),Err("revision_history_limit"));
+    assert!(store.get(&imported.job_id).unwrap()==imported);
+}
