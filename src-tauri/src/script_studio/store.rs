@@ -293,6 +293,9 @@ impl ScriptStudioStore{
     }
     pub fn save_plan(&self,seed:&LegacyChannelSeed,input:&PlanInput)
         ->Result<ScriptStudioPlanV1,StudioError>{
+        if !valid_id(&input.plan_id) || !input.plan_id.starts_with("sp_") || input.plan_id.len()>80
+            || input.channel_id!=seed.channel_id {return Err(invalid())}
+        seed.validate().map_err(|_|invalid())?;
         let _g=self.operation.lock().unwrap_or_else(|p|p.into_inner());
         let folder=self.folder(&seed.channel_id)?;
         let config=load_chain(&folder,&seed.channel_id)?.unwrap_or_else(||ChannelStudioConfigV1::seed(
