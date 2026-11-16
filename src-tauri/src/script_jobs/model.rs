@@ -110,6 +110,38 @@ pub enum ManualSubmissionEvidence {
     UserConfirmed,
     UserConfirmedNotSubmitted,
 }
+/// Deterministic technical diagnostics; not a quality or originality score.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ValidationSeverity { Error, Warning }
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ScriptValidationFinding {
+    pub code: String,
+    pub severity: ValidationSeverity,
+    pub message: String,
+}
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ScriptValidationReport {
+    pub validation_version: String,
+    pub revision_id: String,
+    pub content_digest: String,
+    pub actual_word_count: u32,
+    pub requested_word_count: Option<u32>,
+    pub findings: Vec<ScriptValidationFinding>,
+}
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ScriptApprovalRecord {
+    pub revision_id: String,
+    pub content_digest: String,
+    pub validation_version: String,
+    pub approved_at: String,
+    /// User confirmation only, never provider authentication.
+    pub source: String,
+}
+
 pub fn valid_revision_id(id: &str) -> bool {
     id.len() == 68 && id.starts_with("rev_")
         && id[4..].bytes().all(|b| b.is_ascii_hexdigit())
@@ -138,6 +170,10 @@ pub struct ScriptJobRecord {
     pub applied_operations: Vec<AppliedJobOperation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub submission_evidence: Option<ManualSubmissionEvidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_report: Option<ScriptValidationReport>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_record: Option<ScriptApprovalRecord>,
 }
 
 pub fn valid_id(value: &str) -> bool {
@@ -220,8 +256,14 @@ impl ScriptJobRecord {
         if self.state_revision == 0 && self.state != ScriptJobState::Created {
             return Err("invalid_initial_state");
         }
-        if self.approved_revision_id.is_some() || self.revisions.len() > 1 {
-            return Err("unsupported_revision_data");
+        if self.revisions.len() > 1 { return Err("unsupported_revision_data"); }
+        if self.state != ScriptJobState::Approved
+            && (self.approved_revision_id.is_some() || self.approval_record.is_some()) {
+            return Err("unexpected_approval");
+        }
+        if self.state == ScriptJobState::Approved
+            && (self.approved_revision_id.is_none() || self.approval_record.is_none()) {
+            return Err("missing_approval");
         }
         for reference in &self.revisions {
             if !valid_revision_id(&reference.revision_id)
@@ -235,11 +277,42 @@ impl ScriptJobRecord {
             && self.submission_evidence != Some(ManualSubmissionEvidence::UserConfirmed) {
             return Err("missing_manual_submission_evidence");
         }
-        if self.revisions.is_empty() && self.state == ScriptJobState::ResponseReceived {
-            return Err("missing_response_revision");
+        let requires_revision = matches!(self.state,
+            ScriptJobState::ResponseReceived | ScriptJobState::Validating
+            | ScriptJobState::DraftSaved | ScriptJobState::ReviewPending | ScriptJobState::Approved);
+        if requires_revision != (self.revisions.len() == 1) {
+            return Err("revision_state_mismatch");
         }
-        if !self.revisions.is_empty() && self.state != ScriptJobState::ResponseReceived {
-            return Err("unexpected_response_revision");
+        let requires_report = matches!(self.state,
+            ScriptJobState::DraftSaved | ScriptJobState::ReviewPending | ScriptJobState::Approved);
+        if requires_report != self.review_report.is_some() {
+            return Err("review_report_state_mismatch");
+        }
+        if let Some(report) = &self.review_report {
+            let reference = &self.revisions[0];
+            if report.revision_id != reference.revision_id
+                || report.content_digest != reference.content_digest
+                || report.validation_version != super::validation::VALIDATION_VERSION
+                || report.requested_word_count != self.request.requested_words
+                || report.findings.len() > 16
+                || report.actual_word_count > MAX_IMPORT_BYTES as u32
+                || report.findings.iter().any(|f| !valid_id(&f.code)
+                    || f.message.trim().is_empty() || f.message.len() > 300) {
+                return Err("invalid_validation_report");
+            }
+        }
+        if let Some(approval) = &self.approval_record {
+            let reference = &self.revisions[0];
+            let report = self.review_report.as_ref().ok_or("missing_review_report")?;
+            if self.approved_revision_id.as_deref() != Some(reference.revision_id.as_str())
+                || approval.revision_id != reference.revision_id
+                || approval.content_digest != reference.content_digest
+                || approval.validation_version != report.validation_version
+                || approval.source != "user_confirmed"
+                || !valid_iso_utc(&approval.approved_at)
+                || super::validation::has_technical_errors(report) {
+                return Err("invalid_approval");
+            }
         }
         match self.state {
             ScriptJobState::Created => {
@@ -249,10 +322,11 @@ impl ScriptJobRecord {
             ScriptJobState::Prepared | ScriptJobState::AwaitingUserAction
             | ScriptJobState::CopyIntent | ScriptJobState::Copied
             | ScriptJobState::SubmissionIntent | ScriptJobState::SubmissionUncertain
-            | ScriptJobState::Submitted | ScriptJobState::ResponseReceived => {
+            | ScriptJobState::Submitted | ScriptJobState::ResponseReceived
+            | ScriptJobState::Validating | ScriptJobState::DraftSaved
+            | ScriptJobState::ReviewPending | ScriptJobState::Approved => {
                 if self.prepared_prompt.is_none() { return Err("missing_prepared_prompt"); }
             }
-            // Phase 03E will implement validating, draft, review and approval.
             _ => return Err("unimplemented_lifecycle_state"),
         }
         if let Some(prompt) = &self.prepared_prompt {

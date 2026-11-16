@@ -17,6 +17,7 @@ use super::model::{
     ScriptRevisionSource, MAX_IMPORT_BYTES, MAX_OPERATIONS, SCHEMA_VERSION,
 };
 use super::state::{apply_transition, ScriptJobAction, TransitionError};
+use super::validation;
 
 const MAX_RECORD_BYTES: u64 = 1_048_576;
 
@@ -226,7 +227,7 @@ impl ScriptJobStore {
                         state_revision: 0, created_at: now.clone(), updated_at: now,
                         prepared_prompt: None, revisions: Vec::new(),
                         approved_revision_id: None, error_code: None, recovery_action: None,
-                        applied_operations: Vec::new(), submission_evidence: None,
+                        applied_operations: Vec::new(), submission_evidence: None, review_report: None, approval_record: None,
                     };
                     persist_initial(&folder, &record, false)?;
                     return Ok(record);
@@ -301,6 +302,13 @@ impl ScriptJobStore {
             result_revision: next.state_revision,
             result_state: next.state.clone(),
         });
+        if let ScriptJobAction::CompleteValidation { .. } = &input.action {
+            let reference = next.revisions.first().ok_or_else(bad_record)?;
+            let text = read_revision(&folder, reference)?;
+            next.review_report = Some(validation::analyze(
+                &text, reference, next.request.requested_words,
+            ));
+        }
         if let ScriptJobAction::ImportResponse { text } = &input.action {
             let revision_id = format!("rev_{}", &digest(format!("{}:{}", current.job_id, input.operation_id).as_bytes())[7..]);
             next.revisions.push(ScriptRevisionRef {
@@ -315,9 +323,11 @@ impl ScriptJobStore {
         if let ScriptJobAction::ImportResponse { text } = &input.action {
             publish_revision(&folder, &next.revisions[0], text, fault)?;
         }
-        publish_state(&folder, &next, if matches!(fault, ImportFault::AfterCheckpoint) {
-            PublicationFault::AfterRename
-        } else { PublicationFault::None })?;
+        publish_state(&folder, &next, match fault {
+            ImportFault::BeforeCheckpoint => PublicationFault::BeforeRename,
+            ImportFault::AfterCheckpoint => PublicationFault::AfterRename,
+            _ => PublicationFault::None,
+        })?;
         Ok(next)
     }
 
@@ -391,6 +401,7 @@ pub(super) enum ImportFault {
     BeforeRevision,
     AfterRevision,
     AfterCheckpoint,
+    BeforeCheckpoint,
 }
 
 #[derive(Clone, serde::Deserialize)]
@@ -474,7 +485,16 @@ fn publish_revision(folder: &Path, reference: &ScriptRevisionRef, text: &str, fa
 /// Validate a candidate state's immutable text before treating the snapshot
 /// as the latest recoverable committed state.
 fn verify_revisions(folder: &Path, snapshot: &ScriptJobRecord) -> Result<(), StoreError> {
-    for reference in &snapshot.revisions { read_revision(folder, reference)?; }
+    for reference in &snapshot.revisions {
+        let text = read_revision(folder, reference)?;
+        if let Some(report) = &snapshot.review_report {
+            if report != &validation::analyze(
+                &text, reference, snapshot.request.requested_words,
+            ) {
+                return Err(bad_record());
+            }
+        }
+    }
     Ok(())
 }
 

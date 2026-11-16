@@ -7,7 +7,7 @@ import type {
   DurableScriptJobV1, ScriptJobCommandError, ScriptJobRecoveryReport,
   PrepareScriptJobInput, LocalScriptJobTransitionInput, JobTransitionIdentity,
   ScriptJobStoreErrorCode, ImportScriptResponseInput, ReadImportedScriptInput,
-  ImportedScriptResponse,
+  ImportedScriptResponse, ReviewScriptJobInput, ApproveScriptJobInput,
 } from "./types.ts";
 
 export const createScriptJob = (request: ScriptGenerationRequest): Promise<DurableScriptJobV1> =>
@@ -28,6 +28,15 @@ export const importScriptResponse = (input: ImportScriptResponseInput): Promise<
   invoke<DurableScriptJobV1>("script_job_import_response", { input });
 export const readImportedScript = (input: ReadImportedScriptInput): Promise<ImportedScriptResponse> =>
   invoke<ImportedScriptResponse>("script_job_read_response", { input });
+export const startScriptValidation = (input: ReviewScriptJobInput): Promise<DurableScriptJobV1> =>
+  invoke<DurableScriptJobV1>("script_job_start_validation", { input });
+export const completeScriptValidation = (input: ReviewScriptJobInput): Promise<DurableScriptJobV1> =>
+  invoke<DurableScriptJobV1>("script_job_complete_validation", { input });
+export const beginScriptReview = (input: ReviewScriptJobInput): Promise<DurableScriptJobV1> =>
+  invoke<DurableScriptJobV1>("script_job_begin_review", { input });
+/** Requires a direct UI action and exact committed revision/validation version. */
+export const approveScriptRevision = (input: ApproveScriptJobInput): Promise<DurableScriptJobV1> =>
+  invoke<DurableScriptJobV1>("script_job_approve", { input });
 
 const CODES: readonly ScriptJobStoreErrorCode[] = [
   "invalid_request", "invalid_job_id", "request_conflict", "writer_busy",

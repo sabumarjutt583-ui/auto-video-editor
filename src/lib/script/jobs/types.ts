@@ -14,6 +14,27 @@ export interface ImportedScriptResponse {
   readonly revision: ImportedScriptRevisionRef;
   readonly text: string;
 }
+export type ScriptFindingSeverity = "error" | "warning";
+export interface ScriptValidationFinding {
+  readonly code: string;
+  readonly severity: ScriptFindingSeverity;
+  readonly message: string;
+}
+export interface ScriptValidationReport {
+  readonly validationVersion: "script-rules-v1";
+  readonly revisionId: string;
+  readonly contentDigest: string;
+  readonly actualWordCount: number;
+  readonly requestedWordCount: number | null;
+  readonly findings: readonly ScriptValidationFinding[];
+}
+export interface ScriptApprovalRecord {
+  readonly revisionId: string;
+  readonly contentDigest: string;
+  readonly validationVersion: "script-rules-v1";
+  readonly approvedAt: string;
+  readonly source: "user_confirmed";
+}
 export type DurableScriptJobState =
   | "created" | "prepared" | "awaiting_user_action" | "copy_intent" | "copied"
   | "submission_intent" | "submission_uncertain" | "submitted"
@@ -63,6 +84,9 @@ export interface DurableScriptJobV1 {
   readonly appliedOperations?: readonly AppliedScriptJobOperation[];
   /** Missing from valid Phase 03B/C snapshots. User-confirmed, never provider-confirmed. */
   readonly submissionEvidence?: ManualSubmissionEvidence | null;
+  /** Absent from all valid Phase 03B/C/D snapshots until a review exists. */
+  readonly reviewReport?: ScriptValidationReport | null;
+  readonly approvalRecord?: ScriptApprovalRecord | null;
 }
 
 export type ScriptJobRecoveryKind =
@@ -123,4 +147,14 @@ export interface ReadImportedScriptInput {
   readonly channelId: string;
   readonly requestId: string;
   readonly revisionId: string;
+}
+
+/** Local-only review operations; Rust checks exact revision and channel owner. */
+export interface ReviewScriptJobInput extends JobTransitionIdentity {
+  readonly revisionId: string;
+  readonly contentDigest: string;
+}
+/** Separate explicit approval; never a generic state setter. */
+export interface ApproveScriptJobInput extends ReviewScriptJobInput {
+  readonly validationVersion: "script-rules-v1";
 }
