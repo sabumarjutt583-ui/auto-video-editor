@@ -65,7 +65,7 @@ pub fn build_plan(config:&ChannelStudioConfigV1, input:&PlanInput, created_at:&s
     let skill=config.active_skill();
     let needs_prompt=matches!(config.writing.instruction_mode,WritingMode::MasterPrompt|WritingMode::MasterPlusSkill);
     let needs_skill=matches!(config.writing.instruction_mode,WritingMode::ClaudeSkill|WritingMode::MasterPlusSkill);
-    if needs_prompt && prompt.is_none_or(|p|p.content.trim().is_empty()){return make_error("master_prompt_required");}
+    if needs_prompt && prompt.map_or(true, |p|p.content.trim().is_empty()){return make_error("master_prompt_required");}
     if needs_skill && skill.is_none(){return make_error("registered_skill_required");}
     let mut warnings=Vec::new();
     if needs_skill {
