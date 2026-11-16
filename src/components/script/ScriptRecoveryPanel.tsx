@@ -6,6 +6,7 @@ import {
 import type {
   DurableScriptJobV1, ScriptJobRecoveryInspection, ScriptRecoveryArtifactText,
 } from "../../lib/script/jobs/types.ts";
+import { canInspectUnverifiedOrphan, recoveryArtifactCounts } from "../../lib/script/jobs/recovery.ts";
 import { Button } from "../ui";
 
 interface Props { readonly job: DurableScriptJobV1; }
@@ -51,7 +52,7 @@ export function ScriptRecoveryPanel({ job }: Props) {
 
   async function readOrphan(): Promise<void> {
     const artifact = report?.artifacts.find(item => item.artifactId === artifactId);
-    if (!artifact || !consent || !artifact.canReadText || artifact.attachmentProven || busy) return;
+    if (!artifact || !canInspectUnverifiedOrphan(report, artifactId, consent) || busy) return;
     setBusy(true); setError(""); setInspected(null);
     try {
       const text = await inspectScriptOrphanText({
@@ -93,6 +94,11 @@ export function ScriptRecoveryPanel({ job }: Props) {
             </p>
           ))}
           <p className="font-medium">Artifacts in this job's revisions directory</p>
+          <p>
+            Orphan files: {recoveryArtifactCounts(report.artifacts).orphaned} ·
+            Incomplete files: {recoveryArtifactCounts(report.artifacts).incomplete} ·
+            Unsafe or ambiguous: {recoveryArtifactCounts(report.artifacts).unsafeOrAmbiguous}
+          </p>
           {report.artifacts.length === 0 && <p>No unreferenced or temporary revision artifacts.</p>}
           {report.artifacts.map(item => (
             <div key={item.artifactId} className="rounded border border-line p-2 break-all">
@@ -120,7 +126,7 @@ export function ScriptRecoveryPanel({ job }: Props) {
               <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)}/>
               I understand this text is unverified, is not being reattached and must not inherit an old approval.
             </label>
-            <Button disabled={busy || !artifactId || !consent} onClick={() => void readOrphan()}>
+            <Button disabled={busy || !canInspectUnverifiedOrphan(report, artifactId, consent)} onClick={() => void readOrphan()}>
               Read unverified orphan text (no write)
             </Button>
             {inspected && (
