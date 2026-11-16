@@ -11,6 +11,7 @@ use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
 use super::lock;
+use super::comparison::{self, ScriptRevisionComparison};
 use super::model::{
     digest, request_digest, valid_id, valid_job_id, valid_revision_id, AppliedJobOperation,
     ScriptGenerationRequest, ScriptJobRecord, ScriptJobState, ScriptRevisionRef,
@@ -27,7 +28,7 @@ pub enum StoreErrorCode {
     InvalidRequest, InvalidJobId, RequestConflict, WriterBusy, StorageFailure,
     RecoveryBlocked, JobNotFound, CorruptRecord, UnsupportedVersion,
     StaleRevision, InvalidTransition, InvalidOperation, OperationConflict, OperationHistoryFull,
-    InvalidResponse, RevisionNotFound,
+    InvalidResponse, RevisionNotFound, ComparisonTooLarge,
 }
 #[derive(Debug)]
 pub struct StoreError {
@@ -379,6 +380,32 @@ impl ScriptJobStore {
         let folder = self.root.join("jobs").join(job_id);
         let text = read_revision(&folder, reference)?;
         Ok(ImportedScriptResponse { revision: reference.clone(), text })
+    }
+
+    /// Read-only typed list with an ownership check; never exposes file paths.
+    pub fn list_revisions(&self, job_id: &str, channel_id: &str, request_id: &str)
+        -> Result<Vec<ScriptRevisionRef>, StoreError> {
+        if !valid_id(channel_id) || !valid_id(request_id) {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Invalid revision ownership."));
+        }
+        let job = self.get(job_id)?;
+        if job.channel_id != channel_id || job.request_id != request_id {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Revision owner mismatch."));
+        }
+        Ok(job.revisions)
+    }
+
+    /// All revision bytes are verified before diffing, with explicit CPU/memory bounds.
+    pub fn compare_revisions(&self, job_id: &str, channel_id: &str, request_id: &str,
+        revision_a: &str, revision_b: &str) -> Result<ScriptRevisionComparison, StoreError> {
+        if revision_a == revision_b || !valid_revision_id(revision_a) || !valid_revision_id(revision_b) {
+            return Err(StoreError::new(StoreErrorCode::InvalidOperation, "Choose two distinct valid revisions."));
+        }
+        let one = self.read_response(job_id, channel_id, request_id, revision_a)?;
+        let two = self.read_response(job_id, channel_id, request_id, revision_b)?;
+        comparison::compare(&one.text, &two.text, one.revision, two.revision)
+            .ok_or_else(|| StoreError::new(StoreErrorCode::ComparisonTooLarge,
+                "This diff exceeds the safe comparison limit; read versions separately."))
     }
 
     #[cfg(test)]
