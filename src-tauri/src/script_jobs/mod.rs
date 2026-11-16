@@ -3,11 +3,12 @@ mod lock;
 mod model;
 mod store;
 mod state;
+mod validation;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
 mod state_tests;
 
-pub use model::{MasterPromptSnapshot, ProviderMode, ScriptGenerationRequest, ScriptJobRecord, ScriptJobState, PreparedPromptSnapshot, AppliedJobOperation};
+pub use model::{MasterPromptSnapshot, ProviderMode, ScriptGenerationRequest, ScriptJobRecord, ScriptJobState, PreparedPromptSnapshot, AppliedJobOperation, ScriptValidationFinding, ScriptValidationReport, ScriptApprovalRecord, ValidationSeverity};
 pub use store::{RecoveryIssue, RecoveryKind, RecoveryReport, ScriptJobStore, StoreError, StoreErrorCode, JobMutation, ImportedScriptResponse};
 pub use state::{ScriptJobAction, WaitingReason};
