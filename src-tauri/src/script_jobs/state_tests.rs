@@ -834,7 +834,7 @@ fn sw_03f_02_two_immutable_versions_preserve_exact_unicode_and_origin() {
     let newer=edit_version(&store,&original,"rev-2",&parent," Updated 🎬\r\nবাংলا اردو  \n");
     assert_eq!(newer.state,ScriptJobState::ResponseReceived);
     assert_eq!(newer.revisions.len(),2);
-    assert!(newer.revisions[0],original.revisions[0])
+    assert!(newer.revisions[0] == original.revisions[0]);
     assert_eq!(newer.revisions[1].origin_revision_id.as_deref(),Some(parent.as_str()));
     assert_ne!(newer.revisions[0].revision_id,newer.revisions[1].revision_id);
     assert_eq!(newer.selected_revision_id.as_deref(),Some(newer.revisions[1].revision_id.as_str()));
@@ -852,9 +852,9 @@ fn sw_03f_03_third_version_can_reference_original_and_preserve_order() {
     let third=edit_version(&store,&second,"edit-three",&root,"Third version based on original");
     assert_eq!(third.revisions.len(),3);
     assert_eq!(third.revisions[2].origin_revision_id.as_deref(),Some(root.as_str()));
-    assert!(third.revisions[0],first.revisions[0])
-    assert!(third.revisions[1],second.revisions[1])
-    assert!(store.list_revisions(&third.job_id,&third.channel_id,&third.request_id).unwrap(),third.revisions)
+    assert!(third.revisions[0] == first.revisions[0]);
+    assert!(third.revisions[1] == second.revisions[1]);
+    assert!(store.list_revisions(&third.job_id,&third.channel_id,&third.request_id).unwrap() == third.revisions);
 }
 #[test]
 fn sw_03f_04_approval_is_archived_and_not_inherited_by_edit() {
@@ -868,7 +868,7 @@ fn sw_03f_04_approval_is_archived_and_not_inherited_by_edit() {
     assert!(newer.approval_record.is_none());
     assert!(newer.review_report.is_none());
     assert_eq!(newer.approval_history.len(),1);
-    assert!(newer.approval_history[0] ==approved.approval_record.clone().unwrap()
+    assert!(newer.approval_history[0] == approved.approval_record.clone().unwrap());
     assert!(newer.validation_history.iter().any(|report|report.revision_id==old_id));
 }
 #[test]
@@ -918,7 +918,7 @@ fn sw_03f_07_selection_and_reapproval_survive_restart_without_mutating_text() {
         store.transition(input(&pending,"approve-v2",revision_action(&pending,"approve"))).unwrap()};
     let store=temp.store();
     let got=store.get(&saved.job_id).unwrap();
-    assert!(got,saved)
+    assert!(got == saved);
     assert_eq!(got.approval_history.len(),1);
     assert_eq!(got.revisions.len(),2);
     for reference in &got.revisions {
@@ -940,7 +940,7 @@ fn sw_03f_08_cross_channel_and_invalid_origin_are_blocked() {
     })).err().unwrap().code,StoreErrorCode::InvalidTransition);
     assert_eq!(store.list_revisions(&first.job_id,"other_channel",&first.request_id).err().unwrap().code,
         StoreErrorCode::InvalidOperation);
-    assert!(store.get(&first.job_id).unwrap(),first)
+    assert!(store.get(&first.job_id).unwrap() == first);
 }
 #[test]
 fn sw_03f_09_duplicate_revision_creation_is_idempotent_after_restart() {
@@ -952,7 +952,7 @@ fn sw_03f_09_duplicate_revision_creation_is_idempotent_after_restart() {
     let store=temp.store();
     let input=input(&first,"stable-version-op",ScriptJobAction::CreateRevision{
         origin_revision_id:first.revisions[0].revision_id.clone(),text:"Manual edit".into()});
-    assert!(store.transition(input).unwrap(),second)
+    assert!(store.transition(input).unwrap() == second);
     assert_eq!(store.list_revisions(&second.job_id,&second.channel_id,&second.request_id).unwrap().len(),2);
 }
 #[test]
@@ -966,7 +966,7 @@ fn sw_03f_10_conflicting_operation_id_and_stale_revision_rejected() {
     let stale=input(&first,"different-id",ScriptJobAction::CreateRevision{
         origin_revision_id:first.revisions[0].revision_id.clone(),text:"Third".into()});
     assert_eq!(store.transition(stale).err().unwrap().code,StoreErrorCode::StaleRevision);
-    assert!(store.get(&first.job_id).unwrap(),second)
+    assert!(store.get(&first.job_id).unwrap() == second);
 }
 #[test]
 fn sw_03f_11_parallel_versions_at_same_expected_revision_never_both_commit() {
@@ -1003,7 +1003,7 @@ fn sw_03f_12_comparison_reports_changed_lines_and_correct_word_counts() {
     assert!(kinds.contains(&"unchanged"));
     assert!(kinds.contains(&"added"));
     assert!(kinds.contains(&"removed"));
-    assert!(store.get(&first.job_id).unwrap(),second)
+    assert!(store.get(&first.job_id).unwrap() == second);
 }
 #[test]
 fn sw_03f_13_comparison_is_bounded_and_identity_checked() {
@@ -1068,7 +1068,7 @@ fn sw_03f_17_post_checkpoint_ack_failure_replays_identical_revision() {
         .err().unwrap().code,StoreErrorCode::StorageFailure);
     let committed=store.get(&first.job_id).unwrap();
     assert_eq!(committed.revisions.len(),2);
-    assert!(store.transition(call).unwrap(),committed)
+    assert!(store.transition(call).unwrap() == committed);
 }
 #[test]
 fn sw_03f_18_revision_selection_crash_keeps_prior_selection_and_blocks_when_uncertain() {
