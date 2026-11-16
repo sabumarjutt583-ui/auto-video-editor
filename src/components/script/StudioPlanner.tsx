@@ -26,6 +26,7 @@ export function StudioPlanner({config,seed,hasUnsavedSettings}: Props) {
   const [language,setLanguage] = useState("");
   const [mode,setMode] = useState<ScriptMode>(config.planning.defaultScriptMode);
   const [words,setWords] = useState(config.planning.defaultTotalWords);
+  const [useStructuredDefaults,setUseStructuredDefaults] = useState(true);
   const [parts,setParts] = useState(config.planning.defaultPartCount);
   const [outline,setOutline] = useState(config.planning.outlineRequired);
   const [continuity,setContinuity] = useState(config.planning.continuityRequired);
@@ -47,6 +48,7 @@ export function StudioPlanner({config,seed,hasUnsavedSettings}: Props) {
     setContinuity(config.planning.continuityRequired);
     setLanguage("");
     setPartInstructions([]);
+    setUseStructuredDefaults(true);
     setPreview(null);
     setPlanId(studioPlanId());
   }, [config.channelId,config.revision]);
@@ -59,7 +61,7 @@ export function StudioPlanner({config,seed,hasUnsavedSettings}: Props) {
   }, [config.channelId,config.revision]);
   useEffect(() => {
     setPreview(null);setMessageText("");
-  }, [title,topic,language,mode,words,parts,outline,continuity,partInstructions,hasUnsavedSettings]);
+  }, [title,topic,language,mode,words,parts,outline,continuity,partInstructions,useStructuredDefaults,hasUnsavedSettings]);
 
   function editPart(index: number, field: keyof PartRequest, value: string): void {
     setPartInstructions(previous => {
@@ -76,8 +78,9 @@ export function StudioPlanner({config,seed,hasUnsavedSettings}: Props) {
   function input(): PlanInput {
     return {
       planId, channelId:config.channelId, expectedConfigRevision:config.revision,
-      title,topic,language:language || null,mode,
-      totalWords:words,partCount:mode === "single" ? 1 : parts,
+      title,topic,language:language || null,mode:useStructuredDefaults ? null : mode,
+      totalWords:useStructuredDefaults ? null : words,
+      partCount:useStructuredDefaults ? null : mode === "single" ? 1 : parts,
       outlineRequired:outline,continuityRequired:continuity,
       parts:partInstructions.slice(0,partCount),
     };
@@ -132,20 +135,26 @@ export function StudioPlanner({config,seed,hasUnsavedSettings}: Props) {
         <input className={cn} maxLength={120} value={language}
           onChange={e => setLanguage(e.target.value)} placeholder={config.writing.language || "Channel default"}/>
       </label>
+      <label className="flex gap-2 text-xs">
+        <input type="checkbox" checked={useStructuredDefaults}
+          onChange={e => setUseStructuredDefaults(e.target.checked)}/>
+        Resolve mode, total words and part count from selected Skill/prompt structured defaults
+        (otherwise use these explicit job override fields)
+      </label>
       <div className="grid grid-cols-2 gap-2">
         <label className="block text-xs">Script mode
-          <select className={cn} value={mode} onChange={e => setMode(e.target.value as ScriptMode)}>
+          <select className={cn} value={mode} onChange={e => {setMode(e.target.value as ScriptMode);setUseStructuredDefaults(false);}}>
             <option value="single">One complete script</option>
             <option value="multi_part">Multi-part</option>
           </select>
         </label>
         <label className="block text-xs">Total target words
           <input className={cn} type="number" min={50} max={200000}
-            value={words} onChange={e => setWords(Number(e.target.value))}/>
+            value={words} onChange={e => {setWords(Number(e.target.value));setUseStructuredDefaults(false);}}/>
         </label>
         {mode === "multi_part" && <label className="block text-xs">Number of parts (1–40)
           <input className={cn} type="number" min={1} max={40}
-            value={parts} onChange={e => setParts(Number(e.target.value))}/>
+            value={parts} onChange={e => {setParts(Number(e.target.value));setUseStructuredDefaults(false);}}/>
         </label>}
       </div>
       <label className="flex gap-2 text-xs"><input type="checkbox" checked={outline}
