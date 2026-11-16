@@ -6,6 +6,7 @@ import { compileScriptPrompt } from "../../lib/script/core/compiler.ts";
 import {
   createScriptJob, getScriptJob, importScriptResponse, listScriptJobs,
   parseScriptJobCommandError, prepareScriptJob, readImportedScript, transitionScriptJob,
+  startScriptValidation, completeScriptValidation, beginScriptReview, approveScriptRevision,
 } from "../../lib/script/jobs/api.ts";
 import type { DurableScriptJobV1, JobTransitionIdentity, LocalScriptJobAction } from "../../lib/script/jobs/types.ts";
 import { copyPreparedPromptWithCheckpoint, validateManualResponse } from "../../lib/script/jobs/manual.ts";
@@ -142,6 +143,33 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
     });
   }
 
+
+  /** Explicit transitions persist independently so a crash can resume validation. */
+  async function advanceReview(step: "start" | "complete" | "review" | "approve") {
+    if (!job?.revisions[0]) { setError("No committed script revision is available."); return; }
+    const reference = job.revisions[0];
+    const data = {
+      ...identity(job),
+      revisionId: reference.revisionId,
+      contentDigest: reference.contentDigest,
+    };
+    await run(() => {
+      switch (step) {
+        case "start": return startScriptValidation(data);
+        case "complete": return completeScriptValidation(data);
+        case "review": return beginScriptReview(data);
+        case "approve": return approveScriptRevision({
+          ...data, validationVersion: "script-rules-v1",
+        });
+      }
+    }, saved => {
+      setJob(saved);
+      setNotice(step === "approve"
+        ? "This exact script revision was approved by your explicit action. No video generation started."
+        : "Durable review state saved: " + saved.state);
+    });
+  }
+
   async function showSaved() {
     if (!job?.revisions[0]) return;
     const reference = job.revisions[0];
@@ -156,7 +184,7 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
       aria-label="Manual Script Job — Development Only">
       <h3 className="text-sm font-semibold">Manual Script Job — Development Only</h3>
       <p className="mt-1 text-xs text-muted">
-        Opt-in local draft testing. Nothing is sent to Claude, approved, or added to Make Video.
+        Opt-in local draft review. Nothing is sent to Claude or Make Video. Approval requires your explicit action.
       </p>
       {error && <p role="alert" className="mt-2 text-sm text-danger">{error}</p>}
       {notice && <p role="status" className="mt-2 text-xs text-muted">{notice}</p>}
@@ -224,7 +252,8 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
             </div>
           )}
           {job.state === "submitted" && <p className="text-xs text-muted">Submission evidence: user-confirmed only.</p>}
-          {job.preparedPrompt && job.state !== "cancelled" && job.state !== "response_received" && (
+          {job.preparedPrompt && ["prepared", "copy_intent", "copied", "awaiting_user_action",
+            "submission_intent", "submission_uncertain", "submitted"].includes(job.state) && (
             <div>
               <label htmlFor="manual-response-text" className="text-sm font-medium">Paste completed response</label>
               <textarea id="manual-response-text" rows={7} value={response}
@@ -240,9 +269,61 @@ export function ScriptManualJobPanel({ profile, title, topic, wordCountText, scr
           {job.revisions[0] && (
             <div className="space-y-2">
               <p className="break-all text-xs text-muted">
-                Origin: {job.revisions[0].source} · SHA-256: {job.revisions[0].contentDigest} · Not approved
+                Origin: {job.revisions[0].source} · SHA-256: {job.revisions[0].contentDigest} ·
+                {job.state === "approved" ? " Explicitly approved" : " Not approved"}
               </p>
               <Button disabled={busy} onClick={() => void showSaved()}>Read saved response</Button>
+              {job.state === "response_received" &&
+                <Button disabled={busy} onClick={() => void advanceReview("start")}>
+                  Run validation — save progress
+                </Button>}
+              {job.state === "validating" &&
+                <Button disabled={busy} onClick={() => void advanceReview("complete")}>
+                  Finish validation and save findings
+                </Button>}
+              {job.reviewReport && (
+                <div className="rounded border border-line p-3 text-xs" aria-label="Saved technical script validation">
+                  <p className="font-semibold">Saved technical validation · {job.reviewReport.validationVersion}</p>
+                  <p>Actual words: {job.reviewReport.actualWordCount.toLocaleString()}
+                    {" · "}Requested: {job.reviewReport.requestedWordCount === null
+                      ? "not specified" : job.reviewReport.requestedWordCount.toLocaleString()}</p>
+                  <p>Technical errors: {job.reviewReport.findings.filter(f => f.severity === "error").length}
+                    {" · "}Warnings: {job.reviewReport.findings.filter(f => f.severity === "warning").length}</p>
+                  <p className="text-muted">Rule-based diagnostics only, not a factual accuracy, originality, storytelling-quality or virality score.</p>
+                  {job.reviewReport.findings.length === 0
+                    ? <p>No rule-based findings detected; human review is still necessary.</p>
+                    : <ul className="mt-2 list-disc space-y-1 pl-4">
+                      {job.reviewReport.findings.map(finding =>
+                        <li key={finding.code}>
+                          <strong>{finding.severity === "error" ? "Technical error" : "Writing warning"}:</strong>
+                          {" "}{finding.message}
+                        </li>)}
+                    </ul>}
+                </div>
+              )}
+              {job.state === "draft_saved" && (
+                <Button disabled={busy} onClick={() => void advanceReview("review")}>Open human review</Button>
+              )}
+              {job.state === "review_pending" && (
+                <div className="rounded border border-line p-2">
+                  <p className="text-xs text-muted">
+                    Approve ONLY after reading the full saved response. Warnings are not a guarantee of accuracy.
+                    Approval is final for this immutable revision and will not start Make Video.
+                  </p>
+                  <Button disabled={busy || !job.reviewReport ||
+                    job.reviewReport.findings.some(f => f.severity === "error")}
+                    onClick={() => void advanceReview("approve")}>
+                    Explicitly approve this revision
+                  </Button>
+                </div>
+              )}
+              {job.state === "approved" && job.approvalRecord && (
+                <p role="status" className="text-xs font-semibold">
+                  Explicitly approved by user · {job.approvalRecord.approvedAt} ·
+                  revision {job.approvalRecord.revisionId} · no pipeline handoff
+                </p>
+              )}
+
               {savedText && <textarea aria-label="Saved response" readOnly value={savedText} rows={6}
                 className="w-full rounded border border-line bg-surface p-2 text-sm" />}
             </div>
