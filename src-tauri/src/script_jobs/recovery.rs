@@ -82,9 +82,27 @@ fn read_bounded(path: &Path, expected_len: u64) -> Result<Vec<u8>, StoreError> {
     if expected_len == 0 || expected_len > MAX_IMPORT_BYTES as u64 {
         return Err(unsafe_entry());
     }
+    // Refuse final-component symlink/reparse traversal even if a file changes
+    // after the directory scan. This operation never accepts arbitrary paths.
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        // FILE_FLAG_OPEN_REPARSE_POINT; inspect the opened entry itself.
+        options.custom_flags(0x0020_0000);
+    }
+    let file = options.open(path).map_err(|_| storage())?;
+    let meta = file.metadata().map_err(|_| storage())?;
+    if !meta.is_file() || meta.file_type().is_symlink()
+        || meta.len() != expected_len { return Err(unsafe_entry()); }
     let mut bytes = Vec::new();
-    File::open(path).map_err(|_| storage())?
-        .take(MAX_IMPORT_BYTES as u64 + 1)
+    file.take(MAX_IMPORT_BYTES as u64 + 1)
         .read_to_end(&mut bytes).map_err(|_| storage())?;
     if bytes.len() as u64 != expected_len {
         return Err(unsafe_entry());
