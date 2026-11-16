@@ -323,9 +323,11 @@ impl ScriptJobStore {
         if let ScriptJobAction::ImportResponse { text } = &input.action {
             publish_revision(&folder, &next.revisions[0], text, fault)?;
         }
-        publish_state(&folder, &next, if matches!(fault, ImportFault::AfterCheckpoint) {
-            PublicationFault::AfterRename
-        } else { PublicationFault::None })?;
+        publish_state(&folder, &next, match fault {
+            ImportFault::BeforeCheckpoint => PublicationFault::BeforeRename,
+            ImportFault::AfterCheckpoint => PublicationFault::AfterRename,
+            _ => PublicationFault::None,
+        })?;
         Ok(next)
     }
 
@@ -399,6 +401,7 @@ pub(super) enum ImportFault {
     BeforeRevision,
     AfterRevision,
     AfterCheckpoint,
+    BeforeCheckpoint,
 }
 
 #[derive(Clone, serde::Deserialize)]
