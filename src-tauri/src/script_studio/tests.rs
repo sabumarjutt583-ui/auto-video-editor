@@ -79,10 +79,10 @@ fn plan_id(c:char)->String{format!("sp_{}","".to_string()+&c.to_string().repeat(
     let saved=save(&store,&input,&operation);
     assert!(store.save(&input,&operation,&["1".into()],&[]).unwrap()==saved);
     let mut conflict=operation.clone();conflict.channel_name="Different".into();
-    assert_eq!(store.save(&input,&conflict,&["1".into()],&[]).unwrap_err().code,
+    assert_eq!(store.save(&input,&conflict,&["1".into()],&[]).err().expect("expected validation failure").code,
         StudioErrorCode::Conflict);
     let another=edit(&initial,"stale-attempt");
-    assert_eq!(store.save(&input,&another,&["1".into()],&[]).unwrap_err().code,
+    assert_eq!(store.save(&input,&another,&["1".into()],&[]).err().expect("expected validation failure").code,
         StudioErrorCode::StaleRevision);
 }
 #[test] fn studio_05_two_process_lease_cannot_take_same_store(){
@@ -95,7 +95,7 @@ fn plan_id(c:char)->String{format!("sp_{}","".to_string()+&c.to_string().repeat(
     let t=Temp::new();let store=t.store();let input=seed("channel-account");
     let original=store.get(&input).unwrap();let mut changed=edit(&original,"missing");
     changed.accounts.claude_account_id=Some("deleted".into());
-    assert_eq!(store.save(&input,&changed,&["1".into()],&[]).unwrap_err().code,StudioErrorCode::InvalidAccount);
+    assert_eq!(store.save(&input,&changed,&["1".into()],&[]).err().expect("expected validation failure").code,StudioErrorCode::InvalidAccount);
     assert_eq!(store.get(&input).unwrap().revision,0);
 }
 #[test] fn studio_07_skill_registration_is_local_not_provider_verified(){
@@ -116,7 +116,7 @@ fn plan_id(c:char)->String{format!("sp_{}","".to_string()+&c.to_string().repeat(
     let t=Temp::new();let store=t.store();let input=seed("channel-rubric");
     let config=store.get(&input).unwrap();let mut edit=edit(&config,"bad-rubric");
     edit.rubric[0].points+=1;
-    assert_eq!(store.save(&input,&edit,&["1".into()],&[]).unwrap_err().code,StudioErrorCode::InvalidInput);
+    assert_eq!(store.save(&input,&edit,&["1".into()],&[]).err().expect("expected validation failure").code,StudioErrorCode::InvalidInput);
     assert_eq!(config.rubric.iter().map(|r|r.points).sum::<u32>(),100);
 }
 #[test] fn studio_09_eight_parts_distribute_12000_words_exactly(){
@@ -186,7 +186,7 @@ fn plan_id(c:char)->String{format!("sp_{}","".to_string()+&c.to_string().repeat(
     let first=store.save_plan(&input,&plan).unwrap();
     assert!(store.save_plan(&input,&plan).unwrap()==first);
     let mut changed=plan.clone();changed.total_words=Some(13_000);
-    assert_eq!(store.save_plan(&input,&changed).unwrap_err().code,StudioErrorCode::Conflict);
+    assert_eq!(store.save_plan(&input,&changed).err().expect("expected validation failure").code,StudioErrorCode::Conflict);
 }
 #[test] fn studio_15_channel_isolation_and_duplicate_names(){
     let t=Temp::new();let store=t.store();let a=seed("channel-AAA");
@@ -195,7 +195,7 @@ fn plan_id(c:char)->String{format!("sp_{}","".to_string()+&c.to_string().repeat(
     let bv=save(&store,&b,&edit(&store.get(&b).unwrap(),"save-B"));
     assert_ne!(av.channel_id,bv.channel_id);
     let mut op=edit(&av,"foreign");op.channel_id=b.channel_id.clone();
-    assert_eq!(store.save(&a,&op,&["1".into()],&[]).unwrap_err().code,StudioErrorCode::InvalidInput);
+    assert_eq!(store.save(&a,&op,&["1".into()],&[]).err().expect("expected validation failure").code,StudioErrorCode::InvalidInput);
     assert_eq!(store.get(&b).unwrap().active_prompt().unwrap().channel_id,b.channel_id);
 }
 #[test] fn studio_16_import_backup_requires_rebinding_and_no_overwrite(){
@@ -206,7 +206,7 @@ fn plan_id(c:char)->String{format!("sp_{}","".to_string()+&c.to_string().repeat(
     assert_eq!(imported.channel_id,b.channel_id);
     assert_eq!(imported.prompt_versions[0].channel_id,b.channel_id);
     assert_eq!(imported.prompt_versions[0].content,original.prompt_versions[0].content);
-    assert_eq!(store.import(&b,&backup,"repeat",&["1".into()],&[]).unwrap_err().code,StudioErrorCode::Conflict);
+    assert_eq!(store.import(&b,&backup,"repeat",&["1".into()],&[]).err().expect("expected validation failure").code,StudioErrorCode::Conflict);
 }
 #[test] fn studio_17_corrupt_latest_record_does_not_overwrite_older_checkpoint(){
     let t=Temp::new();let store=t.store();let input=seed("channel-corrupt");
@@ -214,7 +214,7 @@ fn plan_id(c:char)->String{format!("sp_{}","".to_string()+&c.to_string().repeat(
     let second=save(&store,&input,&edit(&first,"save-2"));
     let file=t.0.join("channels").join(&input.channel_id).join(format!("config-{:06}.json",second.revision));
     fs::write(&file,b"{bad-json").unwrap();
-    assert_eq!(store.get(&input).unwrap_err().code,StudioErrorCode::CorruptRecord);
+    assert_eq!(store.get(&input).err().expect("expected validation failure").code,StudioErrorCode::CorruptRecord);
     assert!(t.0.join("channels").join(&input.channel_id).join("config-000001.json").exists());
     assert_eq!(fs::read(file).unwrap(),b"{bad-json");
 }
@@ -225,20 +225,20 @@ fn plan_id(c:char)->String{format!("sp_{}","".to_string()+&c.to_string().repeat(
     let mut raw:serde_json::Value=serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
     raw["schemaVersion"]=serde_json::json!(99);
     fs::write(&file,serde_json::to_vec(&raw).unwrap()).unwrap();
-    assert_eq!(store.get(&input).unwrap_err().code,StudioErrorCode::UnsupportedVersion);
-    assert_eq!(store.save(&input,&edit(&existing,"attempt"),&["1".into()],&[]).unwrap_err().code,
+    assert_eq!(store.get(&input).err().expect("expected validation failure").code,StudioErrorCode::UnsupportedVersion);
+    assert_eq!(store.save(&input,&edit(&existing,"attempt"),&["1".into()],&[]).err().expect("expected validation failure").code,
         StudioErrorCode::UnsupportedVersion);
 }
 #[test] fn studio_19_malformed_plan_path_and_corruption_fail_closed(){
     let t=Temp::new();let store=t.store();let input=seed("channel-path");
     let config=store.get(&input).unwrap();
     let mut bad=plan(&config,"../escape");
-    assert_eq!(store.save_plan(&input,&bad).unwrap_err().code,StudioErrorCode::InvalidInput);
+    assert_eq!(store.save_plan(&input,&bad).err().expect("expected validation failure").code,StudioErrorCode::InvalidInput);
     bad.plan_id=plan_id('b');
     let created=store.save_plan(&input,&bad).unwrap();
     let path=t.0.join("channels").join(&input.channel_id).join("plans").join(format!("{}.json",created.plan_id));
     fs::write(&path,b"corrupted").unwrap();
-    assert_eq!(store.get_plan(&input.channel_id,&created.plan_id).unwrap_err().code,
+    assert_eq!(store.get_plan(&input.channel_id,&created.plan_id).err().expect("expected validation failure").code,
         StudioErrorCode::CorruptRecord);
     assert_eq!(store.list_plans(&input.channel_id).unwrap().issues.len(),1);
 }
