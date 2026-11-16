@@ -8,6 +8,8 @@ import type {
   PrepareScriptJobInput, LocalScriptJobTransitionInput, JobTransitionIdentity,
   ScriptJobStoreErrorCode, ImportScriptResponseInput, ReadImportedScriptInput,
   ImportedScriptResponse, ReviewScriptJobInput, ApproveScriptJobInput,
+  CreateManualRevisionInput, SelectScriptRevisionInput, ReadScriptRevisionsInput,
+  CompareScriptRevisionsInput, ImportedScriptRevisionRef, ScriptRevisionComparison,
 } from "./types.ts";
 
 export const createScriptJob = (request: ScriptGenerationRequest): Promise<DurableScriptJobV1> =>
@@ -37,13 +39,21 @@ export const beginScriptReview = (input: ReviewScriptJobInput): Promise<DurableS
 /** Requires a direct UI action and exact committed revision/validation version. */
 export const approveScriptRevision = (input: ApproveScriptJobInput): Promise<DurableScriptJobV1> =>
   invoke<DurableScriptJobV1>("script_job_approve", { input });
+export const createManualRevision = (input: CreateManualRevisionInput): Promise<DurableScriptJobV1> =>
+  invoke<DurableScriptJobV1>("script_job_create_revision", { input });
+export const selectScriptRevision = (input: SelectScriptRevisionInput): Promise<DurableScriptJobV1> =>
+  invoke<DurableScriptJobV1>("script_job_select_revision", { input });
+export const listSavedScriptRevisions = (input: ReadScriptRevisionsInput): Promise<readonly ImportedScriptRevisionRef[]> =>
+  invoke<readonly ImportedScriptRevisionRef[]>("script_job_list_revisions", { input });
+export const compareSavedScriptRevisions = (input: CompareScriptRevisionsInput): Promise<ScriptRevisionComparison> =>
+  invoke<ScriptRevisionComparison>("script_job_compare_revisions", { input });
 
 const CODES: readonly ScriptJobStoreErrorCode[] = [
   "invalid_request", "invalid_job_id", "request_conflict", "writer_busy",
   "storage_failure", "recovery_blocked", "job_not_found", "corrupt_record",
   "unsupported_version", "stale_revision", "invalid_transition",
   "invalid_operation", "operation_conflict", "operation_history_full",
-  "invalid_response", "revision_not_found",
+  "invalid_response", "revision_not_found", "comparison_too_large",
 ];
 
 /** Tauri may reject with a structured error, a string, or a transport error.
