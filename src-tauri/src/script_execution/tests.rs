@@ -223,3 +223,26 @@ fn sw_03i_exact_fragment_retry_and_no_unverified_completion(){
     assert_eq!(store.get(&p.channel_id,"ex_test").unwrap().parts[0].fragments.len(),1);
     drop(store);fs::remove_dir_all(root).unwrap();
 }
+
+
+#[test]
+fn sw_03i_updated_continuity_supersedes_old_note_without_erasing_history(){
+    let root=disposable();let p=plan(2,false,true);
+    let store=ExecutionStore::new(root.join("executions")).unwrap();
+    let mut state=start(&store,&p);
+    state=act(&store,&p,&state,prepare(1),"prepare_first");
+    state=act(&store,&p,&state,fragment(1,"First section is complete."),"fragment_first");
+    state=act(&store,&p,&state,commit(1),"commit_first");
+    state=act(&store,&p,&state,ExecutionAction::SaveContinuity{
+        after_part:1,text:"OUTDATED continuity: character is Bob".into()
+    },"old_note");
+    state=act(&store,&p,&state,ExecutionAction::SaveContinuity{
+        after_part:1,text:"Corrected continuity: character is Elena".into()
+    },"new_note");
+    assert_eq!(state.continuity_notes.len(),2);
+    state=act(&store,&p,&state,prepare(2),"prepare_second");
+    let prompt=store.read(&p.channel_id,&state.execution_id,"prompt",2,0).unwrap();
+    assert!(prompt.contains("Corrected continuity: character is Elena"));
+    assert!(!prompt.contains("OUTDATED continuity"));
+    drop(store);fs::remove_dir_all(root).unwrap();
+}
