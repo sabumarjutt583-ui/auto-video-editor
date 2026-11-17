@@ -21,7 +21,7 @@ impl StudioService {
             Err(code)=>Self{store:None,unavailable:Some(code)}
         }
     }
-    fn store(&self)->Result<Arc<ScriptStudioStore>,StudioCommandError>{
+    pub(crate) fn store(&self)->Result<Arc<ScriptStudioStore>,StudioCommandError>{
         self.store.as_ref().cloned().ok_or(StudioCommandError{
             code:self.unavailable.unwrap_or(StudioErrorCode::StorageFailure),
             message:"Offline Script Studio is unavailable; existing production tools remain usable.".into()
@@ -41,7 +41,7 @@ fn invalid()->StudioCommandError {
 }
 /// The saved settings are authoritative for legacy profile identity/data.
 /// Caller cannot invent a profile or import into a nonexistent channel.
-fn actual_seed(app:&AppHandle,claimed:&LegacyChannelSeed)->ResultCmd<LegacyChannelSeed>{
+pub(crate) fn actual_seed(app:&AppHandle,claimed:&LegacyChannelSeed)->ResultCmd<LegacyChannelSeed>{
     let settings=crate::settings::load(app).map_err(|_|StudioCommandError{
         code:StudioErrorCode::StorageFailure,
         message:"Could not read saved channel profiles.".into()})?;

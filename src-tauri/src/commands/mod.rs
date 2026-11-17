@@ -28,6 +28,7 @@ pub mod render;
 pub mod script;
 pub mod script_jobs;
 pub mod script_studio;
+pub mod script_execution;
 pub mod settings;
 pub mod sfx;
 pub mod styles;

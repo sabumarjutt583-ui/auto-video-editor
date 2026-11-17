@@ -1,8 +1,12 @@
 name: Frontend PR validation
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 on:
   pull_request:
-    branches: [main, feature/script-writer-core-v1, feature/script-writer-integration-v1, feature/script-writer-comparison-v1, feature/script-writer-desktop-readiness-v1, feature/script-writer-durable-store-v1, feature/script-writer-state-machine-v1, feature/script-writer-manual-import-v1, feature/script-writer-review-approval-v1, feature/script-writer-revisions-v1, feature/script-writer-recovery-v1]
+    branches: [main, feature/script-writer-core-v1, feature/script-writer-integration-v1, feature/script-writer-comparison-v1, feature/script-writer-desktop-readiness-v1, feature/script-writer-durable-store-v1, feature/script-writer-state-machine-v1, feature/script-writer-manual-import-v1, feature/script-writer-review-approval-v1, feature/script-writer-revisions-v1, feature/script-writer-recovery-v1, feature/script-writer-channel-studio-v1]
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
@@ -64,13 +68,18 @@ jobs:
           touch src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
       - name: Run job store tests with locked Rust dependencies
         working-directory: src-tauri
-        run: cargo test --locked script_jobs && cargo test --locked script_studio
+        run: cargo test --locked script_jobs && cargo test --locked script_studio && cargo test --locked script_execution
       - name: Build Rust desktop backend
         working-directory: src-tauri
         run: cargo build --locked
       - name: Verify admin Rust compilation
         working-directory: src-tauri
         run: cargo check --locked --features admin
+
+      - name: Attempt unfiltered Rust suite (informational, not Windows GUI)
+        working-directory: src-tauri
+        continue-on-error: true
+        run: cargo test --locked
 
   rust-windows:
     name: Windows Rust job-store tests and build
@@ -86,7 +95,7 @@ jobs:
           New-Item -ItemType File -Path src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe -Force | Out-Null
       - name: Run Windows job store filesystem tests
         working-directory: src-tauri
-        run: cargo test --locked script_jobs && cargo test --locked script_studio
+        run: cargo test --locked script_jobs && cargo test --locked script_studio && cargo test --locked script_execution
       - name: Build Windows Rust desktop backend
         working-directory: src-tauri
         run: cargo build --locked
