@@ -165,7 +165,7 @@ export function readProfile(value: unknown, fallbackId = "channel"): ChannelProf
     language: str(o.language, 12).toLowerCase().replace(/[^a-z-]/g, ""),
     aspect: pick(o.aspect, ASPECTS, base.aspect),
     quality: pick(o.quality, QUALITIES, base.quality),
-    script: { writer: pick(script.writer, WRITERS, base.script.writer), masterPrompt: str(script.masterPrompt, MAX_MASTER_PROMPT), claudeAccountId: typeof script.claudeAccountId === "string" && script.claudeAccountId.trim() !== "" ? script.claudeAccountId.trim().slice(0, 40) : null },
+    script: { writer: pick(script.writer, WRITERS, base.script.writer), masterPrompt: typeof script.masterPrompt === "string" ? script.masterPrompt.slice(0, MAX_MASTER_PROMPT) : "", claudeAccountId: typeof script.claudeAccountId === "string" && script.claudeAccountId.trim() !== "" ? script.claudeAccountId.trim().slice(0, 40) : null },
     voice: {
       provider: pick(voice.provider, ["", "edge", "gemini"] as const, ""),
       edgeVoice: str(voice.edgeVoice, 120),
