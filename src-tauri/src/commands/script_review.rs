@@ -19,7 +19,7 @@ impl ReviewService{
    Err(e)=>Self{store:None,unavailable:Some(e)}
   }
  }
- fn store(&self)->Cmd<Arc<ReviewStore>>{
+ pub(crate) fn store(&self)->Cmd<Arc<ReviewStore>>{
   self.store.as_ref().cloned().ok_or(CommandError{
    code:self.unavailable.unwrap_or(ReviewErrorCode::StorageFailure),
    message:"Offline review store unavailable; production workflows unaffected.".into()
