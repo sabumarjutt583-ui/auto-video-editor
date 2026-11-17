@@ -256,7 +256,7 @@ fn sw_03j_invalid_review_prompt_fails_before_publishing_orphans(){
   execution_id:"ex_review".into(),operation_id:"op_begin".into()}).unwrap();
  for (i,action) in [
   ExecutionAction::PreparePart{part_index:1,extra_instructions:String::new()},
-  ExecutionAction::ImportFragment{part_index:1,text:"Complete script.".into()},
+  ExecutionAction::ImportFragment{part_index:1,text:format!("{}.", "Detailed review sentence ".repeat(1000))},
   ExecutionAction::CommitPart{part_index:1,accept_warnings:true},ExecutionAction::Assemble
  ].into_iter().enumerate(){
   s=exec.apply(&plan,&ExecutionRequest{channel_id:"channel_a".into(),execution_id:"ex_review".into(),
