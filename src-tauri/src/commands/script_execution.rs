@@ -21,7 +21,7 @@ impl ExecutionService{
             Err(code)=>Self{store:None,unavailable:Some(code)}
         }
     }
-    fn store(&self)->Result<Arc<ExecutionStore>,CommandError>{
+    pub(crate) fn store(&self)->Result<Arc<ExecutionStore>,CommandError>{
         self.store.as_ref().cloned().ok_or(CommandError{
             code:self.unavailable.unwrap_or(ExecutionErrorCode::StorageFailure),
             message:"Offline Script Execution is unavailable. Production tools are unaffected.".into()

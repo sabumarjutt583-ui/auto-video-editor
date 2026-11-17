@@ -246,3 +246,127 @@ fn sw_03i_updated_continuity_supersedes_old_note_without_erasing_history(){
     assert!(!prompt.contains("OUTDATED continuity"));
     drop(store);fs::remove_dir_all(root).unwrap();
 }
+
+
+#[test]
+fn sw_03j_hardening_restart_after_every_major_part_state(){
+ let root=disposable();let p=plan(1,false,false);
+ let mut store=ExecutionStore::new(root.join("executions")).unwrap();
+ let mut s=start(&store,&p);
+ s=act(&store,&p,&s,prepare(1),"prepare");
+ drop(store);store=ExecutionStore::new(root.join("executions")).unwrap();
+ assert!(store.get("channel_test","ex_test").unwrap().parts[0].prepared.is_some());
+ s=act(&store,&p,&s,fragment(1,"  أولًا اردو 한국어 😀\r\n"),"f1");
+ drop(store);store=ExecutionStore::new(root.join("executions")).unwrap();
+ assert_eq!(store.candidate("channel_test","ex_test",1).unwrap(),"  أولًا اردو 한국어 😀\r\n");
+ s=act(&store,&p,&s,ExecutionAction::PrepareContinuation{part_index:1,extra_instructions:"Finish.".into()},"cont");
+ s=act(&store,&p,&s,fragment(1,"Second line is finished."),"f2");
+ assert_eq!(store.candidate("channel_test","ex_test",1).unwrap(),"  أولًا اردو 한국어 😀\r\n\nSecond line is finished.");
+ s=act(&store,&p,&s,commit(1),"commit");
+ drop(store);store=ExecutionStore::new(root.join("executions")).unwrap();
+ assert_eq!(store.get("channel_test","ex_test").unwrap().completed_parts,1);
+ s=act(&store,&p,&s,ExecutionAction::Assemble,"assemble");
+ assert_eq!(s.assembled.as_ref().unwrap().bytes,store.read("channel_test","ex_test","assembled",0,0).unwrap().len() as u64);
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_hardening_concurrent_writes_only_one_checkpoint(){
+ use std::sync::Arc;
+ let root=disposable();let p=plan(1,false,false);
+ let store=Arc::new(ExecutionStore::new(root.join("executions")).unwrap());
+ let state=start(&store,&p);
+ let req1=request(&state,ExecutionAction::SaveOutline{text:"Outline A".into()},"race1");
+ let req2=request(&state,ExecutionAction::SaveOutline{text:"Outline B".into()},"race2");
+ let (a,b)=std::thread::scope(|scope|{
+  let first=scope.spawn(||store.apply(&p,&req1));
+  let second=scope.spawn(||store.apply(&p,&req2));
+  (first.join().unwrap(),second.join().unwrap())
+ });
+ assert_ne!(a.is_ok(),b.is_ok());
+ assert_eq!(store.get("channel_test","ex_test").unwrap().revision,1);
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_hardening_very_large_fragment_bound_and_exact_unicode(){
+ let root=disposable();let p=plan(1,false,false);
+ let store=ExecutionStore::new(root.join("executions")).unwrap();
+ let mut state=start(&store,&p);state=act(&store,&p,&state,prepare(1),"prepare");
+ let large="X".repeat(MAX_PART_BYTES-3)+" 😀";
+ assert!(store.apply(&p,&request(&state,fragment(1,&large),"oversized")).is_err());
+ let exactly="X".repeat(MAX_PART_BYTES-1)+".";
+ assert_eq!(exactly.len(),MAX_PART_BYTES);
+ state=act(&store,&p,&state,fragment(1,&exactly),"exact");
+ assert_eq!(state.parts[0].fragments[0].bytes,MAX_PART_BYTES as u64);
+ assert_eq!(store.read("channel_test","ex_test","fragment",1,0).unwrap().len(),MAX_PART_BYTES);
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_hardening_corrupt_assembled_script_is_blocked(){
+ let root=disposable();let p=plan(1,false,false);
+ let store=ExecutionStore::new(root.join("executions")).unwrap();
+ let mut s=start(&store,&p);
+ s=act(&store,&p,&s,prepare(1),"p");
+ s=act(&store,&p,&s,fragment(1,"Everything ends."),"f");
+ s=act(&store,&p,&s,commit(1),"c");
+ s=act(&store,&p,&s,ExecutionAction::Assemble,"a");
+ let name=&s.assembled.as_ref().unwrap().filename;
+ let path=root.join("executions/channels/channel_test/ex_test/objects").join(name);
+ fs::write(path,"tampered assembled").unwrap();
+ assert!(matches!(store.get("channel_test","ex_test").unwrap_err().code,ExecutionErrorCode::CorruptRecord));
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_hardening_missing_continuity_cannot_be_skipped(){
+ let root=disposable();let p=plan(2,false,true);
+ let store=ExecutionStore::new(root.join("executions")).unwrap();
+ let mut s=start(&store,&p);
+ s=act(&store,&p,&s,prepare(1),"p");
+ s=act(&store,&p,&s,fragment(1,"Part one ends."),"f");
+ s=act(&store,&p,&s,commit(1),"c");
+ assert!(store.apply(&p,&request(&s,prepare(2),"missing")).is_err());
+ assert_eq!(store.get("channel_test","ex_test").unwrap().revision,s.revision);
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_hardening_state_cap_512_no_history_truncation(){
+ let root=disposable();let p=plan(1,false,false);
+ let store=ExecutionStore::new(root.join("executions")).unwrap();
+ let mut s=start(&store,&p);
+ let dir=root.join("executions/channels/channel_test/ex_test");
+ // Crash-recovery fixture with a valid digest-linked chain at the exact checkpoint cap.
+ for rev in 1..MAX_REVISIONS{
+  let mut next=s.clone();
+  next.previous_digest=Some(digest(&serde_json::to_vec(&s).unwrap()));
+  next.revision=rev;next.operation_id=format!("op_fill_{rev}");
+  next.operation_digest=digest(format!("operation_{rev}").as_bytes());
+  fs::write(state_file(&dir,rev),serde_json::to_vec(&next).unwrap()).unwrap();
+  s=next;
+ }
+ assert_eq!(store.get("channel_test","ex_test").unwrap().revision,MAX_REVISIONS-1);
+ let error=store.apply(&p,&request(&s,ExecutionAction::SaveOutline{text:"No overwrite".into()},"full")).unwrap_err();
+ assert!(matches!(error.code,ExecutionErrorCode::HistoryFull));
+ assert!(state_file(&dir,0).exists()&&state_file(&dir,MAX_REVISIONS-1).exists());
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_hardening_orphan_temp_after_interrupted_publication_is_visible(){
+ let root=disposable();let p=plan(1,false,false);
+ let store=ExecutionStore::new(root.join("executions")).unwrap();start(&store,&p);
+ let path=root.join("executions/channels/channel_test/ex_test/objects/.execution-simulated.tmp");
+ fs::write(&path,"uncommitted object").unwrap();
+ assert!(matches!(store.get("channel_test","ex_test").unwrap_err().code,ExecutionErrorCode::RecoveryBlocked));
+ assert!(path.exists());
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[cfg(unix)]
+#[test]
+fn sw_03j_hardening_symlinked_execution_directory_is_blocked(){
+ use std::os::unix::fs::symlink;
+ let root=disposable();let p=plan(1,false,false);
+ let store=ExecutionStore::new(root.join("executions")).unwrap();start(&store,&p);
+ let dir=root.join("executions/channels/channel_test/ex_test");
+ let moved=root.join("relocated");fs::rename(&dir,&moved).unwrap();
+ symlink(&moved,&dir).unwrap();
+ assert!(store.get("channel_test","ex_test").is_err());
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
