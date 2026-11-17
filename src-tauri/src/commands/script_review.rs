@@ -87,6 +87,14 @@ pub async fn review_read(app:AppHandle,state:State<'_,ReviewService>,
  let channel=owner(&app,&seed)?;let store=state.store()?;
  background(move||store.read(&channel,&review_id,&kind,index)).await
 }
+
+#[tauri::command]
+pub async fn review_read_history(app:AppHandle,state:State<'_,ReviewService>,
+ seed:LegacyChannelSeed,review_id:String,kind:String,round_index:u32,item_index:u32)->Cmd<String>{
+ let channel=owner(&app,&seed)?;let store=state.store()?;
+ background(move||store.read_history(&channel,&review_id,&kind,round_index,item_index)).await
+}
+
 #[tauri::command]
 pub async fn review_apply(app:AppHandle,state:State<'_,ReviewService>,
  seed:LegacyChannelSeed,request:ReviewRequest)->Cmd<ReviewState>{

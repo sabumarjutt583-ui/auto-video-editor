@@ -4,7 +4,7 @@ import {listExecutions} from "../../lib/script/execution/api.ts";
 import type {ExecutionState} from "../../lib/script/execution/types.ts";
 import {
  applyReview,buildReviewRequest,getReview,hasFullCoverage,isCurrentApproved,listReviews,
- newReviewId,newReviewOperation,readReview,reviewError,startReview,sumScore
+ newReviewId,newReviewOperation,readReview,readReviewHistory,reviewError,startReview,sumScore
 } from "../../lib/script/review/api.ts";
 import type {ReviewAction,ReviewList,ReviewRequest,ReviewState,Report} from "../../lib/script/review/types.ts";
 import {Button} from "../ui";
@@ -34,6 +34,12 @@ export function ScriptReviewWorkspace({seed}:Props){
  const [mode,setMode]=useState<"single"|"part"|"final"|"continuity"|"improvement">("final");
  const [confirm,setConfirm]=useState(false);
  const [approvalWord,setApprovalWord]=useState("");
+ const [historicalRound,setHistoricalRound]=useState(0);
+ const [historicalSection,setHistoricalSection]=useState(0);
+ const [historicalText,setHistoricalText]=useState("");
+ const [historicalLabel,setHistoricalLabel]=useState("");
+ const [compareFrom,setCompareFrom]=useState(0);
+ const [compareTo,setCompareTo]=useState(0);
  const retry=useRef<{key:string;request:ReviewRequest}|null>(null);
  const startRetry=useRef<{key:string;input:{channelId:string;executionId:string;reviewId:string;partIndex:number|null;operationId:string}}|null>(null);
 
@@ -78,6 +84,8 @@ export function ScriptReviewWorkspace({seed}:Props){
    readReview(seed,next.reviewId,"script",latest.index)
   ]);
   setPrompt(p);setOriginal(a);setRevised(b);setSection(selected);setConfirm(false);setApprovalWord("");
+  setHistoricalRound(next.rounds.length-1);setHistoricalSection(0);setHistoricalText("");setHistoricalLabel("");
+  setCompareFrom(0);setCompareTo(latest.index);
   const sec=next.rounds.at(-1)!.sections[selected];
   setCorrection(sec.report?JSON.stringify(sec.report,null,2):"");
   setRaw("");
@@ -156,6 +164,25 @@ export function ScriptReviewWorkspace({seed}:Props){
    }
    void act({kind:"correct_response",sectionIndex:section,report:value});
   }catch{setError("Invalid correction JSON; original raw response remains saved.")}
+ }
+ async function openHistorical(kind:"script"|"prompt"|"raw"|"improvement",itemIndex:number){
+  if(!session)return;
+  setBusy(true);setError("");
+  try{
+   const text=await readReviewHistory(seed,session.reviewId,kind,historicalRound,itemIndex);
+   setHistoricalLabel("Saved "+kind+" · round "+historicalRound+" · item "+itemIndex);
+   setHistoricalText(text);
+  }catch(e){setError(reviewError(e))}finally{setBusy(false)}
+ }
+ async function compareVersions(){
+  if(!session)return;setBusy(true);setError("");
+  try{
+   const [a,b]=await Promise.all([
+    readReview(seed,session.reviewId,"script",compareFrom),
+    readReview(seed,session.reviewId,"script",compareTo)
+   ]);
+   setOriginal(a);setRevised(b);setNotice("Showing exact immutable comparison versions "+compareFrom+" and "+compareTo+".");
+  }catch(e){setError(reviewError(e))}finally{setBusy(false)}
  }
  async function copy(text:string){
   try{await navigator.clipboard.writeText(text);setNotice("Exact visible text copied; nothing was sent.");}
@@ -244,6 +271,39 @@ export function ScriptReviewWorkspace({seed}:Props){
     </div>}
     <p className="text-xs">Overall: {sumScore(session)===null?"No single full-script score (multiple or missing sections)":sumScore(session)+"/100 (single covered section only)"}</p>
    </div>
+   <details className="rounded border border-line p-2 space-y-2">
+    <summary className="font-semibold text-sm">Complete review history · immutable past rounds</summary>
+    <label className="block text-xs">Historical review round
+     <select className={field} value={historicalRound} onChange={e=>{setHistoricalRound(Number(e.target.value));setHistoricalSection(0);setHistoricalText("");}}>
+      {session.rounds.map(r=><option value={r.index} key={r.index}>Round {r.index} · script version {r.versionIndex} · {r.mode} · {r.createdAt}</option>)}
+     </select>
+    </label>
+    {session.rounds[historicalRound]&&<div className="space-y-2">
+     <p className="text-xs">Version {session.rounds[historicalRound].versionIndex} ·
+      {session.rounds[historicalRound].sections.filter(s=>s.report!==null).length} /
+      {session.rounds[historicalRound].sections.length} sections with validated user-reported reviews</p>
+     <label className="block text-xs">Historic section
+      <select className={field} value={historicalSection} onChange={e=>{setHistoricalSection(Number(e.target.value));setHistoricalText("");}}>
+       {session.rounds[historicalRound].sections.map(sec=><option key={sec.index} value={sec.index}>Section {sec.index+1} · {sec.score===null?"unscored":sec.score+"/100"}</option>)}
+      </select>
+     </label>
+     <div className="flex flex-wrap gap-2">
+      <Button disabled={busy} onClick={()=>void openHistorical("prompt",historicalSection)}>Read historical prompt</Button>
+      <Button disabled={busy||!session.rounds[historicalRound].sections[historicalSection]?.raw}
+       onClick={()=>void openHistorical("raw",historicalSection)}>Read historical original response</Button>
+     </div>
+     {session.rounds[historicalRound].sections[historicalSection]?.report&&
+      <div className="space-y-1">
+       <p className="text-xs">Saved structured report: {session.rounds[historicalRound].sections[historicalSection]?.score}/100</p>
+       <p className="text-xs">{session.rounds[historicalRound].sections[historicalSection]?.report?.summary}</p>
+       {session.rounds[historicalRound].sections[historicalSection]?.report?.findings.map((f,i)=>
+        <p key={i} className="text-xs">{f.severity} · {f.category}: {f.summary} — {f.recommendation}</p>)}
+      </div>}
+     {historicalText&&<div><p className="text-xs">{historicalLabel}</p>
+      <textarea className={field} readOnly value={historicalText} rows={7}/>
+      <Button onClick={()=>void copy(historicalText)}>Copy saved historical content</Button></div>}
+    </div>}
+   </details>
    <div className="rounded border border-line p-2 space-y-2">
     <p className="font-semibold text-sm">Improve and compare immutable script versions</p>
     <label className="block text-xs">Improvement goals (one per line)
@@ -259,10 +319,23 @@ export function ScriptReviewWorkspace({seed}:Props){
     </label>}
     <Button disabled={busy||!currentVersion.improvementPrompt||!newScript.trim()} onClick={()=>void act({kind:"import_revision",text:newScript})}>Save revised script version (original preserved)</Button>
     <p className="text-xs">Version history: {session.versions.map(v=>v.index+" ["+v.text.bytes+" bytes]").join(" · ")}</p>
+    <div className="flex flex-wrap items-end gap-2">
+     <label className="text-xs">Compare version A
+      <select className={field} value={compareFrom} onChange={e=>setCompareFrom(Number(e.target.value))}>
+       {session.versions.map(v=><option value={v.index} key={v.index}>Version {v.index}</option>)}
+      </select>
+     </label>
+     <label className="text-xs">Compare version B
+      <select className={field} value={compareTo} onChange={e=>setCompareTo(Number(e.target.value))}>
+       {session.versions.map(v=><option value={v.index} key={v.index}>Version {v.index}</option>)}
+      </select>
+     </label>
+     <Button disabled={busy} onClick={()=>void compareVersions()}>Compare chosen immutable versions</Button>
+    </div>
     {currentVersion.validationFindings.map((f,i)=><p key={i} role="alert" className="text-xs text-danger">{f}</p>)}
     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-     <div><p className="text-xs font-semibold">Original immutable version 0</p><pre className="whitespace-pre-wrap break-all max-h-56 overflow-auto text-xs border border-line p-2">{original}</pre></div>
-     <div><p className="text-xs font-semibold">Current active version {currentVersion.index}</p><pre className="whitespace-pre-wrap break-all max-h-56 overflow-auto text-xs border border-line p-2">{revised}</pre></div>
+     <div><p className="text-xs font-semibold">Comparison version {compareFrom}</p><pre className="whitespace-pre-wrap break-all max-h-56 overflow-auto text-xs border border-line p-2">{original}</pre></div>
+     <div><p className="text-xs font-semibold">Comparison version {compareTo}</p><pre className="whitespace-pre-wrap break-all max-h-56 overflow-auto text-xs border border-line p-2">{revised}</pre></div>
     </div>
     {currentVersion.index>round.versionIndex&&<p role="alert" className="text-xs text-danger">The improved draft has not yet been reviewed. Start a new review; old scores cannot approve it.</p>}
     <label className="text-xs">Re-review mode

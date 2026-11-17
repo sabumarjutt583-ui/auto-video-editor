@@ -12,6 +12,9 @@ export const listReviews=(seed:LegacyChannelSeed):Promise<ReviewList>=>
  invoke("review_list",{seed});
 export const readReview=(seed:LegacyChannelSeed,reviewId:string,kind:"script"|"prompt"|"raw"|"improvement",index=0):Promise<string>=>
  invoke("review_read",{seed,reviewId,kind,index});
+export const readReviewHistory=(seed:LegacyChannelSeed,reviewId:string,
+ kind:"script"|"prompt"|"raw"|"improvement",roundIndex:number,itemIndex:number):Promise<string>=>
+ invoke("review_read_history",{seed,reviewId,kind,roundIndex,itemIndex});
 export const applyReview=(seed:LegacyChannelSeed,request:ReviewRequest):Promise<ReviewState>=>
  invoke("review_apply",{seed,request});
 export function buildReviewRequest(state:ReviewState,action:ReviewAction,operationId=newReviewOperation()):ReviewRequest{

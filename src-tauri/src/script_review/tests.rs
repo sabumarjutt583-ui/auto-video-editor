@@ -210,3 +210,64 @@ fn sw_03j_symlinked_object_blocked(){
  assert!(matches!(store.get("channel_a","rv_test").unwrap_err().code,ReviewErrorCode::CorruptRecord));
  drop(store);fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn sw_03j_history_reopens_prior_round_prompt_raw_and_improvement(){
+ let (root,p,e,t)=fixture(1);let store=ReviewStore::new(root.join("reviews")).unwrap();
+ let mut s=store.start(&p,&e,&t,&input(None)).unwrap();
+ let before=store.read("channel_a","rv_test","prompt",0).unwrap();
+ s=reviewed(&store,&s);
+ let raw=store.read("channel_a","rv_test","raw",0).unwrap();
+ s=store.apply(&request(&s,ReviewAction::PrepareImprovement{goals:vec!["Better clarity".into()]},"goal")).unwrap();
+ let improvement=store.read("channel_a","rv_test","improvement",0).unwrap();
+ s=store.apply(&request(&s,ReviewAction::ImportRevision{text:revised(&s)},"draft")).unwrap();
+ s=store.apply(&request(&s,ReviewAction::PrepareReview{mode:"final".into()},"again")).unwrap();
+ assert!(s.rounds.last().unwrap().sections[0].raw.is_none());
+ assert_eq!(store.read_history("channel_a","rv_test","prompt",0,0).unwrap(),before);
+ assert_eq!(store.read_history("channel_a","rv_test","raw",0,0).unwrap(),raw);
+ assert_eq!(store.read_history("channel_a","rv_test","improvement",0,0).unwrap(),improvement);
+ assert!(store.read_history("channel_b","rv_test","raw",0,0).is_err());
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_invalid_review_prompt_fails_before_publishing_orphans(){
+ use crate::script_studio::{TextVersion,ReviewerProvider};
+ let root=std::env::temp_dir().join(format!("sw03j-prompt-{}",new_id()));
+ fs::create_dir(&root).unwrap();
+ let mut cfg=ChannelStudioConfigV1::seed("channel_a".into(),"Testing".into(),"English".into(),"Master".into(),None);
+ cfg.review.single_script_instructions="A".repeat(64_000);
+ cfg.review.per_part_instructions="B".repeat(64_000);
+ cfg.review.final_script_instructions="C".repeat(64_000);
+ cfg.review.provider=ReviewerProvider::None;
+ let reviewer="D".repeat(64_000);
+ cfg.review_versions.push(TextVersion{version_id:"review_v1".into(),channel_id:"channel_a".into(),
+  content_digest:digest(reviewer.as_bytes()),content:reviewer,created_at:"2026-11-17T00:00:00.000Z".into(),
+  planning_override:None});
+ cfg.selected_review_version_id=Some("review_v1".into());
+ cfg.validate().unwrap();
+ let plan=build_plan(&cfg,&PlanInput{
+  plan_id:"sp_bigprompt".into(),channel_id:"channel_a".into(),expected_config_revision:0,
+  title:"Prompt length".into(),topic:"Testing limit".into(),language:Some("English".into()),
+  mode:Some(ScriptMode::Single),total_words:Some(120),part_count:Some(1),
+  outline_required:Some(false),continuity_required:Some(false),parts:Vec::new()
+ },"2026-11-17T00:00:00.000Z").unwrap();
+ let exec=ExecutionStore::new(root.join("executions")).unwrap();
+ let mut s=exec.start(&plan,&StartExecution{channel_id:"channel_a".into(),plan_id:plan.plan_id.clone(),
+  execution_id:"ex_review".into(),operation_id:"op_begin".into()}).unwrap();
+ for (i,action) in [
+  ExecutionAction::PreparePart{part_index:1,extra_instructions:String::new()},
+  ExecutionAction::ImportFragment{part_index:1,text:"Complete script.".into()},
+  ExecutionAction::CommitPart{part_index:1,accept_warnings:true},ExecutionAction::Assemble
+ ].into_iter().enumerate(){
+  s=exec.apply(&plan,&ExecutionRequest{channel_id:"channel_a".into(),execution_id:"ex_review".into(),
+   expected_revision:s.revision,operation_id:format!("op_{i}"),action}).unwrap();
+ }
+ let t=exec.read("channel_a","ex_review","assembled",0,0).unwrap();
+ let store=ReviewStore::new(root.join("reviews")).unwrap();
+ assert!(store.start(&plan,&s,&t,&StartReview{
+  channel_id:"channel_a".into(),execution_id:"ex_review".into(),review_id:"rv_test".into(),
+  part_index:None,operation_id:"op_start".into()
+ }).is_err());
+ assert!(!root.join("reviews/channels/channel_a/rv_test").exists());
+ drop(store);drop(exec);fs::remove_dir_all(root).unwrap();
+}

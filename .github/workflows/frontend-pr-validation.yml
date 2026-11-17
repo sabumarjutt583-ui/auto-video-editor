@@ -89,6 +89,7 @@ jobs:
           cargo test --locked render::pipeline::tests
           cargo test --locked timing::tests
       - name: Full unfiltered Rust suite using real FFmpeg (failure is blocking)
+        if: ${{ always() && !cancelled() }}
         working-directory: src-tauri
         env:
           AVE_TEST_FFMPEG: ${{ github.workspace }}/src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu

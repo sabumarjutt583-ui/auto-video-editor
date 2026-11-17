@@ -333,11 +333,15 @@ impl ReviewStore{
   if !["single","part","final","continuity","improvement"].contains(&mode){return Err(invalid())}
   let text=object_text(dir,&version.text)?;
   let chunks=sections(&text)?;
+  // Preflight every prompt before writing any immutable object. An input-validation
+  // error must never strand partially published objects.
+  let instructions=chunks.iter().enumerate()
+   .map(|(i,chunk)|prompt(p,mode,version,chunk,i,chunks.len()))
+   .collect::<Result<Vec<_>,ReviewError>>()?;
   let mut all=Vec::new();
-  for (i,chunk) in chunks.iter().enumerate(){
-   let instructions=prompt(p,mode,version,chunk,i,chunks.len())?;
-   let o=self.object(dir,rev,&format!("prompt-r{index}-s{i}"),&instructions,MAX_PROMPT)?;
-   all.push(SectionReview{index:i as u32,bytes:chunk.len() as u32,prompt:o,raw:None,report:None,
+  for (i,content) in instructions.iter().enumerate(){
+   let o=self.object(dir,rev,&format!("prompt-r{index}-s{i}"),content,MAX_PROMPT)?;
+   all.push(SectionReview{index:i as u32,bytes:chunks[i].len() as u32,prompt:o,raw:None,report:None,
     score:None,validation_issues:Vec::new()});
   }
   Ok(ReviewRound{index,version_index:version.index,mode:mode.into(),created_at:stamp(),sections:all})
@@ -357,6 +361,16 @@ impl ReviewStore{
   if source_ref.sha256!=digest(source.as_bytes())||source_ref.bytes!=source.len() as u64
    ||source.trim().is_empty()||source.len()>MAX_SCRIPT{return Err(corrupt())}
   let policy=policy(plan,input.part_index)?;
+  // Reject oversized/invalid prompt inputs before creating an on-disk review directory.
+  let mode=if input.part_index.is_some(){"part"}else if execution.total_parts==1{"single"}else{"final"};
+  let preview_version=ScriptVersion{index:0,source:String::new(),parent_digest:None,
+   improvement_prompt:None,validation_findings:Vec::new(),
+   text:ReviewObject{filename:"object-000000-script-v0.txt".into(),bytes:source.len() as u64,
+    sha256:digest(source.as_bytes()),created_at:stamp()}};
+  let pieces=sections(source)?;
+  for (i,piece) in pieces.iter().enumerate(){
+   prompt(&policy,mode,&preview_version,piece,i,pieces.len())?;
+  }
   let op=digest(&serde_json::to_vec(input).map_err(|_|storage())?);
   let _guard=self.mutex.lock().unwrap_or_else(|e|e.into_inner());
   let channel=self.root.join("channels").join(&input.channel_id);
@@ -372,7 +386,6 @@ impl ReviewStore{
   let original=self.object(&dir,0,"script-v0",source,MAX_SCRIPT)?;
   let version=ScriptVersion{index:0,text:original,source:"immutable_phase_03i_manual_execution".into(),
    parent_digest:None,improvement_prompt:None,validation_findings:validate_script(source)};
-  let mode=if input.part_index.is_some(){"part"}else if execution.total_parts==1{"single"}else{"final"};
   let round=self.make_round(&dir,0,mode,&version,&policy,0)?;
   let s=ReviewState{schema_version:1,review_id:input.review_id.clone(),channel_id:input.channel_id.clone(),
    execution_id:input.execution_id.clone(),plan_id:plan.plan_id.clone(),plan_digest:execution.plan_digest.clone(),
@@ -416,6 +429,22 @@ impl ReviewStore{
    _=>return Err(invalid())
   }.ok_or_else(||err(ReviewErrorCode::NotFound,"Requested review artifact is absent."))?;
   object_text(&dir,o)
+ }
+ pub fn read_history(&self,channel:&str,id:&str,kind:&str,round_index:u32,item_index:u32)->Result<String,ReviewError>{
+  let _g=self.mutex.lock().unwrap_or_else(|e|e.into_inner());
+  let dir=self.folder(channel,id)?;let state=chain(&dir)?;
+  if state.channel_id!=channel{return Err(corrupt())}
+  let artifact=match kind{
+   "script"=>state.versions.get(item_index as usize).map(|v|&v.text),
+   "improvement"=>state.versions.get(item_index as usize).and_then(|v|v.improvement_prompt.as_ref()),
+   "prompt"|"raw"=>{
+    let section=state.rounds.get(round_index as usize)
+     .and_then(|r|r.sections.get(item_index as usize)).ok_or_else(invalid)?;
+    if kind=="prompt"{Some(&section.prompt)}else{section.raw.as_ref()}
+   },
+   _=>return Err(invalid())
+  }.ok_or_else(||err(ReviewErrorCode::NotFound,"Historical review artifact is unavailable."))?;
+  object_text(&dir,artifact)
  }
  pub fn apply(&self,input:&ReviewRequest)->Result<ReviewState,ReviewError>{
   if !valid_id(&input.channel_id)||!valid_review_id(&input.review_id)||!valid_id(&input.operation_id){return Err(invalid())}
