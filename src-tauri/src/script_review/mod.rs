@@ -89,10 +89,10 @@ pub struct CategoryScore {pub key:String,pub points:u32}
 #[serde(rename_all="snake_case")]
 pub enum Severity {Info,Warning,Error}
 #[derive(Clone,Debug,Serialize,Deserialize)]
-#[serde(rename_all="camelCase",deny_unknown_fields")]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct Finding {pub severity:Severity,pub category:String,pub summary:String,pub recommendation:String}
 #[derive(Clone,Debug,Serialize,Deserialize)]
-#[serde(rename_all="camelCase",deny_unknown_fields")]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct Report {
  pub scores:Vec<CategoryScore>,pub findings:Vec<Finding>,pub summary:String,
 }
@@ -184,7 +184,7 @@ pub struct ReviewState{
 pub struct StartReview{pub channel_id:String,pub execution_id:String,pub review_id:String,
  pub part_index:Option<u32>,pub operation_id:String}
 #[derive(Clone,Serialize,Deserialize)]
-#[serde(rename_all="camelCase",deny_unknown_fields")]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ReviewRequest{pub channel_id:String,pub review_id:String,pub expected_revision:u64,
  pub operation_id:String,pub action:ReviewAction}
 #[derive(Clone,Serialize,Deserialize)]
