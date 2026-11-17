@@ -149,6 +149,26 @@ pub enum ExecutionAction {
 #[derive(Default,Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct ExecutionList{pub executions:Vec<ExecutionState>,pub issues:Vec<String>}
+#[derive(Clone,Serialize,Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct CandidateValidation {
+    pub part_index:u32,pub actual_word_estimate:u32,pub target_words:u32,
+    pub fragment_count:usize,pub content_sha256:String,pub findings:Vec<String>,
+}
+fn candidate_findings(dir:&Path,part:&PartState,candidate:&str)->Result<Vec<String>,ExecutionError>{
+    let mut result=warnings(candidate,part.target_words);
+    for adjacent in part.fragments.windows(2){
+        let a=object_text(dir,&adjacent[0],MAX_PART_BYTES)?;
+        let b=object_text(dir,&adjacent[1],MAX_PART_BYTES)?;
+        let left=a.trim_end().as_bytes();let right=b.trim_start().as_bytes();
+        let max=left.len().min(right.len()).min(1024);
+        if (30..=max).rev().any(|n|left.ends_with(&right[..n])){
+            result.push("Possible duplicated continuation overlap; review the candidate.".into());
+        }
+    }
+    Ok(result)
+}
+
 pub struct ExecutionStore{root:PathBuf,lease:File,mutex:Mutex<()>}
 impl Drop for ExecutionStore {fn drop(&mut self){lock::unlock(&self.lease)}}
 
@@ -360,6 +380,19 @@ impl ExecutionStore{
         let p=state.parts.get(index.checked_sub(1).ok_or_else(invalid)? as usize).ok_or_else(invalid)?;
         self.candidate_text(&dir,p)
     }
+    pub fn validate_candidate(&self,channel:&str,execution:&str,index:u32)->Result<CandidateValidation,ExecutionError>{
+        let _g=self.mutex.lock().unwrap_or_else(|e|e.into_inner());
+        let dir=self.folder(channel,execution)?;
+        let state=read_chain(&dir)?;
+        if state.channel_id!=channel||index!=state.completed_parts+1{return Err(invalid())}
+        let part=state.parts.get(index.checked_sub(1).ok_or_else(invalid)? as usize).ok_or_else(invalid)?;
+        let candidate=self.candidate_text(&dir,part)?;
+        Ok(CandidateValidation{
+            part_index:index,actual_word_estimate:words(&candidate),target_words:part.target_words,
+            fragment_count:part.fragments.len(),content_sha256:digest(candidate.as_bytes()),
+            findings:candidate_findings(&dir,part,&candidate)?
+        })
+    }
     pub fn read(&self,channel:&str,execution:&str,kind:&str,index:u32,fragment:u32)->Result<String,ExecutionError>{
         let _g=self.mutex.lock().unwrap_or_else(|e|e.into_inner());
         let dir=self.folder(channel,execution)?;
@@ -506,17 +539,7 @@ impl ExecutionStore{
                 let part=&current.parts[(*part_index-1) as usize];
                 if part.committed.is_some(){return Err(conflict())}
                 let candidate=self.candidate_text(&dir,part)?;
-                let mut findings=warnings(&candidate,part.target_words);
-                for adjacent in part.fragments.windows(2){
-                    let a=object_text(&dir,&adjacent[0],MAX_PART_BYTES)?;
-                    let b=object_text(&dir,&adjacent[1],MAX_PART_BYTES)?;
-                    let left=a.trim_end().as_bytes();let right=b.trim_start().as_bytes();
-                    let max=left.len().min(right.len()).min(1024);
-                    let overlap=(30..=max).rev().any(|size|left.ends_with(&right[..size]));
-                    if overlap {
-                        findings.push("Possible duplicated continuation overlap; review the candidate.".into());
-                    }
-                }
+                let findings=candidate_findings(&dir,part,&candidate)?;
                 if !findings.is_empty() && !accept_warnings {
                     return Err(error(ExecutionErrorCode::InvalidInput,"Part has technical warnings; inspect candidate, then explicitly accept warnings to commit."))
                 }
