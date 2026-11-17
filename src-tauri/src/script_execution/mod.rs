@@ -79,11 +79,17 @@ fn warnings(text:&str,target:u32)->Vec<String>{
     if actual<target/2 {result.push("Word count is less than 50% of the planned target (whitespace-token estimate).".into());}
     if actual>target.saturating_mul(3)/2 {result.push("Word count exceeds 150% of the planned target (whitespace-token estimate).".into());}
     let t=text.trim_end();
-    if !t.ends_with(['.','!','?','。','؟','”','"','\'']) {
+    if !t.ends_with(&['.','!','?','。','؟','”','"','\''][..]) {
         result.push("Possible unfinished ending; inspect the last sentence.".into());
     }
     if ["[TODO]","[PLACEHOLDER]","Lorem ipsum","[Continue]"].iter().any(|mark|text.contains(mark)){
         result.push("Possible placeholder marker present.".into());
+    }
+    for pair in text.split("\n\n").collect::<Vec<_>>().windows(2){
+        if pair[0].trim().len()>=80 && pair[0].trim()==pair[1].trim(){
+            result.push("Identical adjacent passages detected; inspect repetition.".into());
+            break;
+        }
     }
     result
 }
@@ -247,7 +253,9 @@ impl ExecutionStore{
     }
     fn folder(&self,channel:&str,execution:&str)->Result<PathBuf,ExecutionError>{
         if !valid_identity(execution,"ex_"){return Err(invalid())}
-        Ok(self.channel_dir(channel)?.join(execution))
+        let parent=self.channel_dir(channel)?;
+        directory(&parent,false)?;
+        Ok(parent.join(execution))
     }
     fn check_owner(&self,state:&ExecutionState,channel:&str,execution:&str,plan:&ScriptStudioPlanV1)
         ->Result<(),ExecutionError>{
@@ -426,12 +434,12 @@ impl ExecutionStore{
         let current=read_chain(&dir)?;
         self.check_owner(&current,&request.channel_id,&request.execution_id,plan)?;
         let op=digest(&serde_json::to_vec(request).map_err(|_|storage())?);
-        if request.expected_revision<=current.revision{
+        {
             for rev in 0..=current.revision {
                 let old:ExecutionState=serde_json::from_slice(&read_file(&state_file(&dir,rev),MAX_STATE_BYTES)?)
                     .map_err(|_|corrupt())?;
                 if old.operation_id==request.operation_id {
-                    if old.operation_digest==op&&old.revision==request.expected_revision+1{return Ok(old)}
+                    if old.operation_digest==op&&old.revision==request.expected_revision+1{return Ok(current)}
                     return Err(conflict())
                 }
             }
@@ -556,3 +564,6 @@ impl ExecutionStore{
         Ok(next)
     }
 }
+
+#[cfg(test)]
+mod tests;
