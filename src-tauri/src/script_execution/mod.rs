@@ -401,6 +401,9 @@ impl ExecutionStore{
         let reference=match kind {
             "outline"=>state.outline_versions.last(),
             "bible"=>state.bible_versions.last(),
+            // Read only the latest saved, immutable note for the requested completed part.
+            // Historical notes remain in the execution store, unchanged.
+            "continuity"=>state.continuity_notes.iter().rev().find(|n|n.after_part==index).map(|n|&n.document),
             "assembled"=>state.assembled.as_ref(),
             "handoff"=>state.handoff.as_ref(),
             "part"|"prompt"|"fragment"|"continuation"=>{

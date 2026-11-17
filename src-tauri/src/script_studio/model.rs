@@ -124,7 +124,7 @@ impl Default for AccountPreferences {
         writer_policy:AccountPolicy::StrictSelected,reviewer_policy:AccountPolicy::StrictSelected,
         allowed_claude_account_ids:Vec::new(),allowed_chatgpt_account_ids:Vec::new()}}
 }
-#[derive(Clone,PartialEq,Eq,Serialize,Deserialize)]
+#[derive(Clone,Debug,PartialEq,Eq,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct RubricCriterion {
     pub key:String,

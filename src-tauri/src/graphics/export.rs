@@ -298,9 +298,16 @@ mod tests {
 
     async fn frame_count(path: &Path) -> i64 {
         let mut cmd = command(Tool::Ffmpeg).unwrap();
-        cmd.args(["-hide_banner", "-v", "error", "-nostats", "-i"]).arg(path).args(["-map", "0:v:0", "-c", "copy", "-f", "null", "-progress", "pipe:1", "-"]);
+        // Test-only frame counter: stream-copy to the null muxer may report no
+        // frame= progress field on current Ubuntu FFmpeg. Decode frames instead.
+        cmd.args(["-hide_banner", "-v", "error", "-nostats", "-i"]).arg(path)
+            .args(["-map", "0:v:0", "-an", "-fps_mode", "passthrough", "-f", "null", "-progress", "pipe:1", "-"]);
         let out = cmd.output().await.unwrap();
-        String::from_utf8_lossy(&out.stdout).lines().filter_map(|l| l.strip_prefix("frame=")).filter_map(|v| v.trim().parse().ok()).last().unwrap_or(-1)
+        assert!(out.status.success(), "Graphics frame probe failed: {}", String::from_utf8_lossy(&out.stderr));
+        let progress = String::from_utf8_lossy(&out.stdout);
+        progress.lines().filter_map(|l| l.strip_prefix("frame=")).filter_map(|v| v.trim().parse().ok()).last()
+            .unwrap_or_else(|| panic!("No decoded-frame count from FFmpeg: stdout={progress:?} stderr={:?}",
+                String::from_utf8_lossy(&out.stderr)))
     }
 
     /// "00:00:03.00" in the header FFmpeg prints for a file.

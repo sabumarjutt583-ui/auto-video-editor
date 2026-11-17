@@ -25,6 +25,7 @@ mod render;
 mod settings;
 mod script_jobs;
 mod script_execution;
+mod script_review;
 mod script_studio;
 #[cfg(test)]
 mod smoke_test;
@@ -187,6 +188,12 @@ macro_rules! handler {
             commands::script_execution::execution_read,
             commands::script_execution::execution_candidate,
             commands::script_execution::execution_validate_candidate,
+            commands::script_review::review_start,
+            commands::script_review::review_get,
+            commands::script_review::review_list,
+            commands::script_review::review_read,
+            commands::script_review::review_read_history,
+            commands::script_review::review_apply,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -378,6 +385,12 @@ macro_rules! handler {
             commands::script_execution::execution_read,
             commands::script_execution::execution_candidate,
             commands::script_execution::execution_validate_candidate,
+            commands::script_review::review_start,
+            commands::script_review::review_get,
+            commands::script_review::review_list,
+            commands::script_review::review_read,
+            commands::script_review::review_read_history,
+            commands::script_review::review_apply,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -478,6 +491,7 @@ fn main() {
             // Independent offline Studio store; failed lease never disables existing tools.
             app.manage(commands::script_studio::StudioService::initialize(app.handle()));
             app.manage(commands::script_execution::ExecutionService::initialize(app.handle()));
+            app.manage(commands::script_review::ReviewService::initialize(app.handle()));
             match commands::script::create(app.handle()) {
                 Ok(script) => {
                     app.manage(script);

@@ -304,11 +304,19 @@ mod tests {
     }
 
     async fn count_frames(path: &Path) -> i64 {
-        // Copies the packets to nowhere and reads the frame counter from the progress report.
+        // Decode frames instead of stream-copying packets: newer FFmpeg builds do
+        // not always report a frame counter for -c copy into the null muxer.
+        // Test-only helper: production rendering is unchanged.
         let mut cmd = command(Tool::Ffmpeg).unwrap();
-        cmd.args(["-hide_banner", "-v", "error", "-nostats", "-i"]).arg(path).args(["-map", "0:v:0", "-c", "copy", "-f", "null", "-progress", "pipe:1", "-"]);
+        cmd.args(["-hide_banner", "-v", "error", "-nostats", "-i"]).arg(path)
+            .args(["-map", "0:v:0", "-an", "-fps_mode", "passthrough", "-f", "null", "-progress", "pipe:1", "-"]);
         let out = cmd.output().await.unwrap();
-        String::from_utf8_lossy(&out.stdout).lines().filter_map(|l| l.strip_prefix("frame=")).filter_map(|v| v.trim().parse().ok()).last().unwrap()
+        assert!(out.status.success(), "Frame-count probe FFmpeg failed: {}", String::from_utf8_lossy(&out.stderr));
+        let progress = String::from_utf8_lossy(&out.stdout);
+        progress.lines().filter_map(|l| l.strip_prefix("frame="))
+            .filter_map(|v| v.trim().parse().ok()).last()
+            .unwrap_or_else(|| panic!("FFmpeg returned no decoded-frame count: stdout={progress:?} stderr={:?}",
+                String::from_utf8_lossy(&out.stderr)))
     }
 
     fn request(json: serde_json::Value) -> RenderRequest {

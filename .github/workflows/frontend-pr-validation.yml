@@ -6,7 +6,7 @@ concurrency:
 
 on:
   pull_request:
-    branches: [main, feature/script-writer-core-v1, feature/script-writer-integration-v1, feature/script-writer-comparison-v1, feature/script-writer-desktop-readiness-v1, feature/script-writer-durable-store-v1, feature/script-writer-state-machine-v1, feature/script-writer-manual-import-v1, feature/script-writer-review-approval-v1, feature/script-writer-revisions-v1, feature/script-writer-recovery-v1, feature/script-writer-channel-studio-v1]
+    branches: [main, feature/script-writer-core-v1, feature/script-writer-integration-v1, feature/script-writer-comparison-v1, feature/script-writer-desktop-readiness-v1, feature/script-writer-durable-store-v1, feature/script-writer-state-machine-v1, feature/script-writer-manual-import-v1, feature/script-writer-review-approval-v1, feature/script-writer-revisions-v1, feature/script-writer-recovery-v1, feature/script-writer-channel-studio-v1, feature/script-writer-multipart-execution-v1]
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
@@ -60,15 +60,17 @@ jobs:
       - name: Install Linux Tauri build prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf ffmpeg
       - uses: dtolnay/rust-toolchain@stable
-      - name: Provide compile-only Tauri sidecar placeholder (never executed)
+      - name: Install real Ubuntu FFmpeg test executable (CI only; never packaged)
         run: |
           mkdir -p src-tauri/binaries
-          touch src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          cp "$(command -v ffmpeg)" src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          chmod +x src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu -version | head -n 1
       - name: Run job store tests with locked Rust dependencies
         working-directory: src-tauri
-        run: cargo test --locked script_jobs && cargo test --locked script_studio && cargo test --locked script_execution
+        run: cargo test --locked script_jobs && cargo test --locked script_studio && cargo test --locked script_execution && cargo test --locked script_review
       - name: Build Rust desktop backend
         working-directory: src-tauri
         run: cargo build --locked
@@ -76,9 +78,22 @@ jobs:
         working-directory: src-tauri
         run: cargo check --locked --features admin
 
-      - name: Attempt unfiltered Rust suite (informational, not Windows GUI)
+      - name: Re-run previously failing media audio render and timing tests with real FFmpeg
         working-directory: src-tauri
-        continue-on-error: true
+        env:
+          AVE_TEST_FFMPEG: ${{ github.workspace }}/src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          AVE_REQUIRE_SIDECAR: "1"
+        run: |
+          cargo test --locked ffmpeg_job::tests
+          cargo test --locked audio::mix::tests
+          cargo test --locked render::pipeline::tests
+          cargo test --locked timing::tests
+      - name: Full unfiltered Rust suite using real FFmpeg (failure is blocking)
+        if: ${{ always() && !cancelled() }}
+        working-directory: src-tauri
+        env:
+          AVE_TEST_FFMPEG: ${{ github.workspace }}/src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          AVE_REQUIRE_SIDECAR: "1"
         run: cargo test --locked
 
   rust-windows:
@@ -88,17 +103,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Provide compile-only Tauri sidecar placeholder (never executed)
+      - name: Install supported Windows FFmpeg 7.1.1 for compatibility tests (CI only)
         shell: pwsh
         run: |
+          # The current renderer uses -filter_complex_script. FFmpeg 9 removed
+          # this deprecated option; explicitly pin 7.1.1 as the compatibility
+          # test baseline without changing production media or shipped binaries.
+          choco install ffmpeg --version=7.1.1 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned FFmpeg 7.1.1 package installation failed.' }
+          $root = 'C:\ProgramData\chocolatey\lib\ffmpeg\tools'
+          $actual = Get-ChildItem -Path $root -Filter 'ffmpeg.exe' -Recurse -File | Select-Object -First 1
+          if (-not $actual) { throw 'Actual FFmpeg executable not found (Chocolatey shim is not acceptable).' }
           New-Item -ItemType Directory -Path src-tauri/binaries -Force | Out-Null
-          New-Item -ItemType File -Path src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe -Force | Out-Null
+          $sidecar = Join-Path (Resolve-Path 'src-tauri/binaries').Path 'ffmpeg-x86_64-pc-windows-msvc.exe'
+          Copy-Item -Path $actual.FullName -Destination $sidecar -Force
+          $version = (& $sidecar -version | Select-Object -First 1)
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch 'ffmpeg version 7\.1\.1') {
+            throw "Unexpected FFmpeg test version: $version"
+          }
+          Write-Host $version
+          $supported = (& $sidecar -hide_banner -h full 2>&1 | Out-String)
+          if ($supported -notmatch 'filter_complex_script') {
+            throw 'Pinned test FFmpeg does not support -filter_complex_script; full-suite testing must fail clearly.'
+          }
+          "AVE_TEST_FFMPEG=$sidecar" >> $env:GITHUB_ENV
+          "AVE_REQUIRE_SIDECAR=1" >> $env:GITHUB_ENV
       - name: Run Windows job store filesystem tests
         working-directory: src-tauri
-        run: cargo test --locked script_jobs && cargo test --locked script_studio && cargo test --locked script_execution
+        run: cargo test --locked script_jobs && cargo test --locked script_studio && cargo test --locked script_execution && cargo test --locked script_review
       - name: Build Windows Rust desktop backend
         working-directory: src-tauri
         run: cargo build --locked
       - name: Verify Windows admin Rust compilation
         working-directory: src-tauri
         run: cargo check --locked --features admin
+      - name: Full Windows Rust suite with real FFmpeg (blocking, not installed WebView2 acceptance)
+        working-directory: src-tauri
+        run: cargo test --locked
