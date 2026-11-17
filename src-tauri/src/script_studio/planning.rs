@@ -133,8 +133,13 @@ pub fn validate_stored_plan(plan:&ScriptStudioPlanV1)->Result<(),&'static str>{
     let expected=build_plan(&plan.config_snapshot,&input,&plan.created_at)?;
     // No equality of JSON key order; compare all semantically relevant contract
     // fields. Plan word counts/references/warnings must survive unmodified.
-    if plan.parts!=expected.parts || plan.selected_prompt_digest!=expected.selected_prompt_digest
-        || plan.selected_skill_id!=expected.selected_skill_id || plan.selected_skill_name!=expected.selected_skill_name
+    if plan.parts!=expected.parts || plan.writing_mode!=expected.writing_mode
+        || plan.selected_prompt_version_id!=expected.selected_prompt_version_id
+        || plan.selected_prompt_digest!=expected.selected_prompt_digest
+        || plan.selected_skill_id!=expected.selected_skill_id
+        || plan.selected_skill_name!=expected.selected_skill_name
+        || plan.reviewer_provider!=expected.reviewer_provider
+        || plan.reviewer_prompt_version_id!=expected.reviewer_prompt_version_id
         || plan.reviewer_prompt_digest!=expected.reviewer_prompt_digest
         || plan.claude_account_id!=expected.claude_account_id
         || plan.reviewer_account_id!=expected.reviewer_account_id
