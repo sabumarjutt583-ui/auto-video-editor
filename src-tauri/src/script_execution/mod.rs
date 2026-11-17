@@ -510,10 +510,10 @@ impl ExecutionStore{
                 for adjacent in part.fragments.windows(2){
                     let a=object_text(&dir,&adjacent[0],MAX_PART_BYTES)?;
                     let b=object_text(&dir,&adjacent[1],MAX_PART_BYTES)?;
-                    let left=a.trim_end();let right=b.trim_start();
-                    let n=left.len().min(right.len()).min(128);
-                    let end=right.char_indices().map(|(i,_)|i).take_while(|i|*i<=n).last().unwrap_or(0);
-                    if end>=30 && left.ends_with(&right[..end]) {
+                    let left=a.trim_end().as_bytes();let right=b.trim_start().as_bytes();
+                    let max=left.len().min(right.len()).min(1024);
+                    let overlap=(30..=max).rev().any(|size|left.ends_with(&right[..size]));
+                    if overlap {
                         findings.push("Possible duplicated continuation overlap; review the candidate.".into());
                     }
                 }
