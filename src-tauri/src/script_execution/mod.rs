@@ -94,10 +94,10 @@ fn warnings(text:&str,target:u32)->Vec<String>{
     result
 }
 
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ObjectRef {pub filename:String,pub bytes:u64,pub sha256:String,pub created_at:String}
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct PartState {
     pub index:u32,pub title:String,pub objective:String,pub target_words:u32,
@@ -106,10 +106,10 @@ pub struct PartState {
     pub actual_words:Option<u32>,pub completed_at:Option<String>,
     pub validation_findings:Vec<String>,
 }
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ContinuityNote {pub after_part:u32,pub document:ObjectRef}
-#[derive(Clone,Serialize,Deserialize)]
+#[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ExecutionState {
     pub schema_version:u32,pub execution_id:String,pub plan_id:String,pub channel_id:String,
