@@ -520,6 +520,11 @@ impl ExecutionStore{
                     text.trim().is_empty()||text.len()>MAX_PART_BYTES {return Err(invalid())}
                 let part=&mut next.parts[(*part_index-1) as usize];
                 if part.prepared.is_none()||part.committed.is_some()||part.fragments.len()>=16{return Err(invalid())}
+                if part.fragments.iter().any(|existing|existing.bytes==text.len() as u64
+                    && existing.sha256==digest(text.as_bytes())){
+                    return Err(error(ExecutionErrorCode::Conflict,
+                        "This exact response fragment is already saved; inspect existing fragments instead of appending twice."));
+                }
                 let mut total=text.len();
                 for f in &part.fragments {total=total.saturating_add(f.bytes as usize+1);}
                 if total>MAX_PART_BYTES{return Err(invalid())}
