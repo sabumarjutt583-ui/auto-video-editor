@@ -36,3 +36,8 @@ export interface ExecutionRequest {
   channelId:string;executionId:string;expectedRevision:number;operationId:string;action:ExecutionAction;
 }
 export interface ExecutionError {code:string;message:string}
+
+export interface CandidateValidation {
+  partIndex:number;actualWordEstimate:number;targetWords:number;
+  fragmentCount:number;contentSha256:string;findings:string[];
+}
