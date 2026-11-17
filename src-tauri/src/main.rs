@@ -24,6 +24,7 @@ mod project;
 mod render;
 mod settings;
 mod script_jobs;
+mod script_studio;
 #[cfg(test)]
 mod smoke_test;
 mod sfx;
@@ -169,6 +170,15 @@ macro_rules! handler {
             commands::script_jobs::script_job_compare_revisions,
             commands::script_jobs::script_job_inspect_recovery,
             commands::script_jobs::script_job_inspect_orphan_text,
+            commands::script_studio::studio_get,
+            commands::script_studio::studio_save,
+            commands::script_studio::studio_history,
+            commands::script_studio::studio_preview_plan,
+            commands::script_studio::studio_save_plan,
+            commands::script_studio::studio_get_plan,
+            commands::script_studio::studio_list_plans,
+            commands::script_studio::studio_export,
+            commands::script_studio::studio_import,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -344,6 +354,15 @@ macro_rules! handler {
             commands::script_jobs::script_job_compare_revisions,
             commands::script_jobs::script_job_inspect_recovery,
             commands::script_jobs::script_job_inspect_orphan_text,
+            commands::script_studio::studio_get,
+            commands::script_studio::studio_save,
+            commands::script_studio::studio_history,
+            commands::script_studio::studio_preview_plan,
+            commands::script_studio::studio_save_plan,
+            commands::script_studio::studio_get_plan,
+            commands::script_studio::studio_list_plans,
+            commands::script_studio::studio_export,
+            commands::script_studio::studio_import,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -441,6 +460,8 @@ fn main() {
             // A failed store initialization never disables existing production tools.
             // All new commands then return a typed unavailable/lock error.
             app.manage(commands::script_jobs::ScriptJobService::initialize(app.handle()));
+            // Independent offline Studio store; failed lease never disables existing tools.
+            app.manage(commands::script_studio::StudioService::initialize(app.handle()));
             match commands::script::create(app.handle()) {
                 Ok(script) => {
                     app.manage(script);
