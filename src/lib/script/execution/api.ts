@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { LegacyChannelSeed } from "../studio/types.ts";
 import { studioOperationId } from "../studio/api.ts";
-import type { ExecutionAction, ExecutionList, ExecutionRequest, ExecutionState, StartExecution } from "./types.ts";
+import type { CandidateValidation, ExecutionAction, ExecutionList, ExecutionRequest, ExecutionState, StartExecution } from "./types.ts";
 
 export const newExecutionId = () => studioOperationId("ex");
 export const newExecutionOperationId = () => studioOperationId("exec");
@@ -27,3 +27,6 @@ export function errorDescription(error:unknown):string{
   }
   return "Offline execution failed. Reload and inspect the saved state; no provider request occurred.";
 }
+
+export const validateCandidate = (seed:LegacyChannelSeed,executionId:string,partIndex:number):Promise<CandidateValidation> =>
+  invoke("execution_validate_candidate",{seed,executionId,partIndex});
