@@ -103,31 +103,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install executable Windows FFmpeg CI sidecar (not a packaged release artifact)
+      - name: Install supported Windows FFmpeg 7.1.1 for compatibility tests (CI only)
         shell: pwsh
         run: |
-          # Copy the actual installed static FFmpeg binary, never Chocolatey's
-          # PATH shim: a relocated shim cannot locate its relative package files.
+          # The current renderer uses -filter_complex_script. FFmpeg 9 removed
+          # this deprecated option; explicitly pin 7.1.1 as the compatibility
+          # test baseline without changing production media or shipped binaries.
+          choco install ffmpeg --version=7.1.1 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned FFmpeg 7.1.1 package installation failed.' }
           $root = 'C:\ProgramData\chocolatey\lib\ffmpeg\tools'
-          $actual = if (Test-Path $root) {
-            Get-ChildItem -Path $root -Filter 'ffmpeg.exe' -Recurse -File | Select-Object -First 1
-          } else { $null }
-          $ff = if ($actual) { $actual.FullName } else { $null }
-          if (-not $ff) {
-            $cmd = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
-            if ($cmd -and $cmd.Source -notlike '*\chocolatey\bin\*') { $ff = $cmd.Source }
-          }
-          if (-not $ff) {
-            choco install ffmpeg --yes --no-progress
-            $actual = Get-ChildItem -Path $root -Filter 'ffmpeg.exe' -Recurse -File | Select-Object -First 1
-            if ($actual) { $ff = $actual.FullName }
-          }
-          if (-not $ff -or -not (Test-Path $ff)) { throw 'Real FFmpeg.exe missing: Windows full-suite media tests cannot be validated.' }
+          $actual = Get-ChildItem -Path $root -Filter 'ffmpeg.exe' -Recurse -File | Select-Object -First 1
+          if (-not $actual) { throw 'Actual FFmpeg executable not found (Chocolatey shim is not acceptable).' }
           New-Item -ItemType Directory -Path src-tauri/binaries -Force | Out-Null
           $sidecar = Join-Path (Resolve-Path 'src-tauri/binaries').Path 'ffmpeg-x86_64-pc-windows-msvc.exe'
-          Copy-Item -Path $ff -Destination $sidecar -Force
-          & $sidecar -version
-          if ($LASTEXITCODE -ne 0) { throw 'Installed FFmpeg failed executable version preflight.' }
+          Copy-Item -Path $actual.FullName -Destination $sidecar -Force
+          $version = (& $sidecar -version | Select-Object -First 1)
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch 'ffmpeg version 7\.1\.1') {
+            throw "Unexpected FFmpeg test version: $version"
+          }
+          Write-Host $version
+          $supported = (& $sidecar -hide_banner -h full 2>&1 | Out-String)
+          if ($supported -notmatch 'filter_complex_script') {
+            throw 'Pinned test FFmpeg does not support -filter_complex_script; full-suite testing must fail clearly.'
+          }
           "AVE_TEST_FFMPEG=$sidecar" >> $env:GITHUB_ENV
           "AVE_REQUIRE_SIDECAR=1" >> $env:GITHUB_ENV
       - name: Run Windows job store filesystem tests

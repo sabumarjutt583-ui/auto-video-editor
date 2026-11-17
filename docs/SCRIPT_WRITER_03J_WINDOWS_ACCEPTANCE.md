@@ -159,3 +159,17 @@ not a test result. GUI result remains NOT RUN until an operator completes it.**
 
 Do not reinterpret automated GitHub Actions or a source-level screenshot as a
 passing interactive Windows acceptance result.
+
+
+### Additional FFmpeg version acceptance note
+
+The current Phase 03J stabilization CI validates its Windows media tests
+against pinned, real **FFmpeg 7.1.1**. The 2026 Windows runner with
+**FFmpeg 9.0.2** demonstrated an **unresolved production media option
+incompatibility** (\`-filter_complex_script\` is rejected), resulting
+in 8 Rust test failures. This test discovery was not dismissed as an
+environment-only fault. The production renderer was intentionally left
+unchanged by Phase 03J. On the installed Windows acceptance machine,
+record the **actual shipped sidecar version**, separately from CI's
+7.1.1 binary, and do not mark renderer compatibility with FFmpeg 9 as
+validated.

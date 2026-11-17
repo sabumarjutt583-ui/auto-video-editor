@@ -97,3 +97,22 @@ are backend-owned; frontend buttons are advisory.
 Source execution records, previous reviews and video/media production remain
 unchanged. The Tauri app must still be interactively tested on installed
 Windows/WebView2; GitHub CI is not GUI acceptance.
+
+
+### Windows FFmpeg 9 compatibility finding (stabilization)
+
+A full Windows Rust suite under Chocolatey FFmpeg **9.0.2** produced
+**726 passes, 8 failures, 5 ignored**. The common error is
+\`Unrecognized option 'filter_complex_script'\` in production audio/render
+command builders; one cancellation assertion then fails downstream.
+This is an **actual unsupported FFmpeg major-version compatibility issue**,
+not proof of an invalid test runner or a Phase 03J review defect.
+The FFmpeg project deprecated that CLI option and removed it in FFmpeg 9.
+
+For deterministic Phase 03J regression verification, GitHub Actions uses
+the real, explicitly version-pinned **Windows FFmpeg 7.1.1** binary and
+fails if the required command option is absent. The CI binary is not a
+shipped artifact; no production audio/render logic is changed. The Windows
+FFmpeg 9 finding remains **unresolved** and should be handled in a
+separate scoped compatibility change before any FFmpeg 9 upgrade. The new
+CI green result (if achieved) establishes compatibility with 7.1.1 only.
