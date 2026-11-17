@@ -42,6 +42,9 @@ test("SW-03J-TS-02 partial sections never claim full coverage or score",()=>{
 });
 test("SW-03J-TS-03 approval is tied to digest of current version",()=>{
  const s=structuredClone(base);
+ s.rounds[0].sections[0].report={scores:[{key:"hook",points:70},{key:"clarity",points:30}],
+   findings:[],summary:"Explicitly imported manual review"};
+ s.rounds[0].sections[0].score=100;
  s.approvals.push({versionIndex:0,scriptDigest:h,roundIndex:0,reviewDigest:h,
  confirmedAt:"2026-11-17T00:00:00.000Z",confirmation:"APPROVE FINAL SCRIPT",
  provenance:"explicit_local_user_confirmation"});
@@ -54,4 +57,71 @@ test("SW-03J-TS-04 namespaced IDs and stable operation retries",()=>{
  assert.match(newReviewOperation(),/^review_[0-9a-f]{32}$/);
  const first=buildReviewRequest(base,{kind:"approve",confirmation:"APPROVE FINAL SCRIPT"},"op_same");
  assert.deepEqual(first,buildReviewRequest(base,first.action,"op_same"));
+});
+
+test("SW-03J-STAB-TS-01 invalid or partial historical approval is not displayed as current",()=>{
+ const state=structuredClone(base);
+ state.approvals.push({versionIndex:0,scriptDigest:h,roundIndex:0,reviewDigest:h,
+  confirmedAt:"2026-11-17T00:00:00.000Z",confirmation:"APPROVE FINAL SCRIPT",
+  provenance:"explicit_local_user_confirmation"});
+ assert.equal(isCurrentApproved(state),false,"missing structured review");
+ state.rounds[0].sections[0].report={scores:[{key:"hook",points:60},{key:"clarity",points:20}],
+  findings:[],summary:"Manual"};
+ state.rounds[0].sections[0].score=80;
+ assert.equal(isCurrentApproved(state),true);
+ state.approvals[0].scriptDigest="sha256:stale";
+ assert.equal(isCurrentApproved(state),false);
+ state.approvals[0].scriptDigest=h;
+ state.approvals[0].roundIndex=777;
+ assert.equal(isCurrentApproved(state),false);
+});
+test("SW-03J-STAB-TS-02 scoped coverage is not a holistic aggregate",()=>{
+ const s=structuredClone(base);
+ s.rounds[0].sections=[{...s.rounds[0].sections[0],index:0,bytes:8,
+  coverage:{startByte:0,endByte:8,sha256:"sha256:a"}},
+  {...s.rounds[0].sections[0],index:1,bytes:12,
+   coverage:{startByte:8,endByte:20,sha256:"sha256:b"}}];
+ const report={scores:[{key:"hook",points:60},{key:"clarity",points:20}],
+  findings:[],summary:"User-reported reviewer feedback"};
+ s.rounds[0].sections[0].score=80;s.rounds[0].sections[0].report=report;
+ assert.equal(hasFullCoverage(s),false);assert.equal(sumScore(s),null);
+ s.rounds[0].sections[1].score=90;s.rounds[0].sections[1].report=report;
+ assert.equal(hasFullCoverage(s),true);
+ assert.equal(sumScore(s),null,"section scores must not be averaged");
+});
+test("SW-03J-STAB-TS-03 immutable execution continuity context serializes exact Urdu and CRLF",()=>{
+ const s=structuredClone(base);
+ s.policy.continuity={executionRevision:5,sourceCount:1,includedBytes:0,omittedCount:0,
+  entries:[{kind:"continuity",afterPart:1,sourceSha256:h,sourceBytes:0,
+   includedText:"  کردار: Amir اردو 한국어 😀\r\n"}],
+  partStructure:[{partIndex:1,title:"Start",objective:"Maintain Amir",targetWords:100,
+   previousPart:null,nextPart:2},{partIndex:2,title:"Finish",objective:"Continue Amir",targetWords:100,
+   previousPart:1,nextPart:null}],
+  warnings:[]};
+ const text=s.policy.continuity.entries[0].includedText;
+ const decoded=JSON.parse(JSON.stringify(s)) as ReviewState;
+ assert.equal(decoded.policy.continuity?.entries[0].includedText,text);
+ assert.equal(decoded.policy.continuity?.partStructure[1].previousPart,1);
+ assert.equal(decoded.policy.continuity?.sourceCount,1);
+});
+test("SW-03J-STAB-TS-04 failed operation data can be retried with exact payload and revision",()=>{
+ const raw="  {\r\n  bad: Urdu اردو 😀  ";
+ const importAction={kind:"import_response" as const,sectionIndex:0,raw};
+ const first=buildReviewRequest(base,importAction,"op_repeat");
+ assert.equal(first.expectedRevision,base.revision);
+ assert.equal(JSON.parse(JSON.stringify(first)).action.raw,raw);
+ const retry=buildReviewRequest(base,importAction,"op_repeat");
+ assert.deepEqual(first,retry);
+ assert.equal(first.channelId,base.channelId);
+});
+test("SW-03J-STAB-TS-05 correction is separate from raw and cannot imply approval",()=>{
+ const state=structuredClone(base);
+ const raw="  Reviewer wrote incomplete notes\r\n";
+ const imported=buildReviewRequest(state,{kind:"import_response",sectionIndex:0,raw},"op_import");
+ const correction=buildReviewRequest(state,{kind:"correct_response",sectionIndex:0,report:{
+  scores:[{key:"hook",points:70},{key:"clarity",points:30}],findings:[],summary:"Manual correction"}
+ },"op_correct");
+ assert.equal((imported.action as {raw:string}).raw,raw);
+ assert.equal(correction.action.kind,"correct_response");
+ assert.equal(isCurrentApproved(state),false);
 });

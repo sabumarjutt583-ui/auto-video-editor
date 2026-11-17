@@ -59,3 +59,103 @@ do NOT constitute installed Windows WebView2 GUI validation.
 
 Record the actual Windows build/version, machine, operator, timestamps,
 pass/fail evidence and bug reports only after performing this checklist.
+
+
+## Exact disposable-channel Windows walkthrough
+
+This walkthrough requires an actual interactive Windows computer. **Documentation is
+not a test result. GUI result remains NOT RUN until an operator completes it.**
+
+1. Back up existing app-data and confirm a clean, disposable Windows test profile.
+   In the app's existing channel/profile selector, create a uniquely named testing
+   channel, for example \`Phase03J-Disposable-A\`. Do not replace a real channel.
+2. On this source branch, in a Windows PowerShell terminal with prerequisites
+   installed, run \`npm ci\` and \`npm run tauri dev\`. If the app's Studio is
+   hidden in the standard dev mode, use the existing admin/development entry
+   point \`npm run dev:admin\`; do not enable Studio in a production release.
+   Record exact launch command, commit SHA, WebView2 version and time.
+3. In Script Studio select the disposable channel. Save a custom reviewer
+   prompt including “check continuity and unresolved names.” Configure
+   audience and voice tone and a custom rubric with categories whose **integer
+   maximum weights total 100**. Save and reopen the channel configuration.
+4. Create a single-part immutable Studio plan (about 120 words), open the
+   Execution Workspace, prepare its offline writing prompt, paste a manually
+   written complete script, validate, explicitly commit and assemble.
+   Confirm no Claude/browser requests are sent.
+5. Create a separate eight-part plan in the same test channel. Set outline and
+   continuity as required. Before Part 1 save a chronological outline and
+   Script Bible with a repeated character name (e.g. “Amir”). Prepare and
+   complete Parts 1–8 manually. After each completed part save continuity
+   notes before preparing the next. Revise the note after Part 1 once to check
+   **latest-saved-note precedence**. Assemble the completed eight-part script.
+6. In Review Workspace, choose this exact assembled execution and create an
+   immutable review. Record the saved execution ID, plan ID, content digest,
+   source execution revision, reviewer version and score-weight total. Expand
+   **Immutable saved continuity context**. Verify outline, Bible, part structure,
+   latest Part 1 note, and note source digests are displayed; no invented facts.
+7. Copy the exact offline review prompt. Verify “Part 1 revised note” and all
+   in-budget context are present. If a source is listed as omitted because the
+   96 KiB budget was reached, confirm it is marked **NOT PROVIDED TO REVIEW**;
+   do not claim full continuity context was reviewed.
+8. For each review section, inspect its 0-based byte range and SHA-256.
+   Import a **manual/synthetic** JSON report with one \`key\` and numeric
+   \`points\` entry for each configured rubric category. Example schema:
+   \`{"scores":[{"key":"hook","points":12}],"findings":[{"severity":"warning","category":"hook","summary":"Opening lacks tension","recommendation":"Use a stronger first sentence"}],"summary":"Sample manual review"}\`.
+   Replace the example score list with **ALL actual saved rubric keys and valid
+   values**; never use a one-category example unless the rubric has only one.
+9. Import an invalid JSON report in a fresh section/session (e.g. \`{oops\`).
+   Confirm no score is invented; read the exact immutable raw response. Enter
+   corrected JSON in the separate correction editor; verify validation,
+   persisted score and the **unchanged original raw bytes**.
+10. If a script produces more than one review section, import reports one
+    section at a time. Verify “partial coverage” until every section has a
+    validated manual report, even if an earlier section earned 100 points.
+    Verify there is **no averaged holistic score** for multiple sections.
+11. Select specific improvement goals. Generate and copy offline improvement
+    instructions. Paste a revised script with changed hook, a preserved
+    character name, Urdu, Korean and emoji text; include leading spaces and
+    CRLF. Save as a separate revision. Compare version 0 and version 1 and
+    re-read the original; byte counts, digests and original content must
+    remain unchanged.
+12. Start a fresh review on the new revision. Verify that the prior score and
+    approval controls cannot approve the unreviewed revision. Import new valid
+    responses for **every** section; inspect findings and coverage.
+13. Confirm approval is rejected without completed coverage, when a part-only
+    session is selected, when deterministic validation warnings remain or
+    when the confirmation text is wrong. With the fully reviewed valid final
+    revision, tick explicit confirmation and type \`APPROVE FINAL SCRIPT\`.
+    Check that Rust reports a persisted checkpoint and stores exact
+    version/digest/round/time, not just a frontend notification.
+14. Close the native desktop app completely and reopen it. In the same
+    channel, reopen historical reviews and raw imports, compare revisions and
+    verify the same exact approval digest persists. If any record is corrupt
+    or orphaned, verify the app **blocks unsafe recovery** without deletion.
+15. Create another disposable profile \`Phase03J-Disposable-B\`. Attempt to
+    access A's review ID through normal UI, then (in an isolated dev-only
+    command harness) with B's saved seed. Expect Rust channel mismatch or
+    not-found; no A text must be returned. Do not tamper with real app-data.
+16. Check that production features still open and perform non-destructive
+    smoke tests: Write with Claude controls (without sending), account/profile
+    selection, Image Generator UI, Voiceover UI, Video Editor project loading,
+    FFmpeg version/help in the normal app, and Make Video controls (without
+    generating). Confirm **no review/approval action** sends content to them.
+17. Record per-step PASS/FAIL/NOT RUN with screenshots, Windows version,
+    exact commit, command, paths and operator name. Remove only the two
+    disposable test channels through supported UI after exporting evidence;
+    never delete unrelated app-data by hand.
+
+### Acceptance record (to be filled only after actually performing the GUI run)
+
+| Field | Value |
+|---|---|
+| Native Windows/WebView2 session | **NOT RUN** |
+| Machine / Windows / WebView2 | Not recorded |
+| Feature-branch commit tested | Not recorded |
+| Operator, time and screenshots | Not recorded |
+| One-part + eight-part scenario | **NOT RUN** |
+| Review corrections, re-review, approval | **NOT RUN** |
+| Restart and channel isolation | **NOT RUN** |
+| Production UI smoke checks | **NOT RUN** |
+
+Do not reinterpret automated GitHub Actions or a source-level screenshot as a
+passing interactive Windows acceptance result.

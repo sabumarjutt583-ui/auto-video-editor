@@ -62,3 +62,38 @@ unofficial browser extraction. The model supports a full section-by-section
 review workflow, but it cannot claim that a single 48 KiB section represents
 a larger text. On-disk revisions are immutable; no automatic orphan cleanup.
 The Windows WebView2 installed application requires manual human acceptance.
+
+
+## Phase 03J stabilization — immutable continuity and approval validation
+
+New sessions bind a provenance-preserving snapshot of the exact source execution
+revision, saved outline, Script Bible, latest manually entered continuity note
+per completed part and saved plan part objectives/previous/next relationships.
+All sources must match the Rust execution store's SHA-256 and byte counts.
+Absent or stale required continuity causes review creation to **fail closed**.
+A bounded **96 KiB** context inclusion budget preserves individual note text
+exactly or omits the entire note, recording its complete digest, size and
+**NOT SUPPLIED** warning. There is no silent truncation or invented summary.
+Large custom reviewer instructions may still exceed 256 KiB prompts and fail
+explicitly. New policy snapshots keep a separate optional \`continuity\` field;
+missing optional fields on older sessions remain absent on serialization to
+retain the exact stored checkpoint hashes and avoid historical migrations.
+
+New review rounds store immutable section byte offsets, SHA-256 hashes and
+lengths. Section splitting prefers sentence/paragraph boundaries but falls
+back to an exact UTF-8 codepoint boundary without dropping text. Historical
+sections without the optional coverage field remain readable. Section reports
+can establish *complete sectional coverage*, not a holistic single-score
+judgment. The UI never averages scores across unrelated sections.
+
+On every review reopen, Rust rechecks category scores against the exact saved
+100-point rubric, validates each round's section coverage and text digest,
+recomputes saved approval proof and verifies that approval is bound to a
+fully covered, valid final/single/improvement review and exact script version.
+Append-only transitions reject deleted/altered earlier approvals or script
+objects. A manual new revision never inherits a prior approval. These checks
+are backend-owned; frontend buttons are advisory.
+
+Source execution records, previous reviews and video/media production remain
+unchanged. The Tauri app must still be interactively tested on installed
+Windows/WebView2; GitHub CI is not GUI acceptance.

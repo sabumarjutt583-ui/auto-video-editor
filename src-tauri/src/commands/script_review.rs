@@ -66,7 +66,33 @@ pub async fn review_start(app:AppHandle,state:State<'_,ReviewService>,
   let script=executions.read(&channel,&input.execution_id,kind,input.part_index.unwrap_or(0),0)
    .map_err(|_|ReviewError{code:ReviewErrorCode::CorruptRecord,
     message:"Source script missing or integrity verification failed."})?;
-  reviews.start(&plan,&execution,&script,&input)
+  // A full immutable continuity snapshot is derived from Rust-verified execution
+  // objects, never frontend-supplied notes or an imagined AI summary.
+  let mut context_sources=Vec::new();
+  for (kind,item) in [
+   ("outline",execution.outline_versions.last()),
+   ("bible",execution.bible_versions.last())
+  ]{
+   if let Some(reference)=item{
+    let exact=executions.read(&channel,&input.execution_id,kind,0,0)
+     .map_err(|_|ReviewError{code:ReviewErrorCode::CorruptRecord,
+      message:"Saved outline/Script Bible could not be verified."})?;
+    context_sources.push(ContextSource{kind:kind.into(),after_part:None,
+     sha256:reference.sha256.clone(),bytes:reference.bytes,text:exact});
+   }
+  }
+  let mut latest=std::collections::BTreeMap::new();
+  for note in &execution.continuity_notes{
+   latest.insert(note.after_part,&note.document);
+  }
+  for (after_part,reference) in latest{
+   let exact=executions.read(&channel,&input.execution_id,"continuity",after_part,0)
+    .map_err(|_|ReviewError{code:ReviewErrorCode::CorruptRecord,
+     message:"Saved part continuity could not be verified."})?;
+   context_sources.push(ContextSource{kind:"continuity".into(),after_part:Some(after_part),
+    sha256:reference.sha256.clone(),bytes:reference.bytes,text:exact});
+  }
+  reviews.start_with_context(&plan,&execution,&script,&input,&context_sources)
  }).await
 }
 #[tauri::command]

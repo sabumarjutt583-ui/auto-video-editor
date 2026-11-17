@@ -103,11 +103,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Provide compile-only Tauri sidecar placeholder (never executed)
+      - name: Install executable Windows FFmpeg CI sidecar (not a packaged release artifact)
         shell: pwsh
         run: |
+          $cmd = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
+          $ff = if ($cmd) { $cmd.Source } else { $null }
+          if (-not $ff) {
+            choco install ffmpeg --yes --no-progress
+            $cmd = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
+            $ff = if ($cmd) { $cmd.Source } else { $null }
+          }
+          if (-not $ff -and (Test-Path 'C:\ProgramData\chocolatey\lib\ffmpeg')) {
+            $candidate = Get-ChildItem -Path 'C:\ProgramData\chocolatey\lib\ffmpeg' -Filter 'ffmpeg.exe' -Recurse -File | Select-Object -First 1
+            if ($candidate) { $ff = $candidate.FullName }
+          }
+          if (-not $ff -or -not (Test-Path $ff)) { throw 'Real FFmpeg.exe missing: Windows full-suite media tests cannot be validated.' }
           New-Item -ItemType Directory -Path src-tauri/binaries -Force | Out-Null
-          New-Item -ItemType File -Path src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe -Force | Out-Null
+          $sidecar = Join-Path (Resolve-Path 'src-tauri/binaries').Path 'ffmpeg-x86_64-pc-windows-msvc.exe'
+          Copy-Item -Path $ff -Destination $sidecar -Force
+          & $sidecar -version
+          if ($LASTEXITCODE -ne 0) { throw 'Installed FFmpeg failed executable version preflight.' }
+          "AVE_TEST_FFMPEG=$sidecar" >> $env:GITHUB_ENV
+          "AVE_REQUIRE_SIDECAR=1" >> $env:GITHUB_ENV
       - name: Run Windows job store filesystem tests
         working-directory: src-tauri
         run: cargo test --locked script_jobs && cargo test --locked script_studio && cargo test --locked script_execution && cargo test --locked script_review
@@ -117,3 +134,6 @@ jobs:
       - name: Verify Windows admin Rust compilation
         working-directory: src-tauri
         run: cargo check --locked --features admin
+      - name: Full Windows Rust suite with real FFmpeg (blocking, not installed WebView2 acceptance)
+        working-directory: src-tauri
+        run: cargo test --locked

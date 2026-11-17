@@ -5,17 +5,23 @@ export interface CategoryScore {key:string;points:number}
 export type Severity = "info"|"warning"|"error";
 export interface Finding {severity:Severity;category:string;summary:string;recommendation:string}
 export interface Report {scores:CategoryScore[];findings:Finding[];summary:string}
+export interface PartRelationship {partIndex:number;title:string;objective:string;targetWords:number;previousPart:number|null;nextPart:number|null}
+export interface ContextEntry {kind:string;afterPart:number|null;sourceSha256:string;sourceBytes:number;includedText:string|null}
+export interface ReviewContext {executionRevision:number;sourceCount:number;includedBytes:number;omittedCount:number;
+ entries:ContextEntry[];partStructure:PartRelationship[];warnings:string[]}
+export interface SectionCoverage {startByte:number;endByte:number;sha256:string}
 export interface ReviewPolicy {
  provider:"none"|"claude"|"chatgpt";accountRef:string|null;promptVersion:string|null;
  promptDigest:string|null;promptText:string;rubric:RubricCriterion[];
  audience:string;tone:string;style:string;language:string;
  singleInstructions:string;perPartInstructions:string;finalInstructions:string;
  title:string;topic:string;partObjective:string|null;targetWords:number|null;
+ /** Absent for pre-stabilization saved sessions. */ continuity?:ReviewContext;
 }
 export interface ScriptVersion {index:number;text:ReviewObject;source:string;parentDigest:string|null;
  improvementPrompt:ReviewObject|null;validationFindings:string[]}
 export interface SectionReview {index:number;bytes:number;prompt:ReviewObject;raw:ReviewObject|null;
- report:Report|null;score:number|null;validationIssues:string[]}
+ report:Report|null;score:number|null;validationIssues:string[];coverage?:SectionCoverage}
 export interface ReviewRound {index:number;versionIndex:number;mode:string;createdAt:string;sections:SectionReview[]}
 export interface Approval {versionIndex:number;scriptDigest:string;roundIndex:number;
  reviewDigest:string;confirmedAt:string;confirmation:string;provenance:string}

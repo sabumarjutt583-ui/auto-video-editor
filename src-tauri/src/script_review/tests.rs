@@ -271,3 +271,227 @@ fn sw_03j_invalid_review_prompt_fails_before_publishing_orphans(){
  assert!(!root.join("reviews/channels/channel_a/rv_test").exists());
  drop(store);drop(exec);fs::remove_dir_all(root).unwrap();
 }
+
+// Stabilization: all context below originates in a real, immutable execution store.
+fn context_fixture(large:bool)->(PathBuf,ScriptStudioPlanV1,crate::script_execution::ExecutionState,String,Vec<ContextSource>){
+ let root=std::env::temp_dir().join(format!("sw03j-continuity-{}",new_id()));fs::create_dir(&root).unwrap();
+ let cfg=ChannelStudioConfigV1::seed("channel_a".into(),"Test channel".into(),"English".into(),"Master".into(),None);
+ let plan=build_plan(&cfg,&PlanInput{
+  plan_id:"sp_review".into(),channel_id:"channel_a".into(),expected_config_revision:0,
+  title:"Eight-part documentary".into(),topic:"Amir's journey".into(),language:Some("English".into()),
+  mode:Some(ScriptMode::MultiPart),total_words:Some(960),part_count:Some(8),
+  outline_required:Some(true),continuity_required:Some(true),parts:Vec::new()
+ },"2026-11-17T00:00:00.000Z").unwrap();
+ let exec=ExecutionStore::new(root.join("executions")).unwrap();
+ let mut state=exec.start(&plan,&StartExecution{channel_id:"channel_a".into(),plan_id:plan.plan_id.clone(),
+  execution_id:"ex_review".into(),operation_id:"op_start".into()}).unwrap();
+ let outline=if large{"A".repeat(58_000)}else{"  Timeline: morning departure, afternoon meeting, night return.\r\n".into()};
+ let bible=if large{"B".repeat(58_000)}else{"  Amir is the narrator. Keep the city spelling and terminology unchanged. اردو 😀\r\n".into()};
+ for (key,action) in [
+  ("outline",ExecutionAction::SaveOutline{text:outline}),
+  ("bible",ExecutionAction::SaveBible{text:bible})
+ ]{
+  state=exec.apply(&plan,&ExecutionRequest{channel_id:"channel_a".into(),execution_id:"ex_review".into(),
+   expected_revision:state.revision,operation_id:format!("op_{key}"),action}).unwrap();
+ }
+ for n in 1..=8 {
+  for (key,action) in [
+   ("prep",ExecutionAction::PreparePart{part_index:n,extra_instructions:String::new()}),
+   ("import",ExecutionAction::ImportFragment{part_index:n,text:format!("Part {n}: Amir travelled through the city. اردو 😀. The scene ended.")}),
+   ("commit",ExecutionAction::CommitPart{part_index:n,accept_warnings:true})
+  ]{
+   state=exec.apply(&plan,&ExecutionRequest{channel_id:"channel_a".into(),execution_id:"ex_review".into(),
+    expected_revision:state.revision,operation_id:format!("op_{key}{n}"),action}).unwrap();
+  }
+  let note=format!("After Part {n}: Amir remains alive, current hour {}. Terminology: house, river.",n+7);
+  state=exec.apply(&plan,&ExecutionRequest{channel_id:"channel_a".into(),execution_id:"ex_review".into(),
+   expected_revision:state.revision,operation_id:format!("op_note{n}"),
+   action:ExecutionAction::SaveContinuity{after_part:n,text:note}}).unwrap();
+  if n==1{
+   state=exec.apply(&plan,&ExecutionRequest{channel_id:"channel_a".into(),execution_id:"ex_review".into(),
+    expected_revision:state.revision,operation_id:"op_latest_note1".into(),
+    action:ExecutionAction::SaveContinuity{after_part:1,
+     text:"After Part 1: Amir remains alive; amended chronology 08:00. اردو 😀\r\n".into()}}).unwrap();
+  }
+ }
+ state=exec.apply(&plan,&ExecutionRequest{channel_id:"channel_a".into(),execution_id:"ex_review".into(),
+  expected_revision:state.revision,operation_id:"op_assemble".into(),action:ExecutionAction::Assemble}).unwrap();
+ let assembled=exec.read("channel_a","ex_review","assembled",0,0).unwrap();
+ let mut sources=Vec::new();
+ for (kind,reference) in [
+  ("outline",state.outline_versions.last()),
+  ("bible",state.bible_versions.last())
+ ]{
+  let o=reference.unwrap();
+  sources.push(ContextSource{kind:kind.into(),after_part:None,
+   sha256:o.sha256.clone(),bytes:o.bytes,
+   text:exec.read("channel_a","ex_review",kind,0,0).unwrap()});
+ }
+ let mut latest=std::collections::BTreeMap::new();
+ for note in &state.continuity_notes{latest.insert(note.after_part,&note.document);}
+ for (index,reference) in latest{
+  sources.push(ContextSource{kind:"continuity".into(),after_part:Some(index),
+   sha256:reference.sha256.clone(),bytes:reference.bytes,
+   text:exec.read("channel_a","ex_review","continuity",index,0).unwrap()});
+ }
+ drop(exec);
+ (root,plan,state,assembled,sources)
+}
+#[test]
+fn sw_03j_stab_01_immutable_cross_part_continuity_and_restart(){
+ let (root,p,e,t,notes)=context_fixture(false);
+ let store=ReviewStore::new(root.join("reviews")).unwrap();
+ let state=store.start_with_context(&p,&e,&t,&input(None),&notes).unwrap();
+ let context=state.policy.continuity.as_ref().unwrap();
+ assert_eq!(context.source_count,10); // outline, bible, latest note for 8 parts
+ assert_eq!(context.omitted_count,0);
+ assert_eq!(context.part_structure.len(),8);
+ assert_eq!(context.part_structure[3].previous_part,Some(3));
+ assert_eq!(context.part_structure[3].next_part,Some(5));
+ assert_eq!(context.entries.iter().find(|n|n.after_part==Some(1)).unwrap().included_text.as_deref(),
+  Some("After Part 1: Amir remains alive; amended chronology 08:00. اردو 😀\r\n"));
+ let prompt=store.read("channel_a","rv_test","prompt",0).unwrap();
+ assert!(prompt.contains("Amir remains alive"));
+ assert!(prompt.contains("amended chronology"));
+ assert!(!prompt.contains("After Part 1: Amir remains alive, current hour 8."));
+ let seq=state.revision;drop(store);
+ let reopened=ReviewStore::new(root.join("reviews")).unwrap();
+ let restored=reopened.get("channel_a","rv_test").unwrap();
+ assert_eq!(restored.revision,seq);
+ assert_eq!(restored.policy.continuity.unwrap().source_count,10);
+ drop(reopened);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_stab_02_part_review_has_previous_next_and_exact_context(){
+ let (root,p,e,_t,notes)=context_fixture(false);
+ let exec=ExecutionStore::new(root.join("executions")).unwrap();
+ let part=exec.read("channel_a","ex_review","part",2,0).unwrap();drop(exec);
+ let store=ReviewStore::new(root.join("reviews")).unwrap();
+ let saved=store.start_with_context(&p,&e,&part,&input(Some(2)),&notes).unwrap();
+ assert_eq!(saved.policy.part_objective,Some(p.parts[1].objective.clone()));
+ assert_eq!(saved.policy.continuity.as_ref().unwrap().part_structure[1].previous_part,Some(1));
+ let prompt=store.read("channel_a","rv_test","prompt",0).unwrap();
+ assert!(prompt.contains("amended chronology"));
+ assert!(store.apply(&request(&saved,ReviewAction::PrepareReview{mode:"final".into()},"bad_mode")).is_err());
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_stab_03_missing_or_stale_continuity_fails_before_new_review(){
+ let (root,p,e,t,notes)=context_fixture(false);
+ let store=ReviewStore::new(root.join("reviews")).unwrap();
+ assert!(store.start_with_context(&p,&e,&t,&input(None),&notes[..notes.len()-1]).is_err());
+ let mut tampered=notes.clone();tampered[0].text.push_str(" forged");
+ assert!(store.start_with_context(&p,&e,&t,&input(None),&tampered).is_err());
+ assert!(!root.join("reviews/channels/channel_a/rv_test").exists());
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_stab_04_bounded_context_discloses_omitted_references(){
+ let (root,p,e,t,notes)=context_fixture(true);
+ let store=ReviewStore::new(root.join("reviews")).unwrap();
+ let saved=store.start_with_context(&p,&e,&t,&input(None),&notes).unwrap();
+ let ctx=saved.policy.continuity.unwrap();
+ assert!(ctx.omitted_count>0);
+ assert!(ctx.entries.iter().any(|entry|entry.included_text.is_none()));
+ assert!(ctx.warnings.iter().any(|warning|warning.contains("NOT supplied")));
+ assert_eq!(ctx.included_bytes,ctx.entries.iter()
+  .filter_map(|e|e.included_text.as_ref().map(|s|s.len() as u64)).sum::<u64>());
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_stab_05_section_ranges_exact_lossless_and_no_unreviewed_approval(){
+ let (root,p,mut e,_)=fixture(1);
+ let t="A complete sentence ends here. ".repeat(7000);
+ let o=e.assembled.as_mut().unwrap();o.sha256=digest(t.as_bytes());o.bytes=t.len() as u64;
+ let store=ReviewStore::new(root.join("reviews")).unwrap();
+ let mut s=store.start(&p,&e,&t,&input(None)).unwrap();
+ assert!(s.rounds[0].sections.len()>2);
+ let mut offset=0usize;
+ for sec in &s.rounds[0].sections{
+  let cov=sec.coverage.as_ref().expect("exact section coverage");
+  assert_eq!(cov.start_byte,offset as u64);
+  assert_eq!(cov.end_byte-cov.start_byte,sec.bytes as u64);
+  assert_eq!(cov.sha256,digest(&t.as_bytes()[cov.start_byte as usize..cov.end_byte as usize]));
+  offset=cov.end_byte as usize;
+ }
+ assert_eq!(offset,t.len());
+ s=reviewed(&store,&s);
+ assert!(store.apply(&request(&s,ReviewAction::Approve{confirmation:"APPROVE FINAL SCRIPT".into()},"partial")).is_err());
+ for index in 1..s.rounds[0].sections.len(){
+  let raw=serde_json::to_string(&report(&s.policy)).unwrap();
+  s=store.apply(&request(&s,ReviewAction::ImportResponse{section_index:index as u32,raw},
+   &format!("sec{index}"))).unwrap();
+ }
+ assert!(all_covered(&s.rounds[0]));
+ s=store.apply(&request(&s,ReviewAction::Approve{confirmation:"APPROVE FINAL SCRIPT".into()},"complete")).unwrap();
+ assert_eq!(s.approvals.len(),1);
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_stab_06_invalid_approval_tampering_cannot_survive_restart(){
+ let (root,p,e,t)=fixture(1);
+ let store=ReviewStore::new(root.join("reviews")).unwrap();
+ let s=store.start(&p,&e,&t,&input(None)).unwrap();
+ let s=reviewed(&store,&s);
+ let s=store.apply(&request(&s,ReviewAction::Approve{confirmation:"APPROVE FINAL SCRIPT".into()},"approve")).unwrap();
+ let path=root.join(format!("reviews/channels/channel_a/rv_test/state-{:06}.json",s.revision));
+ drop(store);
+ let mut tampered:ReviewState=serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+ tampered.approvals[0].review_digest="sha256:forged".into();
+ fs::write(&path,serde_json::to_vec(&tampered).unwrap()).unwrap();
+ let reopened=ReviewStore::new(root.join("reviews")).unwrap();
+ assert!(matches!(reopened.get("channel_a","rv_test").unwrap_err().code,ReviewErrorCode::CorruptRecord));
+ drop(reopened);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_stab_07_wrong_plan_channel_or_execution_not_bound_to_review(){
+ let (root,p,e,t)=fixture(1);let store=ReviewStore::new(root.join("reviews")).unwrap();
+ let mut bad=e.clone();bad.plan_id="sp_wrong".into();
+ assert!(store.start(&p,&bad,&t,&input(None)).is_err());
+ bad=e.clone();bad.execution_id="ex_wrong".into();
+ assert!(store.start(&p,&bad,&t,&input(None)).is_err());
+ let mut wrong=input(None);wrong.channel_id="channel_b".into();
+ assert!(store.start(&p,&e,&t,&wrong).is_err());
+ assert!(!root.join("reviews/channels/channel_a/rv_test").exists());
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_stab_08_concurrent_writes_one_revision_only(){
+ use std::sync::Arc;
+ let (root,p,e,t)=fixture(1);let store=Arc::new(ReviewStore::new(root.join("reviews")).unwrap());
+ let s=store.start(&p,&e,&t,&input(None)).unwrap();
+ let r1=request(&s,ReviewAction::ImportResponse{section_index:0,raw:"{bad".into()},"race_1");
+ let r2=request(&s,ReviewAction::ImportResponse{section_index:0,raw:"different".into()},"race_2");
+ let (a,b)=std::thread::scope(|scope|{
+  let x=scope.spawn(||store.apply(&r1));
+  let y=scope.spawn(||store.apply(&r2));
+  (x.join().unwrap(),y.join().unwrap())
+ });
+ assert_ne!(a.is_ok(),b.is_ok());
+ assert_eq!(store.get("channel_a","rv_test").unwrap().revision,1);
+ drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw_03j_stab_09_invalid_severity_and_unreported_categories_never_score(){
+ let rubric=crate::script_studio::default_rubric();
+ assert!(parse_report("",&rubric).is_err());
+ assert!(parse_report("{}",&rubric).is_err());
+ let report=serde_json::json!({"summary":"manual","findings":[{
+  "severity":"critical","category":"hook","summary":"bad","recommendation":"fix"}],
+  "scores":rubric.iter().map(|r|serde_json::json!({"key":r.key,"points":r.points})).collect::<Vec<_>>()});
+ assert!(parse_report(&report.to_string(),&rubric).is_err());
+ let mut scores=serde_json::to_value(report).unwrap();
+ scores["findings"][0]["severity"]=serde_json::json!("warning");
+ scores["scores"][0]["points"]=serde_json::json!(101);
+ assert!(parse_report(&scores.to_string(),&rubric).is_err());
+}
+#[test]
+fn sw_03j_stab_10_orphan_state_file_blocks_recovery_without_cleanup(){
+ let (root,p,e,t)=fixture(1);let store=ReviewStore::new(root.join("reviews")).unwrap();
+ store.start(&p,&e,&t,&input(None)).unwrap();
+ let state=root.join("reviews/channels/channel_a/rv_test/state-000099.json");
+ fs::write(&state,"interrupted write").unwrap();
+ assert!(matches!(store.get("channel_a","rv_test").unwrap_err().code,ReviewErrorCode::RecoveryBlocked));
+ assert!(state.exists());
+ drop(store);fs::remove_dir_all(root).unwrap();
+}

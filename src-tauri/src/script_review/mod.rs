@@ -1,6 +1,6 @@
 //! Phase 03J. Offline, channel-owned professional reviews. No provider calls or video side effects.
 //! Separate from legacy Script Jobs and Phase 03I's immutable execution history.
-use std::{collections::HashSet,fs::{self,File,OpenOptions},io::{Read,Write},path::{Path,PathBuf},sync::Mutex,time::{SystemTime,UNIX_EPOCH}};
+use std::{collections::{BTreeMap,HashSet},fs::{self,File,OpenOptions},io::{Read,Write},path::{Path,PathBuf},sync::Mutex,time::{SystemTime,UNIX_EPOCH}};
 use rand::RngCore;
 use serde::{Deserialize,Serialize};
 use crate::script_jobs::{lock,model::{digest,valid_id}};
@@ -13,6 +13,7 @@ const MAX_STATE:u64=2*1024*1024;
 const MAX_CHECKPOINT:u64=512;
 const SECTION_BYTES:usize=48*1024;
 const MAX_SECTIONS:usize=1400;
+const MAX_INCLUDED_CONTEXT_BYTES:usize=96*1024;
 
 #[derive(Clone,Copy,Debug,Serialize,Deserialize)]
 #[serde(rename_all="snake_case")]
@@ -124,6 +125,95 @@ pub fn parse_report(raw:&str,rubric:&[RubricCriterion])->Result<(Report,u32),Vec
   Err(e)=>Err(vec![format!("Not a valid structured JSON report: {e}. Preserve original and correct manually.")])
  }
 }
+// All continuity information comes from verified user-authored execution artifacts.
+// No AI summary, hidden browsing or inferred character facts are stored.
+#[derive(Clone,Debug)]
+pub struct ContextSource {
+ pub kind:String,pub after_part:Option<u32>,pub sha256:String,pub bytes:u64,pub text:String,
+}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct PartRelationship {
+ pub part_index:u32,pub title:String,pub objective:String,pub target_words:u32,
+ pub previous_part:Option<u32>,pub next_part:Option<u32>,
+}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct ContextEntry {
+ pub kind:String,pub after_part:Option<u32>,pub source_sha256:String,pub source_bytes:u64,
+ pub included_text:Option<String>,
+}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct ReviewContext {
+ pub execution_revision:u64,pub source_count:u32,pub included_bytes:u64,
+ pub omitted_count:u32,pub entries:Vec<ContextEntry>,pub part_structure:Vec<PartRelationship>,
+ pub warnings:Vec<String>,
+}
+fn context_snapshot(plan:&ScriptStudioPlanV1,execution:&crate::script_execution::ExecutionState,
+ sources:&[ContextSource],part:Option<u32>)->Result<ReviewContext,ReviewError>{
+ let mut expected:BTreeMap<(String,Option<u32>),(String,u64)>=BTreeMap::new();
+ if let Some(o)=execution.outline_versions.last(){expected.insert(("outline".into(),None),(o.sha256.clone(),o.bytes));}
+ if let Some(o)=execution.bible_versions.last(){expected.insert(("bible".into(),None),(o.sha256.clone(),o.bytes));}
+ for n in &execution.continuity_notes{
+  expected.insert(("continuity".into(),Some(n.after_part)),(n.document.sha256.clone(),n.document.bytes));
+ }
+ // Require the saved execution's full latest set. Missing or stale context fails closed.
+ if expected.len()!=sources.len(){return Err(err(ReviewErrorCode::CorruptRecord,"Review continuity snapshot is missing one or more saved source artifacts."))}
+ let mut entries=Vec::new();let mut seen=HashSet::new();
+ for source in sources{
+  let key=(source.kind.clone(),source.after_part);
+  let expected_ref=expected.get(&key).ok_or_else(corrupt)?;
+  if !seen.insert(key)||source.sha256!=expected_ref.0||source.bytes!=expected_ref.1
+   ||digest(source.text.as_bytes())!=source.sha256||source.text.len() as u64!=source.bytes {
+   return Err(corrupt())
+  }
+  entries.push(ContextEntry{kind:source.kind.clone(),after_part:source.after_part,
+   source_sha256:source.sha256.clone(),source_bytes:source.bytes,included_text:Some(source.text.clone())});
+ }
+ let relationship=plan.parts.iter().map(|p|PartRelationship{
+  part_index:p.index,title:p.title.clone(),objective:p.objective.clone(),target_words:p.target_words,
+  previous_part:(p.index>1).then_some(p.index-1),
+  next_part:(p.index<plan.part_count).then_some(p.index+1)
+ }).collect::<Vec<_>>();
+ if plan.continuity_required{
+  let until=part.unwrap_or(plan.part_count);
+  for previous in 1..until{
+   if !expected.contains_key(&("continuity".into(),Some(previous))){
+    return Err(err(ReviewErrorCode::CorruptRecord,"Required saved per-part continuity context is missing."))
+   }
+  }
+ }
+ // Include nearest context first for part-level reviews. All entries remain in
+ // chronological provenance order; omitted digests and sizes are disclosed.
+ let mut order=(0..entries.len()).collect::<Vec<_>>();
+ order.sort_by_key(|i|{
+  let e=&entries[*i];
+  let proximity=match(part,e.after_part){
+   (Some(n),Some(p)) if p==n.saturating_sub(1)||p==n=>0,
+   (Some(n),Some(p))=>2+n.abs_diff(p),
+   _=>0
+  };
+  (if e.kind=="outline"{0}else if e.kind=="bible"{1}else{2+proximity},e.after_part.unwrap_or(0))
+ });
+ let mut included=0usize;let mut omitted=0u32;
+ for index in order{
+  let e=&mut entries[index];
+  if included.saturating_add(e.source_bytes as usize)<=MAX_INCLUDED_CONTEXT_BYTES{
+   included+=e.source_bytes as usize;
+  }else{e.included_text=None;omitted+=1;}
+ }
+ let mut warnings=Vec::new();
+ if expected.is_empty(){warnings.push("No outline, Script Bible or per-part continuity notes were saved in the source execution.".into());}
+ if omitted>0{warnings.push(format!(
+  "{omitted} saved continuity artifact(s) exceed the 96 KiB explicit prompt context budget. Their exact SHA-256 and sizes are recorded, but their text was NOT supplied to any review prompt. Review those source notes separately."
+  ));}
+ if part.is_some()&&plan.part_count>1&&!expected.keys().any(|k|k.0=="continuity"){
+  warnings.push("Part-to-part continuity was not documented in saved notes; only user-written plan objectives are available.".into());
+ }
+ Ok(ReviewContext{execution_revision:execution.revision,source_count:sources.len() as u32,
+  included_bytes:included as u64,omitted_count:omitted,entries,part_structure:relationship,warnings})
+}
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ReviewPolicy{
@@ -132,6 +222,10 @@ pub struct ReviewPolicy{
  pub audience:String,pub tone:String,pub style:String,pub language:String,
  pub single_instructions:String,pub per_part_instructions:String,pub final_instructions:String,
  pub title:String,pub topic:String,pub part_objective:Option<String>,pub target_words:Option<u32>,
+ // Optional additive field: absent from Phase 03J historical snapshots so their
+ // prior serialized digest chains remain byte-for-byte compatible.
+ #[serde(default,skip_serializing_if="Option::is_none")]
+ pub continuity:Option<ReviewContext>,
 }
 fn policy(plan:&ScriptStudioPlanV1,part:Option<u32>)->Result<ReviewPolicy,ReviewError>{
  validate_stored_plan(plan).map_err(|_|corrupt())?;
@@ -150,7 +244,7 @@ fn policy(plan:&ScriptStudioPlanV1,part:Option<u32>)->Result<ReviewPolicy,Review
   language:plan.language.clone(),single_instructions:cfg.review.single_script_instructions.clone(),
   per_part_instructions:cfg.review.per_part_instructions.clone(),final_instructions:cfg.review.final_script_instructions.clone(),
   title:plan.title.clone(),topic:plan.topic.clone(),part_objective:item.map(|x|x.objective.clone()),
-  target_words:item.map(|x|x.target_words)
+  target_words:item.map(|x|x.target_words),continuity:None
  })
 }
 #[derive(Clone,Debug,Serialize,Deserialize)]
@@ -160,8 +254,13 @@ pub struct ScriptVersion {pub index:u32,pub text:ReviewObject,pub source:String,
  pub validation_findings:Vec<String>}
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
+pub struct SectionCoverage{pub start_byte:u64,pub end_byte:u64,pub sha256:String}
+#[derive(Clone,Debug,Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct SectionReview{pub index:u32,pub bytes:u32,pub prompt:ReviewObject,pub raw:Option<ReviewObject>,
- pub report:Option<Report>,pub score:Option<u32>,pub validation_issues:Vec<String>}
+ pub report:Option<Report>,pub score:Option<u32>,pub validation_issues:Vec<String>,
+ #[serde(default,skip_serializing_if="Option::is_none")]
+ pub coverage:Option<SectionCoverage>}
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct ReviewRound {pub index:u32,pub version_index:u32,pub mode:String,pub created_at:String,
@@ -207,6 +306,21 @@ fn sections(text:&str)->Result<Vec<&str>,ReviewError>{
   let mut end=(start+SECTION_BYTES).min(text.len());
   while !text.is_char_boundary(end){end-=1}
   if end==start{return Err(invalid())}
+  if end<text.len(){
+   // Prefer complete sentences, paragraphs and line breaks near the end of
+   // the budget. Fallback remains an exact UTF-8 boundary, never a deletion.
+   let lower=start+SECTION_BYTES/2;
+   let mut preferred=None;
+   for (offset,ch) in text[start..end].char_indices().rev(){
+    let at=start+offset;let following=at+ch.len_utf8();
+    if following<=lower{break}
+    if (matches!(ch,'.'|'?'|'!'|'。'|'؟'|'\n') &&
+        text[following..].chars().next().is_some_and(|c|c.is_whitespace())){
+     preferred=Some(following);break;
+    }
+   }
+   if let Some(p)=preferred{end=p}
+  }
   out.push(&text[start..end]);start=end;
   if out.len()>MAX_SECTIONS{return Err(err(ReviewErrorCode::InvalidInput,"Script exceeds review-section limit; review individual parts instead."))}
  }
@@ -228,6 +342,8 @@ fn prompt(policy:&ReviewPolicy,mode:&str,version:&ScriptVersion,section:&str,ind
  "channelAudience":policy.audience,"tone":policy.tone,"style":policy.style,
  "language":policy.language,"topic":policy.topic,"title":policy.title,
  "partObjective":policy.part_objective,"targetWords":policy.target_words,
+ "immutableSourceContinuity":policy.continuity,
+ "continuityEvidence":"Saved user-authored notes and plan objectives only; omitted notes are explicitly listed and were NOT reviewed.",
  "rubric":policy.rubric,"singleInstructions":policy.single_instructions,
  "partInstructions":policy.per_part_instructions,"finalInstructions":policy.final_instructions,
  "scorePolicy":"Each rubric key must be scored with integer points no larger than its weight. Sum 0-100.",
@@ -246,6 +362,120 @@ fn prompt(policy:&ReviewPolicy,mode:&str,version:&ScriptVersion,section:&str,ind
 }
 fn all_covered(round:&ReviewRound)->bool{
  !round.sections.is_empty() && round.sections.iter().all(|s|s.report.is_some()&&s.score.is_some())
+}
+// Recompute report scoring and approval evidence when reopening a checkpoint.
+// A forged or damaged local approval is never trusted just because JSON parses.
+fn proof(round:&ReviewRound)->Result<String,ReviewError>{
+ let raw=serde_json::to_vec(&round.sections.iter().map(|s|(&s.raw,&s.report,&s.score)).collect::<Vec<_>>())
+  .map_err(|_|storage())?;
+ Ok(digest(&raw))
+}
+fn same<A:Serialize,B:Serialize>(a:&A,b:&B)->Result<bool,ReviewError>{
+ Ok(serde_json::to_vec(a).map_err(|_|storage())?==serde_json::to_vec(b).map_err(|_|storage())?)
+}
+fn valid_snapshot(dir:&Path,s:&ReviewState)->Result<(),ReviewError>{
+ if let Some(ctx)=&s.policy.continuity{
+  if ctx.execution_revision!=s.source_execution_revision||ctx.source_count as usize!=ctx.entries.len()
+   ||ctx.omitted_count as usize!=ctx.entries.iter().filter(|e|e.included_text.is_none()).count()
+   ||ctx.included_bytes!=ctx.entries.iter().filter_map(|e|e.included_text.as_ref().map(|t|t.len() as u64)).sum::<u64>()
+   ||ctx.included_bytes>MAX_INCLUDED_CONTEXT_BYTES as u64{return Err(corrupt())}
+  let mut seen=HashSet::new();
+  for c in &ctx.entries{
+   if !seen.insert((&c.kind,c.after_part))||
+    !["outline","bible","continuity"].contains(&c.kind.as_str())||
+    c.kind!="continuity"&&c.after_part.is_some()||
+    c.kind=="continuity"&&c.after_part.is_none()||
+    c.included_text.as_ref().is_some_and(|t|t.len() as u64!=c.source_bytes||digest(t.as_bytes())!=c.source_sha256){
+     return Err(corrupt())
+   }
+  }
+  if ctx.omitted_count>0&&ctx.warnings.is_empty(){return Err(corrupt())}
+ }
+ let mut prev_digest:Option<String>=None;
+ for (i,version) in s.versions.iter().enumerate(){
+  if version.index as usize!=i||version.parent_digest!=prev_digest{return Err(corrupt())}
+  let text=object_text(dir,&version.text)?;
+  if version.validation_findings!=validate_script(&text){return Err(corrupt())}
+  prev_digest=Some(version.text.sha256.clone());
+ }
+ for round in &s.rounds{
+  if !["single","part","final","continuity","improvement"].contains(&round.mode.as_str())||
+   (s.part_index.is_some()&&["single","final"].contains(&round.mode.as_str())){return Err(corrupt())}
+  let script=object_text(dir,&s.versions[round.version_index as usize].text)?;
+  let mut offset=0u64;let has_coverage=round.sections.iter().any(|sec|sec.coverage.is_some());
+  if has_coverage && round.sections.iter().any(|sec|sec.coverage.is_none()){return Err(corrupt())}
+  for section in &round.sections{
+   if has_coverage{
+    let coverage=section.coverage.as_ref().ok_or_else(corrupt)?;
+    if coverage.start_byte!=offset||coverage.end_byte<offset||
+     coverage.end_byte>script.len() as u64{return Err(corrupt())}
+    let part=&script.as_bytes()[offset as usize..coverage.end_byte as usize];
+    if part.len()!=section.bytes as usize||digest(part)!=coverage.sha256{return Err(corrupt())}
+    offset=coverage.end_byte;
+   }else{offset=offset.saturating_add(section.bytes as u64);}
+   match (&section.raw,&section.report,section.score){
+    (None,None,None) if section.validation_issues.is_empty()=>{},
+    (Some(_),None,None) if !section.validation_issues.is_empty()=>{},
+    (Some(_),Some(report),Some(points)) if section.validation_issues.is_empty()
+      &&score(report,&s.policy.rubric)==Ok(points)=>{},
+    _=>return Err(corrupt())
+   }
+  }
+  if offset!=script.len() as u64{return Err(corrupt())}
+ }
+ let mut approved_versions=HashSet::new();
+ for approval in &s.approvals{
+  let version=s.versions.get(approval.version_index as usize).ok_or_else(corrupt)?;
+  let round=s.rounds.get(approval.round_index as usize).ok_or_else(corrupt)?;
+  if s.part_index.is_some()||!approved_versions.insert(approval.version_index)||
+   approval.confirmation!="APPROVE FINAL SCRIPT"||
+   approval.provenance!="explicit_local_user_confirmation"||
+   approval.script_digest!=version.text.sha256||
+   round.version_index!=version.index||!all_covered(round)||
+   !["single","final","improvement"].contains(&round.mode.as_str())||
+   (round.mode=="single"&&s.policy.continuity.as_ref().is_some_and(|ctx|ctx.part_structure.len()>1))||
+   !version.validation_findings.is_empty()||approval.review_digest!=proof(round)?||
+   approval.confirmed_at.trim().is_empty(){return Err(corrupt())}
+ }
+ Ok(())
+}
+fn valid_transition(before:&ReviewState,after:&ReviewState)->Result<(),ReviewError>{
+ if after.revision!=before.revision+1||after.operation_id==before.operation_id||
+  after.versions.len()<before.versions.len()||after.versions.len()>before.versions.len()+1||
+  after.rounds.len()<before.rounds.len()||after.rounds.len()>before.rounds.len()+1||
+  after.approvals.len()<before.approvals.len()||after.approvals.len()>before.approvals.len()+1||
+  !same(&before.approvals,&after.approvals[..before.approvals.len()])?{return Err(corrupt())}
+ for (i,old) in before.versions.iter().enumerate(){
+  let new=&after.versions[i];
+  if !same(&old.text,&new.text)?||old.source!=new.source||
+   old.parent_digest!=new.parent_digest||old.validation_findings!=new.validation_findings||
+   (old.improvement_prompt.is_some()&&!same(&old.improvement_prompt,&new.improvement_prompt)?)||
+   (i+1<before.versions.len()&&!same(&old.improvement_prompt,&new.improvement_prompt)?)
+   {return Err(corrupt())}
+ }
+ for (i,old) in before.rounds.iter().enumerate(){
+  let new=&after.rounds[i];
+  if i+1<before.rounds.len(){
+   if !same(old,new)?{return Err(corrupt())}
+  }else{
+   if old.index!=new.index||old.version_index!=new.version_index||old.mode!=new.mode||
+    old.created_at!=new.created_at||old.sections.len()!=new.sections.len(){return Err(corrupt())}
+   for (a,b) in old.sections.iter().zip(&new.sections){
+    if a.index!=b.index||a.bytes!=b.bytes||!same(&a.coverage,&b.coverage)?||
+     !same(&a.prompt,&b.prompt)?||
+     (a.raw.is_some()&&!same(&a.raw,&b.raw)?)||
+     (a.report.is_some()&&(!same(&a.report,&b.report)?||a.score!=b.score))
+     {return Err(corrupt())}
+   }
+  }
+ }
+ if after.approvals.len()>before.approvals.len(){
+  let a=after.approvals.last().ok_or_else(corrupt)?;
+  if a.version_index as usize!=before.versions.len()-1||
+   a.round_index as usize!=before.rounds.len()-1||after.versions.len()!=before.versions.len()||
+   after.rounds.len()!=before.rounds.len(){return Err(corrupt())}
+ }
+ Ok(())
 }
 fn chain(dir:&Path)->Result<ReviewState,ReviewError>{
  if !directory(dir,false)?{return Err(err(ReviewErrorCode::NotFound,"Review session not found."))}
@@ -283,6 +513,7 @@ fn chain(dir:&Path)->Result<ReviewState,ReviewError>{
     ||s.previous_digest.as_deref()!=Some(digest(&serde_json::to_vec(prev).map_err(|_|storage())?).as_str()){
     return Err(corrupt())
    }
+   valid_transition(prev,&s)?;
   } else if s.previous_digest.is_some(){return Err(corrupt())}
   previous=Some(s);
  }
@@ -297,6 +528,7 @@ fn chain(dir:&Path)->Result<ReviewState,ReviewError>{
   let n=e.map_err(|_|storage())?.file_name().into_string().map_err(|_|blocked())?;
   if !known.contains(&n){return Err(blocked())}
  }
+ valid_snapshot(dir,&s)?;
  Ok(s)
 }
 pub struct ReviewStore{root:PathBuf,lease:File,mutex:Mutex<()>}
@@ -338,16 +570,24 @@ impl ReviewStore{
   let instructions=chunks.iter().enumerate()
    .map(|(i,chunk)|prompt(p,mode,version,chunk,i,chunks.len()))
    .collect::<Result<Vec<_>,ReviewError>>()?;
-  let mut all=Vec::new();
+  let mut all=Vec::new();let mut offset=0u64;
   for (i,content) in instructions.iter().enumerate(){
    let o=self.object(dir,rev,&format!("prompt-r{index}-s{i}"),content,MAX_PROMPT)?;
-   all.push(SectionReview{index:i as u32,bytes:chunks[i].len() as u32,prompt:o,raw:None,report:None,
-    score:None,validation_issues:Vec::new()});
+   let chunk=chunks[i];let end=offset+chunk.len() as u64;
+   let coverage=SectionCoverage{start_byte:offset,end_byte:end,sha256:digest(chunk.as_bytes())};
+   all.push(SectionReview{index:i as u32,bytes:chunk.len() as u32,prompt:o,raw:None,report:None,
+    score:None,validation_issues:Vec::new(),coverage:Some(coverage)});
+   offset=end;
   }
+  if offset!=text.len() as u64{return Err(corrupt())}
   Ok(ReviewRound{index,version_index:version.index,mode:mode.into(),created_at:stamp(),sections:all})
  }
  pub fn start(&self,plan:&ScriptStudioPlanV1,execution:&crate::script_execution::ExecutionState,
   source:&str,input:&StartReview)->Result<ReviewState,ReviewError>{
+  self.start_with_context(plan,execution,source,input,&[])
+ }
+ pub fn start_with_context(&self,plan:&ScriptStudioPlanV1,execution:&crate::script_execution::ExecutionState,
+  source:&str,input:&StartReview,context_sources:&[ContextSource])->Result<ReviewState,ReviewError>{
   if !valid_review_id(&input.review_id)||!valid_id(&input.operation_id)
    ||!valid_id(&input.channel_id)||!valid_id(&input.execution_id)
    ||execution.channel_id!=input.channel_id||execution.execution_id!=input.execution_id
@@ -360,7 +600,8 @@ impl ReviewStore{
   };
   if source_ref.sha256!=digest(source.as_bytes())||source_ref.bytes!=source.len() as u64
    ||source.trim().is_empty()||source.len()>MAX_SCRIPT{return Err(corrupt())}
-  let policy=policy(plan,input.part_index)?;
+  let mut policy=policy(plan,input.part_index)?;
+  policy.continuity=Some(context_snapshot(plan,execution,context_sources,input.part_index)?);
   // Reject oversized/invalid prompt inputs before creating an on-disk review directory.
   let mode=if input.part_index.is_some(){"part"}else if execution.total_parts==1{"single"}else{"final"};
   let preview_version=ScriptVersion{index:0,source:String::new(),parent_digest:None,
@@ -514,6 +755,11 @@ impl ReviewStore{
      parent_digest:Some(parent),improvement_prompt:None,validation_findings:validate_script(text)});
    },
    ReviewAction::PrepareReview{mode}=>{
+    if (next.part_index.is_some()&&!["part","continuity","improvement"].contains(&mode.as_str()))||
+     (next.part_index.is_none()&&mode=="part")||
+     (mode=="single"&&next.policy.continuity.as_ref().is_some_and(|ctx|ctx.part_structure.len()>1)){
+     return Err(err(ReviewErrorCode::InvalidInput,"Review mode does not match this saved part/assembled source."))
+    }
     let v=next.versions.last().ok_or_else(corrupt)?.clone();
     let prior=next.rounds.last().ok_or_else(corrupt)?;
     if prior.version_index==v.index && !all_covered(prior){return Err(invalid())}
@@ -527,11 +773,13 @@ impl ReviewStore{
     if !version.validation_findings.is_empty(){return Err(err(ReviewErrorCode::InvalidInput,"Script has unresolved deterministic validation warnings; correct script and re-review."))}
     let round=next.rounds.last().ok_or_else(corrupt)?;
     if round.version_index!=version.index||!all_covered(round)
-     ||!["single","final","improvement"].contains(&round.mode.as_str()){return Err(invalid())}
+     ||!["single","final","improvement"].contains(&round.mode.as_str())||
+     (round.mode=="single"&&next.policy.continuity.as_ref().is_some_and(|ctx|ctx.part_structure.len()>1))
+      {return Err(invalid())}
     if next.approvals.iter().any(|a|a.version_index==version.index){return Err(conflict())}
-    let proof=serde_json::to_vec(&round.sections.iter().map(|s|(&s.raw,&s.report,&s.score)).collect::<Vec<_>>()).map_err(|_|storage())?;
+    let digest_of_review=proof(round)?;
     next.approvals.push(Approval{version_index:version.index,script_digest:version.text.sha256.clone(),
-     round_index:round.index,review_digest:digest(&proof),confirmed_at:stamp(),
+     round_index:round.index,review_digest:digest_of_review,confirmed_at:stamp(),
      confirmation:confirmation.clone(),provenance:"explicit_local_user_confirmation".into()});
    }
   }

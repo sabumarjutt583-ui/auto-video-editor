@@ -42,6 +42,8 @@ export function ScriptReviewWorkspace({seed}:Props){
  const [compareTo,setCompareTo]=useState(0);
  const retry=useRef<{key:string;request:ReviewRequest}|null>(null);
  const startRetry=useRef<{key:string;input:{channelId:string;executionId:string;reviewId:string;partIndex:number|null;operationId:string}}|null>(null);
+ const sectionDrafts=useRef<Record<string,string>>({});
+ const draftKey=(state:ReviewState,index:number)=>state.reviewId+"/"+state.rounds.at(-1)?.index+"/"+index;
 
  useEffect(()=>{
   let live=true;
@@ -70,8 +72,11 @@ export function ScriptReviewWorkspace({seed}:Props){
    const [a,b]=await Promise.all([listExecutions(seed),listReviews(seed)]);
    const usable=a.executions.filter(s=>Boolean(s.assembled)||s.parts.some(p=>Boolean(p.committed)));
    setExecutions(usable);setReviews(b);
-   if(session)await open(session.reviewId);
-   setNotice("Recovered channel-owned reviews and immutable execution list from disk.");
+   if(session){
+    const recovered=await getReview(seed,session.reviewId);
+    setSession(recovered);await showArtifacts(recovered,section);
+   }
+   setNotice("Channel-owned execution and review history verified from saved files.");
   }catch(e){setError(reviewError(e))}
   finally{setBusy(false)}
  }
@@ -86,9 +91,12 @@ export function ScriptReviewWorkspace({seed}:Props){
   setPrompt(p);setOriginal(a);setRevised(b);setSection(selected);setConfirm(false);setApprovalWord("");
   setHistoricalRound(next.rounds.length-1);setHistoricalSection(0);setHistoricalText("");setHistoricalLabel("");
   setCompareFrom(0);setCompareTo(latest.index);
+  // Part-only sessions must not default to an assembled-script review mode.
+  setMode(next.partIndex!==null?"part":
+    (next.policy.continuity?.partStructure.length??1)===1?"single":"final");
   const sec=next.rounds.at(-1)!.sections[selected];
   setCorrection(sec.report?JSON.stringify(sec.report,null,2):"");
-  setRaw("");
+  setRaw(sectionDrafts.current[draftKey(next,selected)]??"");
   setImprovement("");
   if(latest.improvementPrompt){
    setImprovement(await readReview(seed,next.reviewId,"improvement"));
@@ -129,6 +137,7 @@ export function ScriptReviewWorkspace({seed}:Props){
   try{
    const next=await applyReview(seed,retry.current.request);
    retry.current=null;setSession(next);
+   if(action.kind==="import_response")delete sectionDrafts.current[draftKey(next,section)];
    await showArtifacts(next,action.kind==="import_response"||action.kind==="correct_response"?section:0);
    setReviews(await listReviews(seed));
    setNotice("Review checkpoint "+next.revision+" committed; no external request and no production handoff.");
@@ -143,10 +152,11 @@ export function ScriptReviewWorkspace({seed}:Props){
  async function chooseSection(index:number){
   if(!session)return;setBusy(true);setError("");
   try{
+   if(!active?.raw)sectionDrafts.current[draftKey(session,section)]=raw;
    setPrompt(await readReview(seed,session.reviewId,"prompt",index));setSection(index);
    const s=session.rounds.at(-1)!.sections[index];
    setCorrection(s.report?JSON.stringify(s.report,null,2):"");
-   setRaw("");
+   setRaw(sectionDrafts.current[draftKey(session,index)]??"");
   }catch(e){setError(reviewError(e))}
   finally{setBusy(false)}
  }
@@ -231,6 +241,26 @@ export function ScriptReviewWorkspace({seed}:Props){
      {session.policy.rubric.map(c=><tr key={c.key}><td>{c.label} ({c.key})</td><td>{c.points} max</td></tr>)}
     </tbody></table>
     <p className="text-xs">Total: {session.policy.rubric.reduce((n,c)=>n+c.points,0)} points</p>
+    <details className="rounded border border-line p-2">
+     <summary className="text-xs font-semibold">Immutable saved continuity context and limitations</summary>
+     {session.policy.continuity ? <>
+      <p className="text-xs">Bound execution revision {session.policy.continuity.executionRevision} ·
+       {session.policy.continuity.sourceCount} user-authored source artifacts ·
+       {session.policy.continuity.includedBytes} bytes included ·
+       {session.policy.continuity.omittedCount} sources omitted from prompts</p>
+      {session.policy.continuity.warnings.map((w,i)=><p key={i} className="text-xs text-danger" role="alert">{w}</p>)}
+      <p className="font-semibold text-xs">Saved part structure (not an AI reconstruction)</p>
+      {session.policy.continuity.partStructure.map(p=><p className="text-xs" key={p.partIndex}>
+       Part {p.partIndex}: {p.title} · {p.objective} · target {p.targetWords} words ·
+       previous {p.previousPart??"none"} · next {p.nextPart??"none"}
+      </p>)}
+      {session.policy.continuity.entries.map((e,i)=><p className="break-all text-xs" key={i}>
+       {e.kind} {e.afterPart===null?"":"after Part "+e.afterPart} · {e.sourceBytes} bytes ·
+       {e.includedText===null?"NOT PROVIDED TO REVIEW PROMPT":"included exactly"} ·
+       digest {e.sourceSha256}
+      </p>)}
+     </> : <p className="text-xs">Legacy pre-stabilization review: continuity snapshot was not captured. Existing prompt and approval history are unchanged.</p>}
+    </details>
     <details><summary className="text-xs">Saved custom reviewer prompt</summary>
      <pre className="whitespace-pre-wrap break-words text-xs">{session.policy.promptText||"No custom reviewer prompt configured."}</pre>
     </details>
@@ -239,17 +269,24 @@ export function ScriptReviewWorkspace({seed}:Props){
     <p className="font-semibold text-sm">Review request & exact coverage</p>
     <p className="text-xs">Round {round.index} · Script version {round.versionIndex} · Mode: {round.mode} ·
       {round.sections.filter(s=>s.report).length} of {round.sections.length} sections with validated manual reports</p>
-    <p className="text-xs">{covered?"All sections have manual structured reviews.":"PARTIAL COVERAGE — do not call this a full review."}
+    <p className="text-xs">{covered
+      ? "All saved sections have manual structured reports; this is sectional coverage, NOT a verified holistic assessment."
+      : "PARTIAL COVERAGE — missing sections are unreviewed."}
       {" "}No provider identity or factual correctness is verified.</p>
     <div className="flex gap-1 flex-wrap">
      {round.sections.map(s=><Button key={s.index} disabled={busy} onClick={()=>void chooseSection(s.index)}>
       Section {s.index+1} · {s.score===null?"unscored":s.score+"/100"}
+      {s.coverage?" · bytes "+s.coverage.startByte+"–"+s.coverage.endByte:" · legacy boundaries"}
      </Button>)}
     </div>
+    {active?.coverage&&<p className="text-xs break-all">Section SHA-256: {active.coverage.sha256} ·
+     exact bytes [{active.coverage.startByte},{active.coverage.endByte}) · source digest {currentVersion.text.sha256}</p>}
     <textarea className={field} aria-label="Exact offline review prompt" readOnly rows={9} value={prompt}/>
     <Button disabled={busy||!prompt} onClick={()=>void copy(prompt)}>Copy exact review prompt</Button>
     {active&&!active.raw&&<label className="block text-xs">Paste reviewer response (original UTF-8 text or structured JSON)
-     <textarea className={field} rows={6} value={raw} onChange={e=>setRaw(e.target.value)} placeholder="Manual reviewer output. Nothing is sent automatically."/>
+     <textarea className={field} rows={6} value={raw} onChange={e=>{
+      setRaw(e.target.value);if(session)sectionDrafts.current[draftKey(session,section)]=e.target.value;
+     }} placeholder="Manual reviewer output. Nothing is sent automatically."/>
     </label>}
     {active&&!active.raw&&<Button disabled={busy||!raw.trim()} onClick={()=>void act({kind:"import_response",sectionIndex:section,raw})}>Import exact raw response</Button>}
     {active?.raw&&<Button disabled={busy} onClick={()=>void inspectRaw()}>Read original immutable response</Button>}
@@ -340,8 +377,10 @@ export function ScriptReviewWorkspace({seed}:Props){
     {currentVersion.index>round.versionIndex&&<p role="alert" className="text-xs text-danger">The improved draft has not yet been reviewed. Start a new review; old scores cannot approve it.</p>}
     <label className="text-xs">Re-review mode
       <select className={field} value={mode} onChange={e=>setMode(e.target.value as typeof mode)}>
-       <option value="final">Final assembled script</option><option value="single">Single script</option>
-       <option value="part">Part-level</option><option value="continuity">Continuity</option>
+       {session.partIndex===null&&<option value="final">Final assembled script</option>}
+       {session.partIndex===null&&(session.policy.continuity?.partStructure.length??1)===1&&<option value="single">Single script</option>}
+       {session.partIndex!==null&&<option value="part">Part-level</option>}
+       <option value="continuity">Continuity</option>
        <option value="improvement">Improvement</option>
       </select>
     </label>
@@ -350,7 +389,7 @@ export function ScriptReviewWorkspace({seed}:Props){
    <div className="rounded border border-line p-2 space-y-2">
     <p className="font-semibold text-sm">Final approval — explicit user confirmation only</p>
     <p className="text-xs">Current approval: {approved?"Approved exact revision":"Not approved"} ·
-     Review coverage: {covered?"All sections":"Partial"} · Active digest: {currentVersion.text.sha256}</p>
+     Review coverage: {covered?"All saved sections (not a holistic score)":"Partial"} · Active digest: {currentVersion.text.sha256}</p>
     {session.approvals.map((a,i)=><p className="break-all text-xs" key={i}>Historical approval {i+1}: version {a.versionIndex} · round {a.roundIndex} · {a.confirmedAt} · {a.scriptDigest}</p>)}
     <label className="text-xs flex gap-2 items-start"><input type="checkbox" checked={confirm} onChange={e=>setConfirm(e.target.checked)}/>
       I personally inspected the exact script and its reported review coverage. I understand this is not an AI guarantee.

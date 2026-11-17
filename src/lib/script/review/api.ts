@@ -29,9 +29,19 @@ export function hasFullCoverage(state:ReviewState):boolean{
  const round=state.rounds.at(-1);
  return Boolean(round&&round.sections.length>0&&round.sections.every(s=>s.report!==null&&s.score!==null));
 }
+/** Display only: Rust re-verifies every approval record and historical report on load. */
 export function isCurrentApproved(state:ReviewState):boolean{
  const current=state.versions.at(-1);
- return Boolean(current&&state.approvals.some(a=>a.versionIndex===current.index&&a.scriptDigest===current.text.sha256));
+ if(!current||state.partIndex!==null||current.validationFindings.length>0)return false;
+ return state.approvals.some(a=>{
+  const round=state.rounds[a.roundIndex];
+  return a.versionIndex===current.index&&a.scriptDigest===current.text.sha256
+   &&a.confirmation==="APPROVE FINAL SCRIPT"
+   &&a.provenance==="explicit_local_user_confirmation"
+   &&Boolean(round&&round.versionIndex===current.index
+    &&["single","final","improvement"].includes(round.mode)
+    &&round.sections.length>0&&round.sections.every(sec=>sec.report!==null&&sec.score!==null));
+ });
 }
 export function reviewError(err:unknown):string{
  if(err&&typeof err==="object"&&"message" in err){
