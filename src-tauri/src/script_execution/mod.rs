@@ -426,8 +426,18 @@ impl ExecutionStore{
             .map(|v|v.content.as_str()).unwrap_or("");
         let outline=state.outline_versions.last().map(|r|object_text(dir,r,MAX_NOTE_BYTES)).transpose()?.unwrap_or_default();
         let bible=state.bible_versions.last().map(|r|object_text(dir,r,MAX_NOTE_BYTES)).transpose()?.unwrap_or_default();
-        let previous=state.continuity_notes.iter().filter(|n|n.after_part<index)
-            .map(|n|object_text(dir,&n.document,MAX_NOTE_BYTES)).collect::<Result<Vec<_>,_>>()?;
+        // Use the latest user-saved continuity version for each completed part.
+        // Historical notes remain immutable but cannot contradict revised notes in new prompts.
+        let mut latest=std::collections::BTreeMap::new();
+        for note in state.continuity_notes.iter().filter(|n|n.after_part<index){
+            latest.insert(note.after_part,&note.document);
+        }
+        let previous=latest.into_iter()
+            .map(|(after_part,reference)|Ok(serde_json::json!({
+                "afterPart":after_part,
+                "notes":object_text(dir,reference,MAX_NOTE_BYTES)?
+            })))
+            .collect::<Result<Vec<serde_json::Value>,ExecutionError>>()?;
         let refs=serde_json::json!({
             "channelId":plan.channel_id,"planId":plan.plan_id,"part":index,"of":plan.part_count,
             "title":plan.title,"topic":plan.topic,"language":plan.language,
