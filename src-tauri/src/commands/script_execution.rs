@@ -108,3 +108,11 @@ pub async fn execution_candidate(app:AppHandle,state:State<'_,ExecutionService>,
     let store=state.store()?;
     background(move||store.candidate(&seed.channel_id,&execution_id,part_index)).await
 }
+
+#[tauri::command]
+pub async fn execution_validate_candidate(app:AppHandle,state:State<'_,ExecutionService>,
+    seed:LegacyChannelSeed,execution_id:String,part_index:u32)->Cmd<CandidateValidation>{
+    let seed=owner(&app,&seed)?;
+    let store=state.store()?;
+    background(move||store.validate_candidate(&seed.channel_id,&execution_id,part_index)).await
+}
