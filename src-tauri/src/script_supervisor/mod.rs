@@ -149,7 +149,7 @@ pub fn verify_start(plan:&ScriptStudioPlanV1,execution:&ExecutionState,input:&Ta
  if skill.is_some_and(|s|input.writer_account_id.as_deref()!=Some(s.claude_account_id.as_str())){
   return Err(SupervisorError("Configured Skill requires a different Claude account; no silent reassignment."))
  }
- let canonical_skill=skill.map(|x|match x.status{
+ let canonical_skill=skill.map(|x|match &x.status{
   crate::script_studio::SkillInstallStatus::RegisteredLocally=>"registered_locally",
   crate::script_studio::SkillInstallStatus::UserConfirmedInstalled=>"user_confirmed_installed",
   crate::script_studio::SkillInstallStatus::NeedsAttention=>"needs_attention",
@@ -220,6 +220,7 @@ impl SupervisorStore{
   let op=digest(&serde_json::to_vec(input).map_err(|_|ioerr())?);
   if clean_dir(&dir,false)?{
    let h=history(&dir)?;let first=&h[0];let last=h.last().ok_or_else(blocked)?;
+   if first.channel_id!=input.channel_id||first.task_id!=input.task_id{return Err(blocked())}
    if first.operation_id==input.operation_id&&first.operation_digest==op{return Ok(last.clone())}
    return Err(invalid())
   }
@@ -236,7 +237,9 @@ impl SupervisorStore{
  }
  pub fn get(&self,channel:&str,task:&str)->Result<TaskState,SupervisorError>{
   let _g=self.mutex.lock().unwrap_or_else(|p|p.into_inner());
-  history(&self.folder(channel,task)?)?.pop().ok_or_else(blocked)
+  let latest=history(&self.folder(channel,task)?)?.pop().ok_or_else(blocked)?;
+  if latest.channel_id!=channel||latest.task_id!=task{return Err(blocked())}
+  Ok(latest)
  }
  pub fn list(&self,channel:&str)->Result<Vec<TaskState>,SupervisorError>{
   let _g=self.mutex.lock().unwrap_or_else(|p|p.into_inner());
@@ -266,9 +269,9 @@ impl SupervisorStore{
    return Err(invalid())
   }
   if current.revision!=input.expected_revision||current.revision>=MAX_CHECKPOINTS-1{return Err(SupervisorError("Stale revision or checkpoint cap; reload and inspect."))}
-  if matches!(&current.stage,Stage::Cancelled|Stage::Completed)
-   &&!matches!(&input.action,TaskAction::SyncReview{..}|TaskAction::InspectApproval{..}){
-   return Err(SupervisorError("Terminal task cannot be restarted silently."))
+  if current.stage==Stage::Cancelled{return Err(SupervisorError("Cancelled task is terminal; source records remain intact."))}
+  if current.stage==Stage::Completed&&!matches!(&input.action,TaskAction::SyncReview{..}|TaskAction::InspectApproval{..}){
+   return Err(SupervisorError("Completed task cannot be restarted silently."))
   }
   if current.stage==Stage::Paused&&!matches!(&input.action,TaskAction::Resume|TaskAction::Cancel){
    return Err(SupervisorError("Task is paused. Resume explicitly before advancing source evidence."))

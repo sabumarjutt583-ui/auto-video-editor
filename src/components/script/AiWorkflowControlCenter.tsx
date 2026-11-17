@@ -3,7 +3,7 @@ import {invoke} from "@tauri-apps/api/core";
 import {Button} from "../ui";
 import type {LegacyChannelSeed,ScriptStudioPlanV1} from "../../lib/script/studio/types.ts";
 import {getStudioPlan} from "../../lib/script/studio/api.ts";
-import type {ExecutionState,ExecutionAction} from "../../lib/script/execution/types.ts";
+import type {ExecutionState,ExecutionAction,ExecutionRequest} from "../../lib/script/execution/types.ts";
 import {applyExecution,buildExecutionRequest,getExecution,listExecutions,readExecution,validateCandidate} from "../../lib/script/execution/api.ts";
 import type {ReviewAction,ReviewState,Report} from "../../lib/script/review/types.ts";
 import {applyReview,buildReviewRequest,getReview,listReviews,newReviewId,newReviewOperation,
@@ -19,6 +19,8 @@ export function AiWorkflowControlCenter({seed}:Props){
  const [executions,setExecutions]=useState<ExecutionState[]>([]);
  const [tasks,setTasks]=useState<SupervisorTask[]>([]);
  const [chosenExecution,setChosenExecution]=useState("");
+ const [writerChoice,setWriterChoice]=useState("");
+ const [reviewerChoice,setReviewerChoice]=useState("");
  const [transport,setTransport]=useState<SupervisorTransport>("visible_browser");
  const [active,setActive]=useState<SupervisorTask|null>(null);
  const [execution,setExecution]=useState<ExecutionState|null>(null);
@@ -35,6 +37,8 @@ export function AiWorkflowControlCenter({seed}:Props){
  const taskRetry=useRef<{key:string;request:TaskRequest}|null>(null);
  const startRetry=useRef<{key:string;input:TaskStart}|null>(null);
  const reviewRetry=useRef<{key:string;action:ReviewAction;operationId:string}|null>(null);
+ const executionRetry=useRef<{key:string;request:ExecutionRequest}|null>(null);
+ const sectionDrafts=useRef<Record<string,string>>({});
  useEffect(()=>{
   let live=true;setActive(null);setExecution(null);setReview(null);setError("");setNotice("");
   taskRetry.current=null;startRetry.current=null;reviewRetry.current=null;
@@ -57,7 +61,7 @@ export function AiWorkflowControlCenter({seed}:Props){
   let rv:ReviewState|null=null;
   if(task.lastReviewId)rv=await getReview(seed,task.lastReviewId);
   setActive(task);setExecution(e);setReview(rv);
-  if(rv){setSection(0);setReportRaw("");setPrompt(await readReview(seed,rv.reviewId,"prompt",0))}
+  if(rv){setSection(0);setReportRaw(sectionDrafts.current[rv.reviewId+"/"+rv.rounds.at(-1)?.index+"/0"]??"");setPrompt(await readReview(seed,rv.reviewId,"prompt",0))}
   else if(e.completedParts<e.totalParts&&e.parts[e.completedParts].prepared){
    setPrompt(await readExecution(seed,e.executionId,"prompt",e.completedParts+1));
   }else setPrompt("");
@@ -82,13 +86,13 @@ export function AiWorkflowControlCenter({seed}:Props){
   try{
    const execution=await getExecution(seed,chosenExecution);
    const plan:ScriptStudioPlanV1=await getStudioPlan(seed.channelId,execution.planId);
-   const key=chosenExecution+"|"+transport;
+   const key=JSON.stringify([chosenExecution,transport,writerChoice,reviewerChoice]);
    if(startRetry.current?.key!==key){
     const skill=plan.configSnapshot.skills.find(x=>x.skillId===plan.selectedSkillId);
     startRetry.current={key,input:{
      channelId:seed.channelId,taskId:newTaskId(),executionId:chosenExecution,
      operationId:newSupervisorOperation(),transport,
-     writerAccountId:plan.claudeAccountId,reviewerAccountId:plan.reviewerAccountId,
+     writerAccountId:writerChoice||plan.claudeAccountId,reviewerAccountId:reviewerChoice||plan.reviewerAccountId,
      skillStatus:skill?.status??"not_configured"
     }};
    }
@@ -113,7 +117,10 @@ export function AiWorkflowControlCenter({seed}:Props){
   if(!active||!execution||busy)return;
   setBusy(true);setError("");
   try{
-   const next=await applyExecution(seed,buildExecutionRequest(execution,action));
+   const key=JSON.stringify([execution.executionId,execution.revision,action]);
+   if(executionRetry.current?.key!==key)executionRetry.current={key,request:buildExecutionRequest(execution,action)};
+   const next=await applyExecution(seed,executionRetry.current.request);
+   executionRetry.current=null;
    const t=await applyTask(seed,taskRequest(active,{kind:"sync_execution"}));
    setExecution(next);await load(t);setTasks(await listTasks(seed));
    if(action.kind==="prepare_part"||action.kind==="prepare_continuation"){
@@ -149,7 +156,10 @@ export function AiWorkflowControlCenter({seed}:Props){
    const next=await applyTask(seed,taskRequest(active,{kind:"sync_review",reviewId:saved.reviewId}));
    await load(next);
    setTasks(await listTasks(seed));
-   if(action.kind==="import_response")setReportRaw("");
+   if(action.kind==="import_response"){
+    delete sectionDrafts.current[saved.reviewId+"/"+saved.rounds.at(-1)?.index+"/"+section];
+    setReportRaw("");
+   }
    if(action.kind==="import_revision")setRevisionText("");
    setNotice("Review checkpoint verified. Manual provenance, not verified Claude/ChatGPT output.");
   }catch(e){setError(supervisorError(e))}
@@ -158,8 +168,9 @@ export function AiWorkflowControlCenter({seed}:Props){
  async function navigateSection(index:number){
   if(!review)return;setBusy(true);setError("");
   try{
+   sectionDrafts.current[review.reviewId+"/"+review.rounds.at(-1)?.index+"/"+section]=reportRaw;
    setPrompt(await readReview(seed,review.reviewId,"prompt",index));
-   setSection(index);setReportRaw("");
+   setSection(index);setReportRaw(sectionDrafts.current[review.reviewId+"/"+review.rounds.at(-1)?.index+"/"+index]??"");
   }catch(e){setError(supervisorError(e))}
   finally{setBusy(false)}
  }
@@ -228,6 +239,18 @@ export function AiWorkflowControlCenter({seed}:Props){
     </select>
    </label>
    <Button disabled={busy||!chosenExecution} onClick={()=>void create()}>Create supervised task</Button>
+   <label className="text-xs">Explicit writer fallback (must be allowed by saved plan)
+    <select className={cn} value={writerChoice} onChange={e=>setWriterChoice(e.target.value)}>
+     <option value="">Use saved plan's Claude account</option>
+     {claude.map(a=><option value={a.id} key={a.id}>{a.name} ({a.id})</option>)}
+    </select>
+   </label>
+   <label className="text-xs">Explicit reviewer fallback (saved policy enforced in Rust)
+    <select className={cn} value={reviewerChoice} onChange={e=>setReviewerChoice(e.target.value)}>
+     <option value="">Use saved plan's reviewer account</option>
+     {[...claude,...chatgpt].map(a=><option value={a.id} key={a.id}>{a.name} ({a.id})</option>)}
+    </select>
+   </label>
    <Button disabled={busy} onClick={()=>void reload()}>Reload all from disk</Button>
   </div>
   <div className="max-h-36 overflow-y-auto space-y-1">
@@ -297,7 +320,7 @@ export function AiWorkflowControlCenter({seed}:Props){
      <Button disabled={busy||!currentPart.prepared||!response.trim()} onClick={()=>void applyExecutionAction({kind:"import_fragment",partIndex:currentPart.index,text:response})}>Import response into Rust execution</Button>
      {currentPart.fragments.length>0&&<>
       <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={warningsAccepted} onChange={e=>setWarningsAccepted(e.target.checked)}/> I inspected this candidate and explicitly accept technical warnings, if any.</label>
-      <Button disabled={busy||!warningsAccepted} onClick={()=>void (async()=>{
+      <Button disabled={busy} onClick={()=>void (async()=>{
        try{const result=await validateCandidate(seed,execution.executionId,currentPart.index);
         if(result.findings.length)setNotice("Candidate warnings: "+result.findings.join(" | "))}
        catch(e){setError(supervisorError(e))}
@@ -329,7 +352,10 @@ export function AiWorkflowControlCenter({seed}:Props){
        Section {s.index+1} · {s.score===null?"unscored":s.score+"/100"}</Button>)}
      </div>
      {lastRound.sections[section]&&!lastRound.sections[section].raw&&<label className="text-xs block">Paste original manual / mock reviewer JSON (all saved rubric keys)
-      <textarea className={cn} rows={6} value={reportRaw} onChange={e=>setReportRaw(e.target.value)}/>
+      <textarea className={cn} rows={6} value={reportRaw} onChange={e=>{
+       setReportRaw(e.target.value);
+       sectionDrafts.current[review.reviewId+"/"+lastRound.index+"/"+section]=e.target.value;
+      }}/>
       <Button disabled={busy||!reportRaw.trim()} onClick={()=>void reviewAction({kind:"import_response",sectionIndex:section,raw:reportRaw})}>Import exact reviewer response</Button>
      </label>}
      {lastRound.sections[section]?.validationIssues.length>0&&<div>

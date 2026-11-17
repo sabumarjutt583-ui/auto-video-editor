@@ -115,7 +115,8 @@ fn sw03k_04_eight_part_mock_execution_restart_review_improve_rereview_approve(){
   let prompt=exec.read("channel_a","ex_mock","prompt",i,0).unwrap();
   assert!(prompt.contains("Amir"));
   task=supervisor_action(&store,&task,TaskAction::MarkAwaitingResponse,None,None);
-  let text=format!("Part {i}: Amir reaches the next place. This is deterministic local mock output. 😀 اردو. Completed.");
+  let text=format!("Part {i}: Amir reaches the next place. {} 😀 اردو. Completed.",
+   "This is deterministic local mock output, never a Claude response. ".repeat(170));
   e=do_action(&exec,&plan,&e,ExecutionAction::ImportFragment{part_index:i,text},"fragment");
   task=supervisor_action(&store,&task,TaskAction::SyncExecution,Some(&e),None);
   assert_eq!(task.stage,Stage::ResponseImported);
@@ -160,6 +161,7 @@ fn sw03k_04_eight_part_mock_execution_restart_review_improve_rereview_approve(){
   review_id:"rv_mock".into(),part_index:None,operation_id:"op_start_review".into()};
  let mut v=reviews.start_with_context(&plan,&e,&script,&start,&notes).unwrap();
  assert_eq!(v.policy.continuity.as_ref().unwrap().source_count,9);
+ assert!(v.rounds[0].sections.len()>1,"Multi-section mock review coverage required");
  assert!(reviews.read("channel_a","rv_mock","prompt",0).unwrap().contains("Amir"));
  let report=|s:&ReviewState|Report{scores:s.policy.rubric.iter().map(|c|CategoryScore{key:c.key.clone(),points:c.points}).collect(),
   findings:vec![Finding{severity:Severity::Info,category:"hook".into(),summary:"Manual fixture.".into(),
@@ -170,8 +172,14 @@ fn sw03k_04_eight_part_mock_execution_restart_review_improve_rereview_approve(){
  assert!(invalid.rounds[0].sections[0].score.is_none());
  v=reviews.apply(&action(&invalid,ReviewAction::CorrectResponse{section_index:0,report:report(&invalid)},"correct")).unwrap();
  task=supervisor_action(&store,&task,TaskAction::SyncReview{review_id:"rv_mock".into()},None,Some(&v));
- assert_eq!(task.stage,Stage::AwaitingApproval);
+ assert_eq!(task.stage,Stage::ReviewPending,"One corrected section cannot imply full review");
  assert!(task.approval_digest.is_none());
+ for index in 1..v.rounds[0].sections.len(){
+  let raw=serde_json::to_string(&report(&v)).unwrap();
+  v=reviews.apply(&action(&v,ReviewAction::ImportResponse{section_index:index as u32,raw},"rest")).unwrap();
+ }
+ task=supervisor_action(&store,&task,TaskAction::SyncReview{review_id:"rv_mock".into()},None,Some(&v));
+ assert_eq!(task.stage,Stage::AwaitingApproval);
  v=reviews.apply(&action(&v,ReviewAction::PrepareImprovement{goals:vec!["Sharper hook".into()]},"improvement")).unwrap();
  v=reviews.apply(&action(&v,ReviewAction::ImportRevision{text:format!("Improved opening. {}",script)},"revised")).unwrap();
  assert!(v.approvals.is_empty());
@@ -273,4 +281,27 @@ fn sw03k_10_paused_task_rejects_mutations_without_resume(){
  assert!(store.apply(&bad,None,None).is_err());
  assert_eq!(store.get("channel_a","su_mock").unwrap().stage,Stage::Paused);
  drop(ex);drop(store);fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn sw03k_11_single_part_mock_verifies_assembly_and_restart(){
+ let (root,plan,exec,mut e,store,mut t)=test_setup(1);
+ e=do_action(&exec,&plan,&e,ExecutionAction::PreparePart{part_index:1,extra_instructions:String::new()},"one_prepared");
+ t=supervisor_action(&store,&t,TaskAction::SyncExecution,Some(&e),None);
+ assert_eq!(t.stage,Stage::PromptPrepared);
+ e=do_action(&exec,&plan,&e,ExecutionAction::ImportFragment{part_index:1,
+  text:"Single-part offline mock narration. Verified exact text. اردو 😀. End.".into()},"one_import");
+ t=supervisor_action(&store,&t,TaskAction::SyncExecution,Some(&e),None);
+ assert_eq!(t.stage,Stage::ResponseImported);
+ e=do_action(&exec,&plan,&e,ExecutionAction::CommitPart{part_index:1,accept_warnings:true},"one_commit");
+ t=supervisor_action(&store,&t,TaskAction::SyncExecution,Some(&e),None);
+ assert_eq!(t.stage,Stage::PartCommitted);
+ e=do_action(&exec,&plan,&e,ExecutionAction::Assemble,"one_assemble");
+ t=supervisor_action(&store,&t,TaskAction::SyncExecution,Some(&e),None);
+ assert_eq!(t.stage,Stage::ReviewPending);
+ assert!(exec.read("channel_a","ex_mock","assembled",0,0).unwrap().contains("Single-part"));
+ drop(exec);drop(store);
+ let reopened=SupervisorStore::new(root.join("supervisor")).unwrap();
+ assert_eq!(reopened.get("channel_a","su_mock").unwrap().stage,Stage::ReviewPending);
+ drop(reopened);fs::remove_dir_all(root).unwrap();
 }
