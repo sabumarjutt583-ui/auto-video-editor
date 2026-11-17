@@ -67,6 +67,33 @@ test("SW-03H-TS-02 pre-existing profile export and import still create new IDs",
   assert.notEqual(imported.id,first.id);
   assert.equal(imported.script.masterPrompt,first.script.masterPrompt);
 });
+test("SW-03H-TS-02A legacy profile roundtrip preserves exact Unicode, spaces and CRLF", () => {
+  const samples = [
+    "  Original 🧠\nاردو 한국어 'quoted' \r\n",
+    "\t\r\n🎬 اردو 한국어 日本語\n\n  ",
+    " \t \r\n",
+    "",
+  ];
+  for (const [index, master] of samples.entries()) {
+    const original = profile(`exact-${index}`, master);
+    const imported = importProfile(exportProfile(original), [original], index + 500);
+    assert(imported);
+    assert.notEqual(imported.id, original.id);
+    assert.equal(imported.script.masterPrompt, master);
+    assert.equal(seedFromProfile(imported).masterPrompt, master);
+  }
+});
+test("SW-03H-TS-02B malformed master prompt is safely rejected without trimming valid text", () => {
+  const original = profile("invalid-master");
+  const wrapped = JSON.parse(exportProfile(original)) as { profile: {script: {masterPrompt: unknown}}};
+  wrapped.profile.script.masterPrompt = 42;
+  const imported = importProfile(JSON.stringify(wrapped), [original], 601);
+  assert(imported);
+  assert.equal(imported.script.masterPrompt, "");
+  const preserved = importProfile(exportProfile(original), [original], 602);
+  assert(preserved);
+  assert.equal(preserved.script.masterPrompt, prompt);
+});
 test("SW-03H-TS-03 same human channel name does not conflate IDs", () => {
   const a=config("channel-A"),b=config("channel-B");
   assert.equal(a.channelName,b.channelName);
