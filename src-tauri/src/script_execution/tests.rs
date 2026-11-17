@@ -217,5 +217,9 @@ fn sw_03i_exact_fragment_retry_and_no_unverified_completion(){
     assert_eq!(replay.parts[0].fragments.len(),1);
     assert_eq!(store.read(&p.channel_id,"ex_test","fragment",1,0).unwrap(),"  한국어\r\nاردو 😀  ");
     assert_eq!(store.candidate(&p.channel_id,"ex_test",1).unwrap(),"  한국어\r\nاردو 😀  ");
+    // A fresh operation identity must not silently duplicate the same response text.
+    let duplicate=request(&state,fragment(1,"  한국어\r\nاردو 😀  "),"duplicate_attempt");
+    assert!(matches!(store.apply(&p,&duplicate).err().map(|e|e.code),Some(ExecutionErrorCode::Conflict)));
+    assert_eq!(store.get(&p.channel_id,"ex_test").unwrap().parts[0].fragments.len(),1);
     drop(store);fs::remove_dir_all(root).unwrap();
 }
