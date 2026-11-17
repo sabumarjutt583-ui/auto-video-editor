@@ -76,6 +76,11 @@ jobs:
         working-directory: src-tauri
         run: cargo check --locked --features admin
 
+      - name: Attempt unfiltered Rust suite (informational, not Windows GUI)
+        working-directory: src-tauri
+        continue-on-error: true
+        run: cargo test --locked
+
   rust-windows:
     name: Windows Rust job-store tests and build
     runs-on: windows-latest
