@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../ui";
 import type { LegacyChannelSeed, ScriptStudioPlanV1 } from "../../lib/script/studio/types.ts";
 import { listStudioPlans } from "../../lib/script/studio/api.ts";
-import type { ExecutionAction,ExecutionList,ExecutionRequest,ExecutionState } from "../../lib/script/execution/types.ts";
+import type { CandidateValidation,ExecutionAction,ExecutionList,ExecutionRequest,ExecutionState } from "../../lib/script/execution/types.ts";
 import {
   applyExecution,buildExecutionRequest,errorDescription,getExecution,listExecutions,
-  newExecutionId,newExecutionOperationId,readCandidate,readExecution,startExecution,
+  newExecutionId,newExecutionOperationId,readCandidate,readExecution,startExecution,validateCandidate,
 } from "../../lib/script/execution/api.ts";
 
 const cn="w-full rounded border border-line bg-surface p-2 text-sm";
@@ -29,6 +29,7 @@ export function ScriptExecutionWorkspace({seed}:Props){
   const [readText,setReadText]=useState("");
   const [readLabel,setReadLabel]=useState("");
   const [candidate,setCandidate]=useState("");
+  const [validation,setValidation]=useState<CandidateValidation|null>(null);
   const [candidateReviewed,setCandidateReviewed]=useState(false);
   const [acceptWarnings,setAcceptWarnings]=useState(false);
   const [historyPart,setHistoryPart]=useState(1);
@@ -65,7 +66,7 @@ export function ScriptExecutionWorkspace({seed}:Props){
     setBusy(true);setError("");setMessage("");
     try{
       const result=await getExecution(seed,id);
-      setSession(result);pending.current=null;setCandidate("");setResponse("");
+      setSession(result);pending.current=null;setCandidate("");setValidation(null);setResponse("");
       setReadText("");setReadLabel("");setHistoryPart(1);
       const [o,b]=await Promise.all([
         result.outlineVersions.length?readExecution(seed,id,"outline"):Promise.resolve(""),
@@ -111,7 +112,7 @@ export function ScriptExecutionWorkspace({seed}:Props){
         setReadText(text);
       }
       if(op.kind==="import_fragment"||op.kind==="commit_part"){
-        setResponse("");setCandidate("");setCandidateReviewed(false);setAcceptWarnings(false);
+        setResponse("");setCandidate("");setValidation(null);setCandidateReviewed(false);setAcceptWarnings(false);
       }
       if(op.kind==="assemble"||op.kind==="prepare_handoff"){
         const kind=op.kind==="assemble"?"assembled":"handoff";
@@ -134,8 +135,11 @@ export function ScriptExecutionWorkspace({seed}:Props){
     if(!session||!current)return;
     setBusy(true);setError("");
     try{
-      const text=await readCandidate(seed,session.executionId,current.index);
-      setCandidate(text);setCandidateReviewed(true);
+      const [text,findings]=await Promise.all([
+        readCandidate(seed,session.executionId,current.index),
+        validateCandidate(seed,session.executionId,current.index)
+      ]);
+      setCandidate(text);setValidation(findings);setCandidateReviewed(true);
       setMessage("Candidate reconstructed from immutable fragments. Check overlap and ending before committing.");
     }catch(e){setError(errorDescription(e))}
     finally{setBusy(false)}
@@ -228,6 +232,13 @@ export function ScriptExecutionWorkspace({seed}:Props){
             <label className="block text-xs">Candidate Part {current.index} (read-only; fragments joined by one LF)
               <textarea className={cn} value={candidate} readOnly rows={8}/>
             </label>
+            {validation&&<div className="space-y-1 text-xs">
+              <p>Rule-based count: {validation.actualWordEstimate} / {validation.targetWords} target words
+                {" · "}fragments: {validation.fragmentCount} · SHA-256: {validation.contentSha256}</p>
+              {validation.findings.length===0
+                ?<p className="text-muted">No technical warnings under the local deterministic checks; this is not an AI quality review.</p>
+                :validation.findings.map((finding,i)=><p role="alert" key={i} className="text-danger">Warning: {finding}</p>)}
+            </div>}
             <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={acceptWarnings}
               onChange={e=>setAcceptWarnings(e.target.checked)}/>
               I inspected the candidate, including possible duplicate overlap, word count and unfinished ending.
