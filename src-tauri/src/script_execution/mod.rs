@@ -504,7 +504,8 @@ impl ExecutionStore{
                     let b=object_text(&dir,&adjacent[1],MAX_PART_BYTES)?;
                     let left=a.trim_end();let right=b.trim_start();
                     let n=left.len().min(right.len()).min(128);
-                    if n>=30 && left.ends_with(&right[..right.floor_char_boundary(n)]) {
+                    let end=right.char_indices().map(|(i,_)|i).take_while(|i|*i<=n).last().unwrap_or(0);
+                    if end>=30 && left.ends_with(&right[..end]) {
                         findings.push("Possible duplicated continuation overlap; review the candidate.".into());
                     }
                 }
