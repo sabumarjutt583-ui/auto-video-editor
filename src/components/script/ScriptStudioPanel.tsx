@@ -13,6 +13,7 @@ import { StudioConfigSections } from "./StudioConfigSections";
 import { StudioPlanner } from "./StudioPlanner";
 import { ScriptExecutionWorkspace } from "./ScriptExecutionWorkspace";
 import { ScriptReviewWorkspace } from "./ScriptReviewWorkspace";
+import { AiWorkflowControlCenter } from "./AiWorkflowControlCenter";
 import { StudioBackupPanel } from "./StudioBackupPanel";
 
 interface Props { readonly profiles: readonly ChannelProfile[]; readonly initialChannelId?: string; }
@@ -174,6 +175,7 @@ export function ScriptStudioPanel({profiles,initialChannelId}:Props) {
               hasUnsavedSettings={dirty}/>
             <ScriptExecutionWorkspace key={config.channelId} seed={seed}/>
             <ScriptReviewWorkspace key={config.channelId} seed={seed}/>
+            <AiWorkflowControlCenter key={config.channelId} seed={seed}/>
             <StudioBackupPanel key={config.channelId} config={config} seed={seed}
               claude={claude} chatgpt={chatgpt}
               onImported={next=>{

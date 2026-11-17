@@ -27,6 +27,7 @@ mod script_jobs;
 mod script_execution;
 mod script_review;
 mod script_studio;
+mod script_supervisor;
 #[cfg(test)]
 mod smoke_test;
 mod sfx;
@@ -194,6 +195,11 @@ macro_rules! handler {
             commands::script_review::review_read,
             commands::script_review::review_read_history,
             commands::script_review::review_apply,
+            commands::script_supervisor::supervisor_start,
+            commands::script_supervisor::supervisor_get,
+            commands::script_supervisor::supervisor_list,
+            commands::script_supervisor::supervisor_apply,
+            commands::script_supervisor::supervisor_mock,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -391,6 +397,11 @@ macro_rules! handler {
             commands::script_review::review_read,
             commands::script_review::review_read_history,
             commands::script_review::review_apply,
+            commands::script_supervisor::supervisor_start,
+            commands::script_supervisor::supervisor_get,
+            commands::script_supervisor::supervisor_list,
+            commands::script_supervisor::supervisor_apply,
+            commands::script_supervisor::supervisor_mock,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -492,6 +503,7 @@ fn main() {
             app.manage(commands::script_studio::StudioService::initialize(app.handle()));
             app.manage(commands::script_execution::ExecutionService::initialize(app.handle()));
             app.manage(commands::script_review::ReviewService::initialize(app.handle()));
+            app.manage(commands::script_supervisor::SupervisorService::initialize(app.handle()));
             match commands::script::create(app.handle()) {
                 Ok(script) => {
                     app.manage(script);
