@@ -352,3 +352,20 @@ fn plan_id(c:char)->String{format!("sp_{}","".to_string()+&c.to_string().repeat(
     let store=t.store();
     assert!(store.get(&input).unwrap()==saved);
 }
+
+#[test] fn studio_30_saved_plan_rejects_metadata_tampering_against_snapshot(){
+    let config=ChannelStudioConfigV1::seed("channel-plan-tamper".into(),"Tamper".into(),
+        "en".into(),"  Exact اردو 한국어 🎬\r\n".into(),Some("1".into()));
+    let stored=build_plan(&config,&plan(&config,&plan_id('z')),
+        "2026-11-16T00:00:00.000Z").unwrap();
+    assert!(validate_stored_plan(&stored).is_ok());
+    let mut tampered=stored.clone();
+    tampered.reviewer_provider=ReviewerProvider::Chatgpt;
+    assert_eq!(validate_stored_plan(&tampered).err(),Some("invalid_plan_data"));
+    let mut tampered=stored.clone();
+    tampered.selected_prompt_version_id=Some("forged-version".into());
+    assert_eq!(validate_stored_plan(&tampered).err(),Some("invalid_plan_data"));
+    let mut tampered=stored.clone();
+    tampered.writing_mode=WritingMode::ClaudeSkill;
+    assert_eq!(validate_stored_plan(&tampered).err(),Some("invalid_plan_data"));
+}
