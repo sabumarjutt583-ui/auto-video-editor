@@ -106,16 +106,21 @@ jobs:
       - name: Install executable Windows FFmpeg CI sidecar (not a packaged release artifact)
         shell: pwsh
         run: |
-          $cmd = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
-          $ff = if ($cmd) { $cmd.Source } else { $null }
+          # Copy the actual installed static FFmpeg binary, never Chocolatey's
+          # PATH shim: a relocated shim cannot locate its relative package files.
+          $root = 'C:\ProgramData\chocolatey\lib\ffmpeg\tools'
+          $actual = if (Test-Path $root) {
+            Get-ChildItem -Path $root -Filter 'ffmpeg.exe' -Recurse -File | Select-Object -First 1
+          } else { $null }
+          $ff = if ($actual) { $actual.FullName } else { $null }
+          if (-not $ff) {
+            $cmd = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
+            if ($cmd -and $cmd.Source -notlike '*\chocolatey\bin\*') { $ff = $cmd.Source }
+          }
           if (-not $ff) {
             choco install ffmpeg --yes --no-progress
-            $cmd = Get-Command ffmpeg.exe -ErrorAction SilentlyContinue
-            $ff = if ($cmd) { $cmd.Source } else { $null }
-          }
-          if (-not $ff -and (Test-Path 'C:\ProgramData\chocolatey\lib\ffmpeg')) {
-            $candidate = Get-ChildItem -Path 'C:\ProgramData\chocolatey\lib\ffmpeg' -Filter 'ffmpeg.exe' -Recurse -File | Select-Object -First 1
-            if ($candidate) { $ff = $candidate.FullName }
+            $actual = Get-ChildItem -Path $root -Filter 'ffmpeg.exe' -Recurse -File | Select-Object -First 1
+            if ($actual) { $ff = $actual.FullName }
           }
           if (-not $ff -or -not (Test-Path $ff)) { throw 'Real FFmpeg.exe missing: Windows full-suite media tests cannot be validated.' }
           New-Item -ItemType Directory -Path src-tauri/binaries -Force | Out-Null

@@ -370,7 +370,7 @@ fn proof(round:&ReviewRound)->Result<String,ReviewError>{
   .map_err(|_|storage())?;
  Ok(digest(&raw))
 }
-fn same<A:Serialize,B:Serialize>(a:&A,b:&B)->Result<bool,ReviewError>{
+fn same<A:Serialize + ?Sized,B:Serialize + ?Sized>(a:&A,b:&B)->Result<bool,ReviewError>{
  Ok(serde_json::to_vec(a).map_err(|_|storage())?==serde_json::to_vec(b).map_err(|_|storage())?)
 }
 fn valid_snapshot(dir:&Path,s:&ReviewState)->Result<(),ReviewError>{
