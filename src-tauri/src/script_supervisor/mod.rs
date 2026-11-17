@@ -51,13 +51,23 @@ pub enum Stage{
  PartCommitted,ReviewPending,ReviewImported,ImprovementPending,AwaitingApproval,
  Completed,Paused,Cancelled,Failed
 }
-#[derive(Clone,Debug,Serialize,Deserialize)]
+#[derive(Clone,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
 pub struct SupervisorSnapshot{
  pub plan:ScriptStudioPlanV1,pub plan_sha256:String,pub execution_id:String,
  pub writer_account_id:Option<String>,pub reviewer_account_id:Option<String>,
  pub reviewer_provider:String,pub selected_skill_id:Option<String>,pub selected_skill_name:Option<String>,
  pub skill_status:String,pub transport:Transport,pub capabilities:Vec<String>,
+}
+impl std::fmt::Debug for SupervisorSnapshot{
+ fn fmt(&self,f:&mut std::fmt::Formatter<'_>)->std::fmt::Result{
+  f.debug_struct("SupervisorSnapshot")
+   .field("plan_id",&self.plan.plan_id)
+   .field("plan_sha256",&self.plan_sha256)
+   .field("execution_id",&self.execution_id)
+   .field("transport",&self.transport)
+   .field("selected_skill_id",&self.selected_skill_id).finish()
+ }
 }
 #[derive(Clone,Debug,Serialize,Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
@@ -117,11 +127,21 @@ pub fn verify_start(plan:&ScriptStudioPlanV1,execution:&ExecutionState,input:&Ta
   ||execution.channel_id!=input.channel_id||execution.execution_id!=input.execution_id
   ||execution.plan_id!=plan.plan_id||execution.plan_digest!=hash{return Err(invalid())}
  if input.transport==Transport::AuthorizedApi{return Err(SupervisorError("No authorized API adapter is configured. No consumer-site automation is permitted."))}
- if let Some(ref expected)=plan.claude_account_id{
-  if input.writer_account_id.as_deref()!=Some(expected){return Err(SupervisorError("Account differs from immutable plan; create a new plan to change account."))}
+ let a=&plan.config_snapshot.accounts;
+ if plan.claude_account_id!=input.writer_account_id{
+  if a.writer_policy!=crate::script_studio::AccountPolicy::AutomaticPermitted
+   ||!input.writer_account_id.as_ref().is_some_and(|id|a.allowed_claude_account_ids.contains(id)){
+   return Err(SupervisorError("Writer account differs from the immutable plan. An explicit permitted fallback is required."))
+  }
  }
- if let Some(ref expected)=plan.reviewer_account_id{
-  if input.reviewer_account_id.as_deref()!=Some(expected){return Err(SupervisorError("Reviewer account differs from immutable plan."))}
+ if plan.reviewer_account_id!=input.reviewer_account_id{
+  let allowed=if matches!(&plan.reviewer_provider,crate::script_studio::ReviewerProvider::Claude){
+   &a.allowed_claude_account_ids
+  }else{&a.allowed_chatgpt_account_ids};
+  if a.reviewer_policy!=crate::script_studio::AccountPolicy::AutomaticPermitted
+   ||!input.reviewer_account_id.as_ref().is_some_and(|id|allowed.contains(id)){
+   return Err(SupervisorError("Reviewer account differs from the immutable plan. An explicit permitted fallback is required."))
+  }
  }
  let skill=plan.selected_skill_id.as_ref().and_then(|id|
   plan.config_snapshot.skills.iter().find(|s|&s.skill_id==id));
@@ -129,7 +149,12 @@ pub fn verify_start(plan:&ScriptStudioPlanV1,execution:&ExecutionState,input:&Ta
  if skill.is_some_and(|s|input.writer_account_id.as_deref()!=Some(s.claude_account_id.as_str())){
   return Err(SupervisorError("Configured Skill requires a different Claude account; no silent reassignment."))
  }
- if input.skill_status.len()>80{return Err(invalid())}
+ let canonical_skill=skill.map(|x|match x.status{
+  crate::script_studio::SkillInstallStatus::RegisteredLocally=>"registered_locally",
+  crate::script_studio::SkillInstallStatus::UserConfirmedInstalled=>"user_confirmed_installed",
+  crate::script_studio::SkillInstallStatus::NeedsAttention=>"needs_attention",
+ }).unwrap_or("not_configured");
+ if input.skill_status!=canonical_skill{return Err(SupervisorError("Skill status must match the immutable local registry; remote activation is never assumed."))}
  Ok(SupervisorSnapshot{plan:plan.clone(),plan_sha256:hash,execution_id:input.execution_id.clone(),
   writer_account_id:input.writer_account_id.clone(),reviewer_account_id:input.reviewer_account_id.clone(),
   reviewer_provider:match plan.reviewer_provider{
@@ -241,8 +266,12 @@ impl SupervisorStore{
    return Err(invalid())
   }
   if current.revision!=input.expected_revision||current.revision>=MAX_CHECKPOINTS-1{return Err(SupervisorError("Stale revision or checkpoint cap; reload and inspect."))}
-  if matches!(current.stage,Stage::Cancelled|Stage::Completed)&&!matches!(&input.action,TaskAction::SyncReview{..}|TaskAction::InspectApproval{..}){
+  if matches!(&current.stage,Stage::Cancelled|Stage::Completed)
+   &&!matches!(&input.action,TaskAction::SyncReview{..}|TaskAction::InspectApproval{..}){
    return Err(SupervisorError("Terminal task cannot be restarted silently."))
+  }
+  if current.stage==Stage::Paused&&!matches!(&input.action,TaskAction::Resume|TaskAction::Cancel){
+   return Err(SupervisorError("Task is paused. Resume explicitly before advancing source evidence."))
   }
   let mut next=current.clone();
   next.revision+=1;next.previous_digest=Some(digest(&serde_json::to_vec(current).map_err(|_|ioerr())?));
@@ -253,16 +282,29 @@ impl SupervisorStore{
    TaskAction::Resume=>{if current.stage!=Stage::Paused{return Err(invalid())}
     next.stage=current.resume_stage.clone().ok_or_else(invalid)?;next.resume_stage=None;"user_resumed"},
    TaskAction::Cancel=>{next.stage=Stage::Cancelled;"cancelled_without_deleting_source_data"},
-   TaskAction::PreparePrompt=>{if current.stage==Stage::Paused{return Err(invalid())}
-    next.stage=Stage::PromptPrepared;"local_prompt_prepared_not_submitted"},
+   TaskAction::PreparePrompt=>{
+    let source=e.ok_or_else(||SupervisorError("A prompt cannot be marked prepared without a verified execution checkpoint."))?;
+    if source.channel_id!=current.channel_id||source.execution_id!=current.snapshot.execution_id
+      ||source.plan_digest!=current.snapshot.plan_sha256
+      ||!source.parts.iter().any(|p|p.prepared.is_some()&&p.committed.is_none()){return Err(invalid())}
+    next.stage=Stage::PromptPrepared;"verified_local_prompt_prepared_not_submitted"},
    TaskAction::MarkBrowserOpening=>{if current.snapshot.transport!=Transport::VisibleBrowser{return Err(invalid())}
     next.stage=Stage::BrowserOpening;"visible_browser_launch_requested"},
    TaskAction::MarkBrowserOpened=>{if current.stage!=Stage::BrowserOpening||current.snapshot.transport!=Transport::VisibleBrowser{return Err(invalid())}
     next.stage=Stage::AwaitingUserAction;"browser_window_opened_manual_interaction_required"},
-   TaskAction::MarkLoginRequired=>{next.stage=Stage::AwaitingLogin;"user_managed_signin_needed"},
-   TaskAction::MarkUserHandoff=>{next.stage=Stage::AwaitingUserAction;"manual_user_action_required_no_submission_claim"},
-   TaskAction::MarkSubmissionUncertain=>{next.stage=Stage::SubmissionUncertain;"delivery_uncertain_no_auto_retry"},
-   TaskAction::MarkAwaitingResponse=>{if current.stage==Stage::Paused{return Err(invalid())}
+   TaskAction::MarkLoginRequired=>{if current.snapshot.transport!=Transport::VisibleBrowser{return Err(invalid())}
+    next.stage=Stage::AwaitingLogin;"user_managed_signin_needed"},
+   TaskAction::MarkUserHandoff=>{if current.snapshot.transport!=Transport::VisibleBrowser{return Err(invalid())}
+    next.stage=Stage::AwaitingUserAction;"manual_user_action_required_no_submission_claim"},
+   TaskAction::MarkSubmissionUncertain=>{
+    if !matches!(&current.stage,Stage::PromptPrepared|Stage::AwaitingUserAction|Stage::AwaitingResponse){
+     return Err(SupervisorError("No prepared prompt or user handoff exists; submission cannot be marked uncertain."))
+    }
+    next.stage=Stage::SubmissionUncertain;"delivery_uncertain_no_auto_retry"},
+   TaskAction::MarkAwaitingResponse=>{
+    if !matches!(&current.stage,Stage::PromptPrepared|Stage::AwaitingUserAction|Stage::SubmissionUncertain){
+     return Err(SupervisorError("Awaiting response requires prior saved prompt or manual browser handoff."))
+    }
     next.stage=Stage::AwaitingResponse;"awaiting_manual_or_mock_response_not_received"},
    TaskAction::SyncExecution=>{
     let x=e.ok_or_else(invalid)?;

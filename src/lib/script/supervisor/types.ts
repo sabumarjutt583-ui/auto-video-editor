@@ -34,6 +34,6 @@ export type SupervisorAction =
  |{kind:"inspect_approval";reviewId:string};
 export interface TaskRequest{channelId:string;taskId:string;expectedRevision:number;
  operationId:string;action:SupervisorAction}
-export type MockScenario="complete"|"partial"|"provider_failure"|"connection_lost"|
+export type MockScenario="complete"|"delayed"|"partial"|"provider_failure"|"connection_lost"|
  "submission_uncertain"|"too_large"|"invalid_review";
 export interface MockResult{status:string;provenance:string;text:string|null;issue:string|null}

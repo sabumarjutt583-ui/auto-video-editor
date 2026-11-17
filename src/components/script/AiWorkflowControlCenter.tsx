@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import {Button} from "../ui";
 import type {LegacyChannelSeed,ScriptStudioPlanV1} from "../../lib/script/studio/types.ts";
-import {getStudioPlan,listStudioClaudeAccounts,listStudioChatGptAccounts} from "../../lib/script/studio/api.ts";
+import {getStudioPlan} from "../../lib/script/studio/api.ts";
 import type {ExecutionState,ExecutionAction} from "../../lib/script/execution/types.ts";
 import {applyExecution,buildExecutionRequest,getExecution,listExecutions,readExecution,validateCandidate} from "../../lib/script/execution/api.ts";
 import type {ReviewAction,ReviewState,Report} from "../../lib/script/review/types.ts";
@@ -12,7 +12,7 @@ import type {MockScenario,SupervisorAction,SupervisorTask,SupervisorTransport,Ta
 import {applyTask,getTask,listTasks,mockText,newSupervisorOperation,newTaskId,startTask,
  supervisorError,taskMessage,taskRequest} from "../../lib/script/supervisor/api.ts";
 const cn="w-full border rounded border-line bg-surface p-2 text-xs";
-type Metadata={id:string;name:string;connected?:boolean;signingIn?:boolean;lastError?:string};
+type Metadata={id:string;name:string;connected?:boolean;signingIn?:boolean;lastError?:string;limitedUntil?:number};
 interface Props{seed:LegacyChannelSeed}
 /** Non-production control center. The only browser actions call existing user-visible profile commands. */
 export function AiWorkflowControlCenter({seed}:Props){
@@ -38,7 +38,7 @@ export function AiWorkflowControlCenter({seed}:Props){
  useEffect(()=>{
   let live=true;setActive(null);setExecution(null);setReview(null);setError("");setNotice("");
   taskRetry.current=null;startRetry.current=null;reviewRetry.current=null;
-  void Promise.allSettled([listExecutions(seed),listTasks(seed),listStudioClaudeAccounts(),listStudioChatGptAccounts()]).then(x=>{
+  void Promise.allSettled([listExecutions(seed),listTasks(seed),invoke<Metadata[]>("script_accounts"),invoke<Metadata[]>("chatgpt_accounts")]).then(x=>{
    if(!live)return;
    if(x[0].status==="fulfilled"){setExecutions(x[0].value.executions);setChosenExecution(x[0].value.executions[0]?.executionId??"")}
    else setError(supervisorError(x[0].reason));
@@ -66,7 +66,7 @@ export function AiWorkflowControlCenter({seed}:Props){
   if(busy)return;setBusy(true);setError("");
   try{
    const [ex,ts,c,g]=await Promise.all([listExecutions(seed),listTasks(seed),
-    listStudioClaudeAccounts(),listStudioChatGptAccounts()]);
+    invoke<Metadata[]>("script_accounts"),invoke<Metadata[]>("chatgpt_accounts")]);
    setExecutions(ex.executions);setTasks(ts);setClaude(c);setChatgpt(g);
    if(active){
     const refreshed=ts.find(t=>t.taskId===active.taskId);
@@ -185,8 +185,10 @@ export function AiWorkflowControlCenter({seed}:Props){
   if(!id){setError("No account selected.");return}
   setBusy(true);setError("");
   try{
+   const awaiting=await applyTask(seed,taskRequest(active,{kind:"mark_login_required"}));
+   setActive(awaiting);
    await invoke(provider==="claude"?"script_account_sign_in":"chatgpt_account_sign_in",{id});
-   const c=await listStudioClaudeAccounts(),g=await listStudioChatGptAccounts();
+   const c=await invoke<Metadata[]>("script_accounts"),g=await invoke<Metadata[]>("chatgpt_accounts");
    setClaude(c);setChatgpt(g);
    setNotice("Existing user-managed sign-in window requested. Complete any verification yourself; not evidence of an AI response.");
   }catch(e){setError(supervisorError(e))}
@@ -246,6 +248,10 @@ export function AiWorkflowControlCenter({seed}:Props){
     <p className="text-xs">Rubric total {active.snapshot.plan.configSnapshot.rubric.reduce((n,c)=>n+c.points,0)} ·
      {active.snapshot.plan.configSnapshot.rubric.map(c=>c.label+" "+c.points).join(" · ")}</p>
     <p className="text-xs">Capabilities: {active.snapshot.capabilities.join(", ")}</p>
+    <p className="text-xs">Writer session: {claude.find(x=>x.id===active.snapshot.writerAccountId)?.connected?"connected (not proof of provider response)":
+      claude.find(x=>x.id===active.snapshot.writerAccountId)?.signingIn?"user sign-in pending":"not connected / not verified"}.
+      Reviewer session: {availableAccounts.find(x=>x.id===active.snapshot.reviewerAccountId)?.connected?"connected":"not connected / not verified"}.</p>
+    {claude.find(x=>x.id===active.snapshot.writerAccountId)?.lastError&&<p role="alert" className="text-xs text-danger">Writer account: {claude.find(x=>x.id===active.snapshot.writerAccountId)?.lastError}</p>}
     <p className="text-xs">Transport: {active.snapshot.transport}; no credential material is written to this supervisor.</p>
    </details>
    <div className="flex flex-wrap gap-2">
@@ -279,7 +285,7 @@ export function AiWorkflowControlCenter({seed}:Props){
      {active.snapshot.transport==="local_mock"&&<div className="flex flex-wrap gap-2 items-end">
       <label className="text-xs">Mock response scenario
        <select className={cn} value={scenario} onChange={e=>setScenario(e.target.value as MockScenario)}>
-        {(["complete","partial","provider_failure","connection_lost","submission_uncertain","too_large","invalid_review"] as MockScenario[]).map(v=><option key={v}>{v}</option>)}
+        {(["complete","delayed","partial","provider_failure","connection_lost","submission_uncertain","too_large","invalid_review"] as MockScenario[]).map(v=><option key={v}>{v}</option>)}
        </select>
       </label>
       <Button disabled={busy} onClick={()=>void generateMock()}>Simulate local mock</Button>

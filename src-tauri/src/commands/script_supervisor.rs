@@ -96,7 +96,7 @@ pub async fn supervisor_apply(app:AppHandle,seed:LegacyChannelSeed,request:TaskR
  let reviews=review.store().map_err(|_|CommandError{message:"Review store unavailable.".into()})?;
  blocking(move||{
   let current=store.get(&channel,&request.task_id)?;
-  let e=if matches!(&request.action,TaskAction::SyncExecution){
+  let e=if matches!(&request.action,TaskAction::SyncExecution|TaskAction::PreparePrompt){
    Some(executions.get(&channel,&current.snapshot.execution_id)
     .map_err(|_|SupervisorError("Source execution missing or corrupt; not advancing."))?)
   }else{None};
@@ -109,7 +109,7 @@ pub async fn supervisor_apply(app:AppHandle,seed:LegacyChannelSeed,request:TaskR
 }
 #[derive(Clone,serde::Deserialize)]
 #[serde(rename_all="snake_case")]
-pub enum MockScenario{Complete,Partial,ProviderFailure,ConnectionLost,SubmissionUncertain,TooLarge,InvalidReview}
+pub enum MockScenario{Complete,Delayed,Partial,ProviderFailure,ConnectionLost,SubmissionUncertain,TooLarge,InvalidReview}
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct MockResult{pub status:&'static str,pub provenance:&'static str,pub text:Option<String>,pub issue:Option<&'static str>}
@@ -125,6 +125,7 @@ pub async fn supervisor_mock(seed:LegacyChannelSeed,app:AppHandle,
   MockScenario::Complete=>("mock_complete",Some(format!(
    "Part {part_index}: This is a deterministic offline test paragraph. {} The ending is complete.",
    "Controlled local text is never a Claude or ChatGPT response. ".repeat(words.min(150) as usize/10+1))),None),
+  MockScenario::Delayed=>("mock_delayed_pending",None,Some("Deterministic delay gate: no response yet; explicitly request the complete mock when ready. No timers or external calls.")),
   MockScenario::Partial=>("mock_partial",Some(format!("Part {part_index}: An intentionally unfinished fragment")) ,Some("Partial response: import as fragment, never commit without checking.")),
   MockScenario::ProviderFailure=>("mock_failure",None,Some("Synthetic provider error; no external connection was attempted.")),
   MockScenario::ConnectionLost=>("mock_disconnected",None,Some("Synthetic connection interruption; retry requires explicit user choice.")),

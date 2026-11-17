@@ -28,7 +28,7 @@ fn test_setup(parts:u32)->(PathBuf,ScriptStudioPlanV1,ExecutionStore,ExecutionSt
  let st=SupervisorStore::new(root.join("supervisor")).unwrap();
  let input=TaskStart{channel_id:"channel_a".into(),task_id:"su_mock".into(),execution_id:"ex_mock".into(),
   operation_id:"op_start_supervisor".into(),writer_account_id:Some("cl_1".into()),
-  reviewer_account_id:Some("gp_1".into()),skill_status:"user_confirmed_installed_not_provider_verified".into(),
+  reviewer_account_id:Some("gp_1".into()),skill_status:"user_confirmed_installed".into(),
   transport:Transport::LocalMock};
  let task=st.start(&plan,&e,&input).unwrap();
  (root,plan,ex,e,st,task)
@@ -53,7 +53,7 @@ fn sw03k_01_account_binding_and_capability_gates(){
  let (root,p,ex,e,s,_)=test_setup(1);
  let mut bad=TaskStart{channel_id:"channel_a".into(),task_id:"su_api".into(),execution_id:"ex_mock".into(),
   operation_id:"op_api".into(),writer_account_id:Some("cl_1".into()),reviewer_account_id:Some("gp_1".into()),
-  skill_status:"user_reported".into(),transport:Transport::AuthorizedApi};
+  skill_status:"user_confirmed_installed".into(),transport:Transport::AuthorizedApi};
  assert!(s.start(&p,&e,&bad).is_err());
  bad.transport=Transport::VisibleBrowser;bad.writer_account_id=Some("cl_2".into());
  assert!(s.start(&p,&e,&bad).is_err());
@@ -61,8 +61,9 @@ fn sw03k_01_account_binding_and_capability_gates(){
 }
 #[test]
 fn sw03k_02_pause_resume_uncertainty_cancel_and_idempotency(){
- let (root,_p,ex,_e,store,mut task)=test_setup(1);
- task=supervisor_action(&store,&task,TaskAction::PreparePrompt,None,None);
+ let (root,p,ex,e,store,mut task)=test_setup(1);
+ let e=do_action(&ex,&p,&e,ExecutionAction::PreparePart{part_index:1,extra_instructions:String::new()},"prep_first");
+ task=supervisor_action(&store,&task,TaskAction::PreparePrompt,Some(&e),None);
  assert_eq!(task.stage,Stage::PromptPrepared);
  task=supervisor_action(&store,&task,TaskAction::MarkSubmissionUncertain,None,None);
  let req=TaskRequest{channel_id:"channel_a".into(),task_id:"su_mock".into(),expected_revision:task.revision,
@@ -86,7 +87,7 @@ fn sw03k_03_visible_browser_never_claims_submission(){
  let (root,p,ex,e,store,_)=test_setup(1);
  let input=TaskStart{channel_id:"channel_a".into(),task_id:"su_browser".into(),execution_id:"ex_mock".into(),
   operation_id:"op_browser".into(),writer_account_id:Some("cl_1".into()),reviewer_account_id:Some("gp_1".into()),
-  skill_status:"local_only".into(),transport:Transport::VisibleBrowser};
+  skill_status:"user_confirmed_installed".into(),transport:Transport::VisibleBrowser};
  let browser=store.start(&p,&e,&input).unwrap();
  let req=|s:&TaskState,key:&str,action|TaskRequest{channel_id:"channel_a".into(),task_id:"su_browser".into(),
   expected_revision:s.revision,operation_id:format!("op_{key}"),action};
@@ -199,4 +200,77 @@ fn sw03k_05_orphan_file_blocks_restart_without_cleanup(){
  fs::write(&path,"partial").unwrap();
  assert!(store.get("channel_a","su_mock").is_err());
  assert!(path.exists());drop(store);drop(exec);fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn sw03k_06_stale_revisions_and_wrong_evidence_fail_closed(){
+ let (root,_plan,execution,e,store,task)=test_setup(1);
+ let wrong=TaskRequest{channel_id:"channel_b".into(),task_id:task.task_id.clone(),
+  expected_revision:task.revision,operation_id:"op_wrong".into(),action:TaskAction::SyncExecution};
+ assert!(store.apply(&wrong,Some(&e),None).is_err());
+ let mut altered=e.clone();altered.channel_id="channel_b".into();
+ let req=TaskRequest{channel_id:"channel_a".into(),task_id:task.task_id.clone(),
+  expected_revision:task.revision,operation_id:"op_sync_wrong".into(),action:TaskAction::SyncExecution};
+ assert!(store.apply(&req,Some(&altered),None).is_err());
+ let next=store.apply(&req,Some(&e),None).unwrap();
+ assert_eq!(next.revision,1);
+ let stale=TaskRequest{channel_id:"channel_a".into(),task_id:task.task_id.clone(),
+  expected_revision:0,operation_id:"op_stale".into(),action:TaskAction::Pause};
+ assert!(store.apply(&stale,None,None).is_err());
+ let mut conflicting=req.clone();conflicting.action=TaskAction::Cancel;
+ assert!(store.apply(&conflicting,None,None).is_err());
+ drop(execution);drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw03k_07_concurrent_operations_have_one_winner(){
+ let (root,_plan,ex,_e,store,task)=test_setup(1);
+ let shared=std::sync::Arc::new(store);
+ let a=TaskRequest{channel_id:task.channel_id.clone(),task_id:task.task_id.clone(),
+  expected_revision:0,operation_id:"op_race_a".into(),action:TaskAction::Pause};
+ let b=TaskRequest{channel_id:task.channel_id.clone(),task_id:task.task_id.clone(),
+  expected_revision:0,operation_id:"op_race_b".into(),action:TaskAction::Cancel};
+ let (one,two)=std::thread::scope(|scope|{
+  let t1=scope.spawn(||shared.apply(&a,None,None));
+  let t2=scope.spawn(||shared.apply(&b,None,None));
+  (t1.join().unwrap(),t2.join().unwrap())
+ });
+ assert_ne!(one.is_ok(),two.is_ok());
+ assert_eq!(shared.get("channel_a","su_mock").unwrap().revision,1);
+ drop(shared);drop(ex);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw03k_08_tampered_checkpoint_and_symlink_data_block_recovery(){
+ let (root,_plan,ex,_e,store,task)=test_setup(1);
+ let next=supervisor_action(&store,&task,TaskAction::Pause,None,None);
+ let path=root.join(format!("supervisor/channels/channel_a/su_mock/state-{:06}.json",next.revision));
+ let mut state:TaskState=serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+ state.snapshot.writer_account_id=Some("cl_2".into());
+ fs::write(&path,serde_json::to_vec(&state).unwrap()).unwrap();
+ assert!(store.get("channel_a","su_mock").is_err());
+ drop(store);drop(ex);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw03k_09_explicit_fallback_does_not_change_channel_identity(){
+ let (root,p,ex,e,store,_)=test_setup(1);
+ let accounts=vec!["cl_1".into(),"cl_2".into()];
+ assert_eq!(resolve_account(Some("cl_1"),&accounts,false,Some("cl_2"),
+  &vec!["cl_2".into()]).unwrap(),Some("cl_2".into()));
+ // An unchanged strict immutable plan must still reject that alternate.
+ let alt=TaskStart{channel_id:"channel_a".into(),task_id:"su_alt".into(),execution_id:"ex_mock".into(),
+  operation_id:"op_alt".into(),writer_account_id:Some("cl_2".into()),reviewer_account_id:Some("gp_1".into()),
+  skill_status:"user_confirmed_installed".into(),transport:Transport::LocalMock};
+ assert!(store.start(&p,&e,&alt).is_err());
+ assert_eq!(e.channel_id,"channel_a");
+ drop(ex);drop(store);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw03k_10_paused_task_rejects_mutations_without_resume(){
+ let (root,_p,ex,_e,store,task)=test_setup(1);
+ let paused=supervisor_action(&store,&task,TaskAction::Pause,None,None);
+ let bad=TaskRequest{channel_id:"channel_a".into(),task_id:"su_mock".into(),
+  expected_revision:paused.revision,operation_id:"op_no_advance".into(),
+  action:TaskAction::MarkAwaitingResponse};
+ assert!(store.apply(&bad,None,None).is_err());
+ assert_eq!(store.get("channel_a","su_mock").unwrap().stage,Stage::Paused);
+ drop(ex);drop(store);fs::remove_dir_all(root).unwrap();
 }
