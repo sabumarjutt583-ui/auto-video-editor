@@ -1,6 +1,8 @@
 name: Frontend PR validation
 
 on:
+  push:
+    branches: [feature/script-writer-multipart-execution-v1]
   pull_request:
     branches: [main, feature/script-writer-core-v1, feature/script-writer-integration-v1, feature/script-writer-comparison-v1, feature/script-writer-desktop-readiness-v1, feature/script-writer-durable-store-v1, feature/script-writer-state-machine-v1, feature/script-writer-manual-import-v1, feature/script-writer-review-approval-v1, feature/script-writer-revisions-v1, feature/script-writer-recovery-v1, feature/script-writer-channel-studio-v1]
     types: [opened, synchronize, reopened, ready_for_review]
