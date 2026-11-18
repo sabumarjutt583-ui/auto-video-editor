@@ -1,9 +1,13 @@
 import {useEffect,useRef,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import {Button} from "../ui";
+import {accountSummary,chromeOpen,chromeStatus,responseStats,type ChromeProvider,type WorkspaceReport} from "../../lib/script/chrome/api.ts";
+import {operatorCanEdit,selectReviewSection} from "../../lib/script/chrome/operator.ts";
+import {nextLocalPartToPrepare} from "../../lib/script/chrome/nextPart.ts";
+import {pendingPromptKind} from "../../lib/script/chrome/promptRecovery.ts";
 import type {LegacyChannelSeed,ScriptStudioPlanV1} from "../../lib/script/studio/types.ts";
 import {getStudioPlan} from "../../lib/script/studio/api.ts";
-import type {ExecutionState,ExecutionAction,ExecutionRequest} from "../../lib/script/execution/types.ts";
+import type {ExecutionState,ExecutionAction,ExecutionRequest,CandidateValidation} from "../../lib/script/execution/types.ts";
 import {applyExecution,buildExecutionRequest,getExecution,listExecutions,readExecution,validateCandidate} from "../../lib/script/execution/api.ts";
 import type {ReviewAction,ReviewState,Report} from "../../lib/script/review/types.ts";
 import {applyReview,buildReviewRequest,getReview,listReviews,newReviewId,newReviewOperation,
@@ -14,7 +18,7 @@ import {applyTask,getTask,listTasks,mockText,newSupervisorOperation,newTaskId,st
 const cn="w-full border rounded border-line bg-surface p-2 text-xs";
 type Metadata={id:string;name:string;connected?:boolean;signingIn?:boolean;lastError?:string;limitedUntil?:number};
 interface Props{seed:LegacyChannelSeed}
-/** Non-production control center. The only browser actions call existing user-visible profile commands. */
+/** Development-only manual operator. All browser sessions remain user-controlled. */
 export function AiWorkflowControlCenter({seed}:Props){
  const [executions,setExecutions]=useState<ExecutionState[]>([]);
  const [tasks,setTasks]=useState<SupervisorTask[]>([]);
@@ -22,9 +26,11 @@ export function AiWorkflowControlCenter({seed}:Props){
  const [writerChoice,setWriterChoice]=useState("");
  const [reviewerChoice,setReviewerChoice]=useState("");
  const [transport,setTransport]=useState<SupervisorTransport>("visible_browser");
+ const [selectedPlan,setSelectedPlan]=useState<ScriptStudioPlanV1|null>(null);
  const [active,setActive]=useState<SupervisorTask|null>(null);
  const [execution,setExecution]=useState<ExecutionState|null>(null);
  const [review,setReview]=useState<ReviewState|null>(null);
+ const [chromeReport,setChromeReport]=useState<WorkspaceReport|null>(null);
  const [claude,setClaude]=useState<Metadata[]>([]);
  const [chatgpt,setChatgpt]=useState<Metadata[]>([]);
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
@@ -34,13 +40,17 @@ export function AiWorkflowControlCenter({seed}:Props){
  const [goals,setGoals]=useState("Improve the opening hook"),[revisionText,setRevisionText]=useState("");
  const [reviewMode,setReviewMode]=useState<"final"|"single"|"improvement">("final");
  const [confirmation,setConfirmation]=useState(""),[consent,setConsent]=useState(false),[warningsAccepted,setWarningsAccepted]=useState(false);
+ const [validated,setValidated]=useState<{executionId:string;revision:number;partIndex:number;result:CandidateValidation}|null>(null);
+ const [browserStatusError,setBrowserStatusError]=useState("");
  const taskRetry=useRef<{key:string;request:TaskRequest}|null>(null);
  const startRetry=useRef<{key:string;input:TaskStart}|null>(null);
  const reviewRetry=useRef<{key:string;action:ReviewAction;operationId:string}|null>(null);
  const executionRetry=useRef<{key:string;request:ExecutionRequest}|null>(null);
  const sectionDrafts=useRef<Record<string,string>>({});
+ const reviewSelection=useRef<{reviewId:string;round:number;index:number}|null>(null);
  useEffect(()=>{
-  let live=true;setActive(null);setExecution(null);setReview(null);setError("");setNotice("");
+  let live=true;setActive(null);setExecution(null);setReview(null);setChromeReport(null);setError("");setNotice("");
+  setSelectedPlan(null);setValidated(null);setBrowserStatusError("");setWarningsAccepted(false);setConsent(false);setConfirmation("");reviewSelection.current=null;
   taskRetry.current=null;startRetry.current=null;reviewRetry.current=null;
   void Promise.allSettled([listExecutions(seed),listTasks(seed),invoke<Metadata[]>("script_accounts"),invoke<Metadata[]>("chatgpt_accounts")]).then(x=>{
    if(!live)return;
@@ -51,20 +61,46 @@ export function AiWorkflowControlCenter({seed}:Props){
    if(x[3].status==="fulfilled")setChatgpt(x[3].value);else setError("ChatGPT account list unavailable.");
   });return()=>{live=false};
  },[seed.channelId]);
+ useEffect(()=>{
+  let live=true;const e=executions.find(x=>x.executionId===chosenExecution);
+  setSelectedPlan(null);setWriterChoice("");setReviewerChoice("");
+  if(e)void getStudioPlan(seed.channelId,e.planId)
+   .then(plan=>{if(live)setSelectedPlan(plan)})
+   .catch(err=>{if(live)setError("Saved plan could not be loaded: "+supervisorError(err))});
+  return()=>{live=false};
+ },[seed.channelId,chosenExecution,executions]);
  const partIndex=execution?.completedParts===execution?.totalParts?0:(execution?.completedParts??0)+1;
  const currentPart=partIndex?execution?.parts[partIndex-1]:null;
  const lastRound=review?.rounds.at(-1),currentVersion=review?.versions.at(-1);
  const reviewedSections=lastRound?.sections.filter(s=>s.report&&s.score!==null).length??0;
  const availableAccounts=active?.snapshot.reviewerProvider==="chatgpt"?chatgpt:claude;
+ const reviewerOptions=selectedPlan?.reviewerProvider==="chatgpt"?chatgpt:selectedPlan?.reviewerProvider==="claude"?claude:[];
+ const canEdit=active?operatorCanEdit(active.stage):false;
+ const candidateCurrent=Boolean(validated&&execution&&currentPart&&validated.executionId===execution.executionId&&
+  validated.revision===execution.revision&&validated.partIndex===currentPart.index&&
+  validated.result.fragmentCount===currentPart.fragments.length);
  async function load(task:SupervisorTask){
   const e=await getExecution(seed,task.snapshot.executionId);
   let rv:ReviewState|null=null;
   if(task.lastReviewId)rv=await getReview(seed,task.lastReviewId);
+  if(active?.taskId!==task.taskId){setValidated(null);setWarningsAccepted(false);setConsent(false);setConfirmation("")}
   setActive(task);setExecution(e);setReview(rv);
-  if(rv){setSection(0);setReportRaw(sectionDrafts.current[rv.reviewId+"/"+rv.rounds.at(-1)?.index+"/0"]??"");setPrompt(await readReview(seed,rv.reviewId,"prompt",0))}
-  else if(e.completedParts<e.totalParts&&e.parts[e.completedParts].prepared){
-   setPrompt(await readExecution(seed,e.executionId,"prompt",e.completedParts+1));
-  }else setPrompt("");
+  if(task.snapshot.transport==="visible_browser"){
+   try{setChromeReport(await chromeStatus(seed,task.taskId));setBrowserStatusError("")}
+   catch(err){setChromeReport(null);setBrowserStatusError("Chrome status unavailable; script data remains accessible: "+supervisorError(err))}
+  }else{setChromeReport(null);setBrowserStatusError("")}
+  if(rv){
+   const round=rv.rounds.at(-1);
+   const selected=selectReviewSection(reviewSelection.current,rv.reviewId,round?.index??0,round?.sections.length??0);
+   reviewSelection.current={reviewId:rv.reviewId,round:round?.index??0,index:selected};
+   setSection(selected);setReportRaw(sectionDrafts.current[rv.reviewId+"/"+round?.index+"/"+selected]??"");
+   if(round?.sections.length)setPrompt(await readReview(seed,rv.reviewId,"prompt",selected));else setPrompt("");
+  }else if(e.completedParts<e.totalParts){
+   reviewSelection.current=null;
+   const part=e.parts[e.completedParts];
+   const kind=part?pendingPromptKind(part):null;
+   setPrompt(kind?await readExecution(seed,e.executionId,kind,e.completedParts+1):"");
+  }else{reviewSelection.current=null;setPrompt("")}
  }
  async function reload(){
   if(busy)return;setBusy(true);setError("");
@@ -76,7 +112,7 @@ export function AiWorkflowControlCenter({seed}:Props){
     const refreshed=ts.find(t=>t.taskId===active.taskId);
     if(refreshed)await load(refreshed);
    }
-   setNotice("Recovered verified local checkpoints and current account metadata.");
+   setNotice("Recovered verified local checkpoints and current account metadata. Browser process status is observable only for this app session.");
   }catch(e){setError(supervisorError(e))}
   finally{setBusy(false)}
  }
@@ -86,6 +122,7 @@ export function AiWorkflowControlCenter({seed}:Props){
   try{
    const execution=await getExecution(seed,chosenExecution);
    const plan:ScriptStudioPlanV1=await getStudioPlan(seed.channelId,execution.planId);
+   setSelectedPlan(plan);
    const key=JSON.stringify([chosenExecution,transport,writerChoice,reviewerChoice]);
    if(startRetry.current?.key!==key){
     const skill=plan.configSnapshot.skills.find(x=>x.skillId===plan.selectedSkillId);
@@ -115,12 +152,44 @@ export function AiWorkflowControlCenter({seed}:Props){
  }
  async function applyExecutionAction(action:ExecutionAction){
   if(!active||!execution||busy)return;
+  if(!operatorCanEdit(active.stage)){setError("Task is paused or terminal. Resume before editing saved script data.");return}
+  if(action.kind==="commit_part"&&
+   !(validated&&validated.executionId===execution.executionId&&validated.partIndex===action.partIndex&&
+     validated.revision===execution.revision&&validated.result.fragmentCount===execution.parts[action.partIndex-1]?.fragments.length)){
+   setError("Revalidate the current part before committing. Old warning acknowledgments cannot be reused.");return;
+  }
   setBusy(true);setError("");
   try{
    const key=JSON.stringify([execution.executionId,execution.revision,action]);
    if(executionRetry.current?.key!==key)executionRetry.current={key,request:buildExecutionRequest(execution,action)};
-   const next=await applyExecution(seed,executionRetry.current.request);
+   if(action.kind==="import_fragment"){
+    const part=execution.parts[action.partIndex-1];
+    if(part?.fragments.length){
+     for(let index=0;index<part.fragments.length;index++){
+      if(await readExecution(seed,execution.executionId,"fragment",action.partIndex,index)===action.text){
+       throw Error("Exact duplicate response already saved as an immutable fragment. Nothing was imported.");
+      }
+     }
+    }
+   }
+   let next=await applyExecution(seed,executionRetry.current.request);
    executionRetry.current=null;
+   let followUp="";
+   // Only create the NEXT LOCAL prompt once the prior checkpoint is safely saved.
+   // A required continuity note is never fabricated. This never sends any browser message.
+   if(action.kind==="commit_part"||action.kind==="save_continuity"){
+    const nextPart=nextLocalPartToPrepare(next,active.snapshot.plan);
+    if(nextPart!==null){
+     try{
+      next=await applyExecution(seed,buildExecutionRequest(next,{kind:"prepare_part",partIndex:nextPart,extraInstructions:""}));
+      followUp=" Part "+nextPart+" prompt prepared locally, not sent.";
+     }catch(e){
+      followUp=" Prior checkpoint saved; next part requires manual attention: "+supervisorError(e);
+     }
+    }else if(next.completedParts<next.totalParts){
+     followUp=" Save required continuity notes or prepare the next local prompt manually.";
+    }
+   }
    const t=await applyTask(seed,taskRequest(active,{kind:"sync_execution"}));
    setExecution(next);await load(t);setTasks(await listTasks(seed));
    if(action.kind==="prepare_part"||action.kind==="prepare_continuation"){
@@ -128,12 +197,14 @@ export function AiWorkflowControlCenter({seed}:Props){
    }
    if(action.kind==="import_fragment")setResponse("");
    if(action.kind==="save_continuity")setContinuity("");
-   setNotice("Verified saved execution checkpoint "+next.revision+". No provider submission.");
+   setValidated(null);setWarningsAccepted(false);
+   setNotice("Verified saved execution checkpoint "+next.revision+". No provider submission."+followUp);
   }catch(e){setError(supervisorError(e)+" Refresh saved records before retrying.")}
   finally{setBusy(false)}
  }
  async function startReviewTask(){
   if(!execution?.assembled||!active||busy)return;
+  if(!operatorCanEdit(active.stage)){setError("Resume task before starting review.");return}
   setBusy(true);setError("");
   try{
    const found=(await listReviews(seed)).reviews.find(r=>r.executionId===execution.executionId&&r.partIndex===null);
@@ -147,6 +218,7 @@ export function AiWorkflowControlCenter({seed}:Props){
  }
  async function reviewAction(action:ReviewAction){
   if(!review||!active||busy)return;
+  if(!operatorCanEdit(active.stage)){setError("Resume task before importing, revising or approving.");return}
   const key=JSON.stringify([review.reviewId,review.revision,action]);
   if(reviewRetry.current?.key!==key)reviewRetry.current={key,action,operationId:newReviewOperation()};
   setBusy(true);setError("");
@@ -161,6 +233,7 @@ export function AiWorkflowControlCenter({seed}:Props){
     setReportRaw("");
    }
    if(action.kind==="import_revision")setRevisionText("");
+   setConsent(false);setConfirmation("");
    setNotice("Review checkpoint verified. Manual provenance, not verified Claude/ChatGPT output.");
   }catch(e){setError(supervisorError(e))}
   finally{setBusy(false)}
@@ -170,40 +243,68 @@ export function AiWorkflowControlCenter({seed}:Props){
   try{
    sectionDrafts.current[review.reviewId+"/"+review.rounds.at(-1)?.index+"/"+section]=reportRaw;
    setPrompt(await readReview(seed,review.reviewId,"prompt",index));
+   reviewSelection.current={reviewId:review.reviewId,round:review.rounds.at(-1)?.index??0,index};
    setSection(index);setReportRaw(sectionDrafts.current[review.reviewId+"/"+review.rounds.at(-1)?.index+"/"+index]??"");
   }catch(e){setError(supervisorError(e))}
   finally{setBusy(false)}
  }
- async function openBrowser(provider:"claude"|"chatgpt"){
+ async function refreshChrome(){
+  if(!active||active.snapshot.transport!=="visible_browser"||busy)return;
+  setBusy(true);setError("");
+  try{setChromeReport(await chromeStatus(seed,active.taskId));setNotice("Browser process state checked; site authentication is not verified.");}
+  catch(e){setError(supervisorError(e))}finally{setBusy(false)}
+ }
+ async function openBrowser(provider:ChromeProvider,role:"writer"|"reviewer"){
   if(!active||busy||active.snapshot.transport!=="visible_browser")return;
-  const id=provider==="claude"?active.snapshot.writerAccountId:active.snapshot.reviewerAccountId;
-  if(!id){setError("No account is selected in the immutable plan.");return}
+  const id=role==="writer"?active.snapshot.writerAccountId:active.snapshot.reviewerAccountId;
+  if(!id){setError("Missing selected saved account in immutable task snapshot.");return}
+  if(role==="writer"&&provider!=="claude"||role==="reviewer"&&active.snapshot.reviewerProvider!==provider){
+   setError("Provider does not match selected channel task.");return;
+  }
   setBusy(true);setError("");
   try{
    const starting=await applyTask(seed,taskRequest(active,{kind:"mark_browser_opening"}));
    setActive(starting);
-   await invoke(provider==="claude"?"script_open_live":"chatgpt_open_live",provider==="claude"?
-    {accountId:id,conversationUrl:null}:{accountId:id});
-   const opened=await applyTask(seed,taskRequest(starting,{kind:"mark_browser_opened"}));
-   await load(opened);setTasks(await listTasks(seed));
-   setNotice("User-visible browser window opened using existing account profile. Authentication and provider response NOT verified. Close the browser window manually when finished.");
-  }catch(e){setError(supervisorError(e)+" If a browser was opened, inspect it manually; do not assume a provider response.")}
-  finally{setBusy(false)}
+   // Rust verifies saved channel, task, provider and selected account before any process launch.
+   const report=await chromeOpen(seed,starting.taskId,provider,id);
+   const latest=await applyTask(seed,taskRequest(starting,{kind:"mark_user_handoff"}));
+   await load(latest);setChromeReport(report);setTasks(await listTasks(seed));
+   setNotice((report.lastLaunchNotice??"Browser request returned.")+" Process: "+(report.lastLaunchOutcome??"unknown")+". Manual website interaction and login remain unverified.");
+  }catch(e){
+   try{setChromeReport(await chromeStatus(seed,active.taskId));}catch{/* keep original launch error */}
+   setError(supervisorError(e)+" Inspect Chrome manually if this profile is already open. No script data changed.");
+  }finally{setBusy(false)}
  }
- async function userSignIn(provider:"claude"|"chatgpt"){
+ async function userSignIn(provider:ChromeProvider,role:"writer"|"reviewer"){
   if(!active||busy)return;
-  const id=provider==="claude"?active.snapshot.writerAccountId:active.snapshot.reviewerAccountId;
-  if(!id){setError("No account selected.");return}
+  const id=role==="writer"?active.snapshot.writerAccountId:active.snapshot.reviewerAccountId;
+  if(!id||role==="writer"&&provider!=="claude"||role==="reviewer"&&active.snapshot.reviewerProvider!==provider){
+   setError("Saved account and provider must match immutable task.");return;
+  }
   setBusy(true);setError("");
   try{
    const awaiting=await applyTask(seed,taskRequest(active,{kind:"mark_login_required"}));
    setActive(awaiting);
    await invoke(provider==="claude"?"script_account_sign_in":"chatgpt_account_sign_in",{id});
-   const c=await invoke<Metadata[]>("script_accounts"),g=await invoke<Metadata[]>("chatgpt_accounts");
-   setClaude(c);setChatgpt(g);
-   setNotice("Existing user-managed sign-in window requested. Complete any verification yourself; not evidence of an AI response.");
+   const [c,g]=await Promise.all([invoke<Metadata[]>("script_accounts"),invoke<Metadata[]>("chatgpt_accounts")]);
+   setClaude(c);setChatgpt(g);await load(await getTask(seed,active.taskId));
+   setNotice("Manual sign-in flow returned. Previously reported account connection is not proof of a current website login or message.");
   }catch(e){setError(supervisorError(e))}
   finally{setBusy(false)}
+ }
+ async function pasteResponse(){
+  try{
+   const text=await navigator.clipboard.readText();
+   if(!text){setError("Clipboard is empty. No response was imported.");return}
+   setResponse(text);setNotice("User-triggered clipboard paste loaded exact text into a local draft. Review before committing.");
+  }catch(e){setError(supervisorError(e)+". Paste manually into the response field instead.")}
+ }
+ async function pasteReview(){
+  try{
+   const text=await navigator.clipboard.readText();
+   if(!text){setError("Clipboard is empty. No review imported.");return}
+   setReportRaw(text);setNotice("Review text pasted locally. No provider origin or scores have yet been verified.");
+  }catch(e){setError(supervisorError(e)+". Paste manually into the review field instead.")}
  }
  async function generateMock(){
   if(!active||!partIndex||busy)return;
@@ -222,8 +323,12 @@ export function AiWorkflowControlCenter({seed}:Props){
  }
  if(!import.meta.env.DEV)return null;
  return <section className="rounded border border-dashed border-line p-3 space-y-3" aria-label="AI Workflow Control Center">
-  <h4 className="font-semibold">AI Workflow Control Center · Phase 03K · Development Only</h4>
-  <p className="text-xs text-muted">Immutable channel plans, visible user-controlled browser handoff, local mock fixtures, and durable Rust verification. Consumer AI submission/extraction is NOT supported. No media handoff.</p>
+  <h4 className="font-semibold">Visible Chrome Script Production Workspace · Phase 03L · Development Only</h4>
+  <p className="text-xs text-muted">One dashboard for user-assisted writing, local imports, review and approval. Consumer-site submission, extraction, live login verification and API generation are NOT supported. No media handoff.</p>
+  <ol className="text-xs grid grid-cols-2 lg:grid-cols-5 gap-2 list-decimal list-inside">
+   {["Select channel","Choose saved plan","Resolve accounts","Open visible Chrome","Prepare/copy prompt","Import actual response","Continue/assemble","Review sections","Improve/re-review","Explicit approval"].map((name,i)=>
+    <li key={name} className="rounded border border-line p-2">{name}{i===9&&active?.approvalDigest?" · Approved":""}</li>)}
+  </ol>
   {error&&<p role="alert" className="text-xs text-danger">{error}</p>}
   {notice&&<p role="status" className="text-xs">{notice}</p>}
   <div className="flex flex-wrap gap-2 items-end">
@@ -238,17 +343,17 @@ export function AiWorkflowControlCenter({seed}:Props){
      <option value="local_mock">Deterministic local mock</option>
     </select>
    </label>
-   <Button disabled={busy||!chosenExecution} onClick={()=>void create()}>Create supervised task</Button>
+   <Button disabled={busy||!chosenExecution||!selectedPlan} onClick={()=>void create()}>Create supervised task</Button>
    <label className="text-xs">Explicit writer fallback (must be allowed by saved plan)
     <select className={cn} value={writerChoice} onChange={e=>setWriterChoice(e.target.value)}>
      <option value="">Use saved plan's Claude account</option>
      {claude.map(a=><option value={a.id} key={a.id}>{a.name} ({a.id})</option>)}
     </select>
    </label>
-   <label className="text-xs">Explicit reviewer fallback (saved policy enforced in Rust)
+   <label className="text-xs">Explicit {selectedPlan?.reviewerProvider??"saved"} reviewer fallback (saved policy enforced in Rust)
     <select className={cn} value={reviewerChoice} onChange={e=>setReviewerChoice(e.target.value)}>
      <option value="">Use saved plan's reviewer account</option>
-     {[...claude,...chatgpt].map(a=><option value={a.id} key={a.id}>{a.name} ({a.id})</option>)}
+     {reviewerOptions.map(a=><option value={a.id} key={a.id}>{selectedPlan?.reviewerProvider}: {a.name} ({a.id})</option>)}
     </select>
    </label>
    <Button disabled={busy} onClick={()=>void reload()}>Reload all from disk</Button>
@@ -262,12 +367,16 @@ export function AiWorkflowControlCenter({seed}:Props){
   {active&&execution&&<div className="space-y-3 border-t border-line pt-3">
    <p className="text-xs break-all">Owner {active.channelId} · Task {active.taskId} · checkpoint {active.revision} · execution {active.snapshot.executionId}</p>
    <p className="text-xs break-all">Immutable plan {active.snapshot.plan.planId} · plan digest {active.snapshot.planSha256} · stage <strong>{active.stage}</strong></p>
+   <p className="text-sm font-semibold">{active.snapshot.plan.title}</p>
+   <p className="text-xs">{active.snapshot.plan.topic} · {active.snapshot.plan.mode==="single"?"Single Script":"Multi-Part"} · {active.snapshot.plan.totalWords} target words · {active.totalParts} parts · {active.snapshot.plan.language}</p>
+   <p className="text-xs">Audience: {active.snapshot.plan.configSnapshot.writing.targetAudience} · Tone: {active.snapshot.plan.configSnapshot.writing.narrationTone} · Style: {active.snapshot.plan.configSnapshot.writing.writingStyle}</p>
    <p className="text-xs">{taskMessage(active)}</p>
    <details className="border border-line rounded p-2" open>
     <summary className="text-sm font-semibold">Channel account, Skill and transport capabilities</summary>
     <p className="text-xs">Writer: Claude {active.snapshot.writerAccountId??"NOT SELECTED"} ({claude.find(x=>x.id===active.snapshot.writerAccountId)?.name??"missing account"}) ·
       reviewer: {active.snapshot.plan.reviewerProvider} {active.snapshot.reviewerAccountId??"NOT SELECTED"} ({availableAccounts.find(x=>x.id===active.snapshot.reviewerAccountId)?.name??"missing account"})</p>
-    <p className="text-xs">Writing mode {active.snapshot.plan.writingMode} · master prompt {active.snapshot.plan.selectedPromptVersionId??"none"} · Skill {active.snapshot.selectedSkillName??"none"} ({active.snapshot.skillStatus}). Skill activation has NOT been remotely verified.</p>
+    <p className="text-xs">Writing mode {active.snapshot.plan.writingMode} · immutable master prompt {active.snapshot.plan.selectedPromptVersionId??"none"} · Skill {active.snapshot.selectedSkillName??"none"} ({active.snapshot.skillStatus}). Skill activation has NOT been remotely verified.</p>
+    {active.snapshot.selectedSkillId&&<p className="text-xs">Skill's registered Claude account {active.snapshot.plan.configSnapshot.skills.find(x=>x.skillId===active.snapshot.selectedSkillId)?.claudeAccountId??"MISSING"} · selected writer {active.snapshot.writerAccountId??"MISSING"}</p>}
     <p className="text-xs">Rubric total {active.snapshot.plan.configSnapshot.rubric.reduce((n,c)=>n+c.points,0)} ·
      {active.snapshot.plan.configSnapshot.rubric.map(c=>c.label+" "+c.points).join(" · ")}</p>
     <p className="text-xs">Capabilities: {active.snapshot.capabilities.join(", ")}</p>
@@ -276,6 +385,7 @@ export function AiWorkflowControlCenter({seed}:Props){
       Reviewer session: {availableAccounts.find(x=>x.id===active.snapshot.reviewerAccountId)?.connected?"connected":"not connected / not verified"}.</p>
     {claude.find(x=>x.id===active.snapshot.writerAccountId)?.lastError&&<p role="alert" className="text-xs text-danger">Writer account: {claude.find(x=>x.id===active.snapshot.writerAccountId)?.lastError}</p>}
     <p className="text-xs">Transport: {active.snapshot.transport}; no credential material is written to this supervisor.</p>
+    <p className="text-xs">Master Prompt: {active.snapshot.plan.configSnapshot.promptVersions.find(v=>v.versionId===active.snapshot.plan.selectedPromptVersionId)?.versionId??"Not selected"} · Writing instruction mode: {active.snapshot.plan.writingMode} · Skill installation: {active.snapshot.skillStatus==="user_confirmed_installed"?"USER-CONFIRMED only (not remotely verified)":active.snapshot.skillStatus}</p>
    </details>
    <div className="flex flex-wrap gap-2">
     <Button disabled={busy||active.stage==="paused"||active.stage==="cancelled"||active.stage==="completed"} onClick={()=>void applySupervisor({kind:"pause"})}>Pause</Button>
@@ -284,16 +394,30 @@ export function AiWorkflowControlCenter({seed}:Props){
     <Button disabled={busy} onClick={()=>void applySupervisor({kind:"sync_execution"})}>Verify execution progress</Button>
     {active.lastReviewId&&<Button disabled={busy} onClick={()=>void applySupervisor({kind:"sync_review",reviewId:active.lastReviewId!})}>Verify review/approval</Button>}
    </div>
-   {active.snapshot.transport==="visible_browser"&&<div className="rounded border border-line p-2 space-y-2">
-    <p className="font-semibold text-sm">Visible browser — local profile, manual provider actions</p>
+   {active.snapshot.transport==="visible_browser"&&<div className="rounded border border-line p-3 space-y-2">
+    <h5 className="font-semibold text-sm">Chrome Workspace · Account-specific browser profiles</h5>
+    <p className="text-xs">Selected writer {active.snapshot.writerAccountId??"missing"} (Claude) · selected reviewer {active.snapshot.reviewerAccountId??"none"} ({active.snapshot.reviewerProvider})</p>
+    <p className="text-xs">{chromeReport?.browserAvailable?"Found: "+chromeReport.browserName:"Browser unavailable or not checked"} · {chromeReport?.browserDiagnostic??"Choose a task to inspect the local browser."}</p>
+    {chromeReport?.accounts.map(a=><div key={a.profileIdentity} className="rounded bg-surface border border-line p-2 space-y-1">
+     <p className="text-xs font-semibold">{a.displayName} · {a.provider.toUpperCase()} · account {a.accountId} · profile {a.profileIdentity}</p>
+     <p className="text-xs">Saved account {a.savedAccountPresent?"present":"MISSING"} · process {a.processState.replace(/_/g," ")} · previous connection report {a.lastReportedConnected?"connected":"not connected"} · sign-in {a.signingIn?"in progress":"unverified"}.</p>
+     <p className="text-xs text-muted">{accountSummary(a)}</p>
+     {a.lastLaunchError&&<p className="text-xs text-danger">{a.lastLaunchError}</p>}
+     {a.reportedAccountError&&<p className="text-xs text-danger">Account manager: {a.reportedAccountError}</p>}
+    </div>)}
+    {browserStatusError&&<p role="alert" className="text-xs text-danger">{browserStatusError}</p>}
+    {chromeReport?.lastLaunchOutcome&&<p className="text-xs">Last open request: {chromeReport.lastLaunchOutcome.replace(/_/g," ")} · {chromeReport.lastLaunchNotice}</p>}
+    <p className="text-xs text-muted">{chromeReport?.warning??"Window status is not proof of website authentication."}</p>
     <div className="flex flex-wrap gap-2">
-     <Button disabled={busy||!active.snapshot.writerAccountId} onClick={()=>void openBrowser("claude")}>Open selected Claude window</Button>
-     <Button disabled={busy||!active.snapshot.writerAccountId} onClick={()=>void userSignIn("claude")}>User-managed Claude sign-in</Button>
-     {active.snapshot.plan.reviewerProvider==="chatgpt"&&<Button disabled={busy||!active.snapshot.reviewerAccountId} onClick={()=>void openBrowser("chatgpt")}>Open selected ChatGPT window</Button>}
-     {active.snapshot.plan.reviewerProvider==="chatgpt"&&<Button disabled={busy||!active.snapshot.reviewerAccountId} onClick={()=>void userSignIn("chatgpt")}>User-managed ChatGPT sign-in</Button>}
+     <Button disabled={busy||!active.snapshot.writerAccountId||!chromeReport?.browserAvailable||active.stage==="paused"||active.stage==="cancelled"} onClick={()=>void openBrowser("claude","writer")}>Open writer Claude in Chrome</Button>
+     <Button disabled={busy||!active.snapshot.writerAccountId} onClick={()=>void userSignIn("claude","writer")}>Claude manual sign-in</Button>
+     {active.snapshot.reviewerProvider!=="none"&&<Button disabled={busy||!active.snapshot.reviewerAccountId||!chromeReport?.browserAvailable||active.stage==="paused"||active.stage==="cancelled"} onClick={()=>void openBrowser(active.snapshot.reviewerProvider as ChromeProvider,"reviewer")}>Open reviewer {active.snapshot.reviewerProvider}</Button>}
+     {active.snapshot.reviewerProvider!=="none"&&<Button disabled={busy||!active.snapshot.reviewerAccountId} onClick={()=>void userSignIn(active.snapshot.reviewerProvider as ChromeProvider,"reviewer")}>Reviewer manual sign-in</Button>}
+     <Button disabled={busy} onClick={()=>void refreshChrome()}>Refresh process status</Button>
     </div>
-    <p className="text-xs">Close the live browser window manually. Opening a browser does not verify login or generated text. The supervisor never extracts consumer-site messages.</p>
-    <Button disabled={busy} onClick={()=>void applySupervisor({kind:"mark_submission_uncertain"})}>Mark submission uncertain (block auto retry)</Button>
+    <p className="text-xs">If Chrome is already running, switch to the existing window manually. No focus/close control is claimed. Close windows yourself; do not disconnect accounts to close them.</p>
+    <Button disabled={busy} onClick={()=>void applySupervisor({kind:"mark_submission_uncertain"})}>Mark manually submitted prompt uncertain</Button>
+    <Button disabled={busy||!prompt} onClick={()=>void applySupervisor({kind:"mark_awaiting_response"})}>I submitted manually · await response</Button>
    </div>}
    <div className="border border-line p-2 rounded space-y-2">
     <p className="text-sm font-semibold">Script progress · {execution.completedParts}/{execution.totalParts} parts · {execution.status}</p>
@@ -301,10 +425,11 @@ export function AiWorkflowControlCenter({seed}:Props){
     {currentPart&&<>
      <p className="text-xs">Part {currentPart.index}: {currentPart.title||"Untitled"} · {currentPart.objective||"No part objective"} · target {currentPart.targetWords} words · fragments {currentPart.fragments.length}</p>
      <div className="flex flex-wrap gap-2">
-      <Button disabled={busy||Boolean(currentPart.prepared)||active.stage==="paused"} onClick={()=>void applyExecutionAction({kind:"prepare_part",partIndex:currentPart.index,extraInstructions:""})}>Prepare exact part prompt</Button>
+      <Button disabled={busy||!canEdit||Boolean(currentPart.prepared)} onClick={()=>void applyExecutionAction({kind:"prepare_part",partIndex:currentPart.index,extraInstructions:""})}>Prepare exact part prompt</Button>
       {currentPart.fragments.length>0&&<Button disabled={busy} onClick={()=>void applyExecutionAction({kind:"prepare_continuation",partIndex:currentPart.index,extraInstructions:""})}>Prepare continuation</Button>}
      </div>
-     {currentPart.prepared&&<Button disabled={busy} onClick={()=>void readExecution(seed,execution.executionId,"prompt",currentPart.index).then(setPrompt).catch(e=>setError(supervisorError(e)))}>Read saved part prompt</Button>}
+     {currentPart.prepared&&<Button disabled={busy} onClick={()=>void readExecution(seed,execution.executionId,"prompt",currentPart.index).then(setPrompt).catch(e=>setError(supervisorError(e)))}>Read original part prompt (reference only)</Button>}
+     {currentPart.fragments.length>0&&!pendingPromptKind(currentPart)&&<p className="text-xs">Latest fragment is saved. Prepare a new continuation prompt if Claude has not completed this part. No old prompt will be automatically reused.</p>}
      {active.snapshot.transport==="local_mock"&&<div className="flex flex-wrap gap-2 items-end">
       <label className="text-xs">Mock response scenario
        <select className={cn} value={scenario} onChange={e=>setScenario(e.target.value as MockScenario)}>
@@ -314,25 +439,37 @@ export function AiWorkflowControlCenter({seed}:Props){
       <Button disabled={busy} onClick={()=>void generateMock()}>Simulate local mock</Button>
      </div>}
      {mock&&<p className="text-xs">Mock returned {mock.length} characters. This text was NOT automatically saved or sent.</p>}
-     {currentPart.prepared&&<label className="text-xs block">Paste exact manual or mock response to import as immutable fragment
+     {currentPart.prepared&&<label className="text-xs block">Paste actual AI response (preserve Unicode, whitespace and CRLF; never auto-submitted)
       <textarea className={cn} rows={5} value={response} onChange={e=>setResponse(e.target.value)}/>
+      <span className="text-xs">Draft only: {responseStats(response).words} words · {responseStats(response).bytes} UTF-8 bytes · {responseStats(response).lines} lines</span>
      </label>}
-     <Button disabled={busy||!currentPart.prepared||!response.trim()} onClick={()=>void applyExecutionAction({kind:"import_fragment",partIndex:currentPart.index,text:response})}>Import response into Rust execution</Button>
+     {currentPart.prepared&&<div className="flex gap-2 flex-wrap"><Button disabled={busy} onClick={()=>void pasteResponse()}>Paste from clipboard (user-triggered)</Button><Button disabled={busy||!response} onClick={()=>setResponse("")}>Clear uncommitted draft</Button></div>}
+     {response&&currentPart.prepared&&<details className="border border-line p-2"><summary className="text-xs">Exact raw response preview (not yet committed)</summary><pre className="text-xs whitespace-pre-wrap break-words">{response}</pre></details>}
+     <Button disabled={busy||!canEdit||!currentPart.prepared||!response.trim()} onClick={()=>void applyExecutionAction({kind:"import_fragment",partIndex:currentPart.index,text:response})}>Import response into Rust execution</Button>
      {currentPart.fragments.length>0&&<>
-      <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={warningsAccepted} onChange={e=>setWarningsAccepted(e.target.checked)}/> I inspected this candidate and explicitly accept technical warnings, if any.</label>
-      <Button disabled={busy} onClick={()=>void (async()=>{
-       try{const result=await validateCandidate(seed,execution.executionId,currentPart.index);
-        if(result.findings.length)setNotice("Candidate warnings: "+result.findings.join(" | "))}
-       catch(e){setError(supervisorError(e))}
-      })()}>Inspect technical warnings</Button>
-      <Button disabled={busy||!warningsAccepted} onClick={()=>void applyExecutionAction({kind:"commit_part",partIndex:currentPart.index,acceptWarnings:true})}>Commit verified part</Button>
+      <p className="text-xs">Saved immutable response fragments: {currentPart.fragments.map((f,i)=>"#"+(i+1)+" "+f.sha256.slice(0,14)).join(" · ")}. Original imports cannot be overwritten.</p>
+      <label className="flex items-center gap-2 text-xs"><input type="checkbox" disabled={!canEdit||!candidateCurrent||!validated?.result.findings.length} checked={warningsAccepted} onChange={e=>setWarningsAccepted(e.target.checked)}/> I explicitly accept this exact candidate's technical warnings.</label>
+       {candidateCurrent&&validated&&<div className="text-xs space-y-1">
+        <p>Validated: {validated.result.actualWordEstimate} estimated words / {validated.result.targetWords} target · {validated.result.fragmentCount} fragments · SHA-256 {validated.result.contentSha256}</p>
+        {validated.result.findings.length===0?<p>No technical warnings; editorial review is still required.</p>:validated.result.findings.map((f,i)=><p key={i} role="alert">{f}</p>)}
+       </div>}
+       <Button disabled={busy||!canEdit} onClick={()=>void (async()=>{
+        setError("");setValidated(null);setWarningsAccepted(false);
+        try{
+         const result=await validateCandidate(seed,execution.executionId,currentPart.index);
+         setValidated({executionId:execution.executionId,revision:execution.revision,partIndex:currentPart.index,result});
+         setNotice(result.findings.length?"Review and accept the displayed warnings before committing.":"Candidate validated with no technical warnings.");
+        }catch(err){setError(supervisorError(err))}
+       })()}>Validate exact candidate</Button>
+       <Button disabled={busy||!canEdit||!candidateCurrent||Boolean(validated?.result.findings.length&&!warningsAccepted)}
+        onClick={()=>void applyExecutionAction({kind:"commit_part",partIndex:currentPart.index,acceptWarnings:warningsAccepted})}>Commit validated part</Button>
      </>}
     </>}
     {execution.status==="active"&&execution.completedParts>0&&<label className="block text-xs">User-authored note for latest completed part {execution.completedParts}
       <textarea className={cn} value={continuity} rows={2} onChange={e=>setContinuity(e.target.value)}/>
-      <Button disabled={busy||!continuity.trim()} onClick={()=>void applyExecutionAction({kind:"save_continuity",afterPart:execution.completedParts,text:continuity})}>Save immutable continuity note</Button>
+      <Button disabled={busy||!canEdit||!continuity.trim()} onClick={()=>void applyExecutionAction({kind:"save_continuity",afterPart:execution.completedParts,text:continuity})}>Save immutable continuity note</Button>
     </label>}
-    {execution.completedParts===execution.totalParts&&execution.status==="active"&&<Button disabled={busy} onClick={()=>void applyExecutionAction({kind:"assemble"})}>Assemble immutable final script</Button>}
+    {execution.completedParts===execution.totalParts&&execution.status==="active"&&<Button disabled={busy||!canEdit} onClick={()=>void applyExecutionAction({kind:"assemble"})}>Assemble immutable final script</Button>}
    </div>
    {prompt&&<div className="space-y-1">
     <p className="text-xs">Exact saved local prompt · NOT submitted</p>
@@ -356,7 +493,8 @@ export function AiWorkflowControlCenter({seed}:Props){
        setReportRaw(e.target.value);
        sectionDrafts.current[review.reviewId+"/"+lastRound.index+"/"+section]=e.target.value;
       }}/>
-      <Button disabled={busy||!reportRaw.trim()} onClick={()=>void reviewAction({kind:"import_response",sectionIndex:section,raw:reportRaw})}>Import exact reviewer response</Button>
+      <div className="flex gap-2 flex-wrap"><Button disabled={busy} onClick={()=>void pasteReview()}>Paste review from clipboard</Button>
+      <Button disabled={busy||!canEdit||!reportRaw.trim()} onClick={()=>void reviewAction({kind:"import_response",sectionIndex:section,raw:reportRaw})}>Import exact reviewer response</Button></div>
      </label>}
      {lastRound.sections[section]?.validationIssues.length>0&&<div>
       <p className="text-xs text-danger">{lastRound.sections[section].validationIssues.join(" | ")}</p>
@@ -368,15 +506,20 @@ export function AiWorkflowControlCenter({seed}:Props){
        void reviewAction({kind:"correct_response",sectionIndex:section,report});
       }catch{setError("Correction must be valid JSON.")}}}>Validate and save corrected report</Button>
      </div>}
-     {lastRound.sections[section]?.report&&<p className="text-xs">Section {section+1} score: {lastRound.sections[section].score}/100 · {lastRound.sections[section].report?.summary}</p>}
+     {lastRound.sections[section]?.report&&<div className="space-y-1 text-xs">
+      <p>Section {section+1} score: {lastRound.sections[section].score}/100 · {lastRound.sections[section].report?.summary}</p>
+      {lastRound.sections[section].report?.scores.map(c=><p key={c.key}>{review.policy.rubric.find(x=>x.key===c.key)?.label??c.key}: {c.points}</p>)}
+      {lastRound.sections[section].report?.findings.map((f,i)=><p key={i}>{f.severity}: {f.summary} · {f.recommendation}</p>)}
+     </div>}
      <label className="block text-xs">Improvement goals, one per line
       <textarea className={cn} rows={2} value={goals} onChange={e=>setGoals(e.target.value)}/>
      </label>
      <Button disabled={busy||reviewedSections!==lastRound.sections.length||Boolean(currentVersion.improvementPrompt)}
       onClick={()=>void reviewAction({kind:"prepare_improvement",goals:goals.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)})}>Prepare immutable improvement request</Button>
+     {currentVersion.improvementPrompt&&<Button disabled={busy} onClick={()=>void readReview(seed,review.reviewId,"improvement",0).then(setPrompt).catch(e=>setError(supervisorError(e)))}>View/copy saved improvement prompt</Button>}
      {currentVersion.improvementPrompt&&<label className="block text-xs">Paste manually improved script (new immutable version)
       <textarea className={cn} rows={5} value={revisionText} onChange={e=>setRevisionText(e.target.value)}/>
-      <Button disabled={busy||!revisionText.trim()} onClick={()=>void reviewAction({kind:"import_revision",text:revisionText})}>Save revised version</Button>
+      <Button disabled={busy||!canEdit||!revisionText.trim()} onClick={()=>void reviewAction({kind:"import_revision",text:revisionText})}>Save revised version</Button>
      </label>}
      <label className="text-xs">Re-review mode
       <select className={cn} value={reviewMode} onChange={e=>setReviewMode(e.target.value as typeof reviewMode)}>
@@ -388,7 +531,7 @@ export function AiWorkflowControlCenter({seed}:Props){
      <p className="text-xs">Approval: {active.approvalDigest?"Rust-verified current approval":"Not approved"}. Only Rust-owned final review may approve.</p>
      <label className="text-xs flex items-center gap-2"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/> I manually reviewed the exact current script and all required sections.</label>
      <label className="text-xs block">Type APPROVE FINAL SCRIPT<input className={cn} value={confirmation} onChange={e=>setConfirmation(e.target.value)}/></label>
-     <Button disabled={busy||active.stage==="completed"||!consent||confirmation!=="APPROVE FINAL SCRIPT"||lastRound.versionIndex!==currentVersion.index||reviewedSections!==lastRound.sections.length}
+     <Button disabled={busy||!canEdit||!consent||confirmation!=="APPROVE FINAL SCRIPT"||lastRound.versionIndex!==currentVersion.index||reviewedSections!==lastRound.sections.length}
       onClick={()=>void reviewAction({kind:"approve",confirmation})}>Request Rust-persisted final approval</Button>
     </>}
    </div>}

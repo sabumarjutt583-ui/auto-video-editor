@@ -200,6 +200,8 @@ macro_rules! handler {
             commands::script_supervisor::supervisor_list,
             commands::script_supervisor::supervisor_apply,
             commands::script_supervisor::supervisor_mock,
+            commands::script_chrome::chrome_workspace_status,
+            commands::script_chrome::chrome_workspace_open,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -402,6 +404,8 @@ macro_rules! handler {
             commands::script_supervisor::supervisor_list,
             commands::script_supervisor::supervisor_apply,
             commands::script_supervisor::supervisor_mock,
+            commands::script_chrome::chrome_workspace_status,
+            commands::script_chrome::chrome_workspace_open,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -477,6 +481,7 @@ fn main() {
         .manage(jobs::JobRegistry::default())
         .manage(graphics::export::GraphicExports::default())
         .manage(commands::app_update::PendingUpdate::default())
+        .manage(commands::script_chrome::ChromeWorkspace::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
