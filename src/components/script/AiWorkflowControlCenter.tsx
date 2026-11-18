@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {AutomaticScriptPanel} from "./AutomaticScriptPanel.tsx";
 import {invoke} from "@tauri-apps/api/core";
 import {Button} from "../ui";
 import {accountSummary,chromeOpen,chromeStatus,responseStats,type ChromeProvider,type WorkspaceReport} from "../../lib/script/chrome/api.ts";
