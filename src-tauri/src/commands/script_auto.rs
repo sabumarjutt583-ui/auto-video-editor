@@ -12,7 +12,7 @@ use crate::{
  script_studio::{LegacyChannelSeed,PlanInput,ScriptMode},
  script_supervisor::{SupervisorStore,TaskState,TaskStart,TaskRequest,TaskAction,Transport,Stage},
  script_execution::{ExecutionStore,ExecutionState,StartExecution},
- script_review::{ReviewStore,ReviewState},
+ script_review::{ReviewStore,ReviewState,ReviewAction,ReviewRequest},
  script_automation::{AutoMode,AutoOutcome,Coordinator,FixtureProvider,capability,AdapterCapability},
  script_jobs::model::{digest,valid_id},
 };
@@ -41,7 +41,8 @@ impl AutoService{
   let path=self.path(&p.channel_id,&p.task_id)?;
   let parent=path.parent().ok_or_else(||err("Automatic policy path missing."))?;
   fs::create_dir_all(parent).map_err(|_|err("Cannot create automatic policy directory."))?;
-  for dir in [self.inner.root.as_path(),self.inner.root.join("channels").as_path(),parent]{
+  let channel_root=self.inner.root.join("channels");
+  for dir in [self.inner.root.as_path(),channel_root.as_path(),parent]{
    let meta=fs::symlink_metadata(dir).map_err(|_|err("Cannot check policy storage directory."))?;
    if !meta.is_dir()||meta.file_type().is_symlink(){return Err(err("Unsafe policy storage directory; nothing overwritten."))}
   }
@@ -61,7 +62,8 @@ impl AutoService{
  fn get(&self,channel:&str,task:&str)->Result<AutoPolicy,AutoError>{
   let path=self.path(channel,task)?;
   let parent=path.parent().ok_or_else(||err("Invalid policy folder."))?;
-  for folder in [self.inner.root.as_path(),self.inner.root.join("channels").as_path(),parent]{
+  let channel_root=self.inner.root.join("channels");
+  for folder in [self.inner.root.as_path(),channel_root.as_path(),parent]{
    let m=fs::symlink_metadata(folder).map_err(|_|err("Automatic policy folder unavailable."))?;
    if !m.is_dir()||m.file_type().is_symlink(){return Err(err("Unsafe automatic policy folder."))}
   }
@@ -101,6 +103,13 @@ impl AutoService{
      .run(&id,None);
    if let Err(ref error)=outcome{
     state.errors.lock().unwrap_or_else(|e|e.into_inner()).insert(id.clone(),error.clone());
+    if let Ok(t)=sup.get(&p.channel_id,&id){
+     if !matches!(t.stage,Stage::Paused|Stage::Cancelled|Stage::Completed|Stage::Failed){
+      let _=sup.apply(&TaskRequest{channel_id:p.channel_id.clone(),task_id:id.clone(),
+       expected_revision:t.revision,operation_id:format!("op_auto_block_{}",t.revision),
+       action:TaskAction::MarkAutomaticBlocked{reason:error.chars().take(300).collect()}},None,None);
+     }
+    }
    }else{state.errors.lock().unwrap_or_else(|e|e.into_inner()).remove(&id);}
    state.running.lock().unwrap_or_else(|e|e.into_inner()).remove(&id);
   });
@@ -197,8 +206,9 @@ pub async fn auto_generate(app:AppHandle,seed:LegacyChannelSeed,request:AutoStar
   language:None,mode:Some(request.script_mode),
   total_words:Some(request.target_words),part_count:Some(request.part_count),
   outline_required:None,continuity_required:None,parts:Vec::new()};
+ let preview=plans.preview(&saved,&input).map_err(|e|err(e.to_string()))?;
+ account_gate(&preview.plan,&claude,&chatgpt)?;
  let plan=plans.save_plan(&saved,&input).map_err(|e|err(e.to_string()))?;
- account_gate(&plan,&claude,&chatgpt)?;
  let execution_id=format!("ex_auto_{id}");
  let state=ex.start(&plan,&StartExecution{channel_id:saved.channel_id.clone(),
   plan_id:plan.plan_id.clone(),execution_id:execution_id.clone(),operation_id:format!("op_auto_ex_{id}")})
@@ -260,6 +270,11 @@ pub async fn auto_control(app:AppHandle,seed:LegacyChannelSeed,task_id:String,ac
  let rv=review.store().map_err(|_|err("Review unavailable."))?;
  let sup=supervisor.store().map_err(|_|err("Supervisor unavailable."))?;
  let task=sup.get(&saved.channel_id,&task_id).map_err(|e|err(e.to_string()))?;
+ if action=="recover" {
+  account_gate(&plan,&claude,&chatgpt)?;
+  service.launch(policy,plan,ex.clone(),rv.clone(),sup.clone())?;
+  return view(&service,&saved.channel_id,&task_id,&ex,&rv,&sup)
+ }
  let supervisor_action=match action.as_str(){
   "pause"=>TaskAction::Pause,"resume"=>TaskAction::Resume,"cancel"=>TaskAction::Cancel,
   _=>return Err(err("Unsupported automation control.")),
@@ -272,4 +287,32 @@ pub async fn auto_control(app:AppHandle,seed:LegacyChannelSeed,task_id:String,ac
   service.launch(policy,plan,ex.clone(),rv.clone(),sup.clone())?;
  }
  view(&service,&saved.channel_id,&task_id,&ex,&rv,&sup)
+}
+
+#[tauri::command]
+pub async fn auto_approve(app:AppHandle,seed:LegacyChannelSeed,task_id:String,confirmation:String,
+ service:State<'_,AutoService>,review:State<'_,ReviewService>,
+ execution:State<'_,ExecutionService>,supervisor:State<'_,SupervisorService>)->Cmd<AutoView>{
+ enabled()?;
+ if confirmation!="APPROVE FINAL SCRIPT"{return Err(err("Exact user confirmation required."))}
+ let owner=actual_seed(&app,&seed).map_err(|_|err("Saved channel missing."))?.channel_id;
+ let policy=service.get(&owner,&task_id)?;
+ if service.running(&task_id){return Err(err("Cannot approve while automatic fixture worker is running."))}
+ let ex=execution.store().map_err(|_|err("Execution store unavailable."))?;
+ let rv=review.store().map_err(|_|err("Review store unavailable."))?;
+ let sup=supervisor.store().map_err(|_|err("Supervisor store unavailable."))?;
+ let task=sup.get(&owner,&task_id).map_err(|e|err(e.to_string()))?;
+ if task.stage!=Stage::AwaitingApproval||task.snapshot.plan_sha256!=policy.plan_digest{
+  return Err(err("Current final review checkpoint is not ready for explicit approval."))
+ }
+ let review_id=task.last_review_id.ok_or_else(||err("Final review evidence missing."))?;
+ let current=rv.get(&owner,&review_id).map_err(|e|err(e.to_string()))?;
+ let approved=rv.apply(&ReviewRequest{channel_id:owner.clone(),review_id,
+  expected_revision:current.revision,operation_id:format!("op_auto_user_approval_{}",random()),
+  action:ReviewAction::Approve{confirmation}}).map_err(|e|err(e.to_string()))?;
+ sup.apply(&TaskRequest{channel_id:owner.clone(),task_id:task_id.clone(),
+  expected_revision:task.revision,operation_id:format!("op_auto_approved_{}",random()),
+  action:TaskAction::SyncReview{review_id:approved.review_id.clone()}},None,Some(&approved))
+  .map_err(|e|err(e.to_string()))?;
+ view(&service,&owner,&task_id,&ex,&rv,&sup)
 }

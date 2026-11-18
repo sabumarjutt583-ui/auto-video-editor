@@ -99,6 +99,7 @@ pub enum TaskAction{
  PreparePrompt,MarkBrowserOpening,MarkBrowserOpened,MarkLoginRequired,MarkUserHandoff,
  MarkSubmissionUncertain,MarkAwaitingResponse,Pause,Resume,Cancel,
  SyncExecution,SyncReview{review_id:String},InspectApproval{review_id:String},
+ MarkAutomaticBlocked{reason:String},
 }
 pub fn capabilities(transport:&Transport)->Vec<String>{
  match transport{
@@ -304,6 +305,14 @@ impl SupervisorStore{
      return Err(SupervisorError("No prepared prompt or user handoff exists; submission cannot be marked uncertain."))
     }
     next.stage=Stage::SubmissionUncertain;"delivery_uncertain_no_auto_retry"},
+   TaskAction::MarkAutomaticBlocked{reason}=>{
+    if current.snapshot.transport!=Transport::LocalMock||reason.trim().is_empty()||reason.len()>300{
+     return Err(invalid())
+    }
+    next.resume_stage=Some(current.stage.clone());next.stage=Stage::Paused;
+    next.warnings.push(format!("MOCK automatic worker stopped: {reason}"));
+    "mock_automatic_worker_stopped_requires_explicit_resume"
+   },
    TaskAction::MarkAwaitingResponse=>{
     if !matches!(&current.stage,Stage::PromptPrepared|Stage::AwaitingUserAction|Stage::SubmissionUncertain){
      return Err(SupervisorError("Awaiting response requires prior saved prompt or manual browser handoff."))
