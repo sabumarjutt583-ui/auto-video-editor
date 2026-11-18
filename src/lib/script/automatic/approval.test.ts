@@ -17,7 +17,7 @@ test("SW-03M-ST-TS-02 require exact preview and fully reviewed current version",
  const v=view();
  assert.equal(canApproveExact(v,""),false);
  assert.equal(canApproveExact({...v,workerRunning:true},latestDigest),false);
- assert.equal(canApproveExact({...v,review:{...v.review!,rounds:[{...v.review!.rounds[0],sections:[{score:null,report:null}]}]}},latestDigest),false);
+ assert.equal(canApproveExact({...v,review:{...v.review!,rounds:[{...v.review!.rounds[0],sections:[{...v.review!.rounds[0].sections[0],score:null,report:null}]}]}},latestDigest),false);
  const approved=view();
  approved.review!.approvals.push({versionIndex:1,scriptDigest:latestDigest,roundIndex:2,
    reviewDigest:"saved",confirmedAt:"now",confirmation:"APPROVE FINAL SCRIPT",
