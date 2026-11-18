@@ -306,7 +306,10 @@ pub async fn auto_control(app:AppHandle,seed:LegacyChannelSeed,task_id:String,ac
   "pause"=>TaskAction::Pause,"resume"=>TaskAction::Resume,"cancel"=>TaskAction::Cancel,
   _=>return Err(err("Unsupported automation control.")),
  };
- if action=="resume"{account_gate(&plan,&claude,&chatgpt)?}
+ if action=="resume"{
+  if service.running(&task_id){return Err(err("The previous local worker is still finishing. Refresh and resume after it stops."))}
+  account_gate(&plan,&claude,&chatgpt)?;
+ }
  let next=sup.apply(&TaskRequest{channel_id:saved.channel_id.clone(),task_id:task_id.clone(),
   expected_revision:task.revision,operation_id:format!("op_auto_control_{}",random()),
   action:supervisor_action},None,None).map_err(|e|err(e.to_string()))?;

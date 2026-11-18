@@ -183,6 +183,9 @@ fn sw03k_04_eight_part_mock_execution_restart_review_improve_rereview_approve(){
  v=reviews.apply(&action(&v,ReviewAction::PrepareImprovement{goals:vec!["Sharper hook".into()]},"improvement")).unwrap();
  v=reviews.apply(&action(&v,ReviewAction::ImportRevision{text:format!("Improved opening. {}",script)},"revised")).unwrap();
  assert!(v.approvals.is_empty());
+ task=supervisor_action(&store,&task,TaskAction::SyncReview{review_id:"rv_mock".into()},None,Some(&v));
+ assert_eq!(task.stage,Stage::ReviewPending,"Stale prior-round scores must not approve a new version");
+ assert_eq!(task.reviewed_sections,0);
  v=reviews.apply(&action(&v,ReviewAction::PrepareReview{mode:"final".into()},"rereview")).unwrap();
  assert!(v.rounds.last().unwrap().sections[0].score.is_none());
  for n in 0..v.rounds.last().unwrap().sections.len(){

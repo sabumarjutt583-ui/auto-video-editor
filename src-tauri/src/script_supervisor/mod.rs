@@ -343,12 +343,17 @@ impl SupervisorStore{
     let round=x.rounds.last().ok_or_else(invalid)?;
     let version=x.versions.last().ok_or_else(invalid)?;
     next.last_review_id=Some(x.review_id.clone());next.last_review_revision=Some(x.revision);
-    next.reviewed_sections=round.sections.iter().filter(|s|s.report.is_some()&&s.score.is_some()).count() as u32;
+    // A newly revised version has no current reviewer evidence until a fresh
+    // round is prepared. Old scores must not mark it AwaitingApproval on restart.
+    let current_round=round.version_index==version.index;
+    next.reviewed_sections=if current_round{
+     round.sections.iter().filter(|s|s.report.is_some()&&s.score.is_some()).count() as u32
+    }else{0};
     next.total_sections=round.sections.len() as u32;
-    next.approval_digest=x.approvals.iter().find(|a|a.version_index==version.index
+    next.approval_digest=x.approvals.iter().find(|a|current_round&&a.version_index==version.index
       &&a.script_digest==version.text.sha256&&a.round_index==round.index).map(|a|a.script_digest.clone());
     next.stage=if next.approval_digest.is_some(){Stage::Completed}
-      else if next.reviewed_sections==next.total_sections{Stage::AwaitingApproval}
+      else if current_round&&next.reviewed_sections==next.total_sections{Stage::AwaitingApproval}
       else{Stage::ReviewPending};
     "verified_immutable_review_checkpoint_manual_provenance"
    },
