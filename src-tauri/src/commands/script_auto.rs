@@ -23,6 +23,28 @@ pub struct AutoPolicy{
  pub execution_id:String,pub plan_id:String,pub plan_digest:String,
  pub mode:AutoMode,pub review_target:u32,pub max_improvements:u32,
 }
+/// Policy storage must never follow account/channel redirects, including Windows junctions.
+fn safe_policy_dir(path:&std::path::Path,create:bool)->Cmd<()>{
+ match fs::symlink_metadata(path){
+  Ok(meta)=>{
+   if !meta.is_dir()||meta.file_type().is_symlink(){
+    return Err(err("Unsafe automatic policy folder; no policy was modified."))
+   }
+   #[cfg(windows)]{
+    use std::os::windows::fs::MetadataExt;
+    if meta.file_attributes()&0x400!=0{
+     return Err(err("Automatic policy directory is a Windows reparse point; refusing redirected storage."))
+    }
+   }
+   Ok(())
+  }
+  Err(e) if create&&e.kind()==std::io::ErrorKind::NotFound=>{
+   fs::create_dir(path).map_err(|_|err("Cannot safely create automatic policy directory."))?;
+   safe_policy_dir(path,false)
+  },
+  Err(_)=>Err(err("Automatic policy directory is missing or cannot be inspected.")),
+ }
+}
 #[derive(Default)]
 struct Inner {root:Option<PathBuf>,running:Mutex<HashSet<String>>,errors:Mutex<HashMap<String,String>>}
 #[derive(Clone)]
@@ -43,16 +65,10 @@ impl AutoService{
   let parent=path.parent().ok_or_else(||err("Automatic policy path missing."))?;
   let root=self.inner.root.as_ref().ok_or_else(||err("Automatic policy root unavailable."))?;
   let channel_root=root.join("channels");
-  // Never create paths through unchecked symlinks or junctions.
+  // Parent exists because the Studio/Execution stores are initialized first.
+  safe_policy_dir(root.parent().ok_or_else(||err("Automatic policy parent missing."))?,false)?;
   for dir in [root.as_path(),channel_root.as_path(),parent]{
-   match fs::symlink_metadata(dir){
-    Ok(meta) if meta.is_dir()&&!meta.file_type().is_symlink()=>{},
-    Ok(_)=>return Err(err("Unsafe policy storage directory; nothing overwritten.")),
-    Err(e) if e.kind()==std::io::ErrorKind::NotFound=>{
-     fs::create_dir(dir).map_err(|_|err("Could not safely create policy directory."))?;
-    },
-    Err(_)=>return Err(err("Cannot inspect policy directory.")),
-   }
+   safe_policy_dir(dir,true)?;
   }
   if fs::symlink_metadata(&path).is_ok(){return Err(err("Automatic task policy already exists; no overwrite."))}
   let temp=parent.join(format!(".auto-{}.tmp",random()));
@@ -72,9 +88,9 @@ impl AutoService{
   let parent=path.parent().ok_or_else(||err("Invalid policy folder."))?;
   let root=self.inner.root.as_ref().ok_or_else(||err("Automatic policy root unavailable."))?;
   let channel_root=root.join("channels");
+  safe_policy_dir(root.parent().ok_or_else(||err("Automatic policy parent missing."))?,false)?;
   for folder in [root.as_path(),channel_root.as_path(),parent]{
-   let m=fs::symlink_metadata(folder).map_err(|_|err("Automatic policy folder unavailable."))?;
-   if !m.is_dir()||m.file_type().is_symlink(){return Err(err("Unsafe automatic policy folder."))}
+   safe_policy_dir(folder,false)?;
   }
   let meta=fs::symlink_metadata(&path).map_err(|_|err("Automatic task policy missing."))?;
   if !meta.is_file()||meta.file_type().is_symlink()||meta.len()>16*1024{
@@ -365,4 +381,50 @@ pub async fn auto_approve(app:AppHandle,seed:LegacyChannelSeed,task_id:String,co
   action:TaskAction::SyncReview{review_id:approved.review_id.clone()}},None,Some(&approved))
   .map_err(|e|err(e.to_string()))?;
  view(&service,&owner,&task_id,&ex,&rv,&sup)
+}
+
+#[cfg(test)]
+mod tests{
+ use super::*;
+ fn new_fixture()->(AutoService,PathBuf){
+  let root=std::env::temp_dir().join(format!("sw03m-auto-policy-{}",random()));
+  fs::create_dir_all(root.join("script-writer")).unwrap();
+  let path=root.join("script-writer").join("automatic");
+  (AutoService{inner:Arc::new(Inner{root:Some(path),..Inner::default()})},root)
+ }
+ fn fixture_policy()->AutoPolicy{
+  AutoPolicy{schema_version:1,channel_id:"channel_a".into(),task_id:"su_auto_a".into(),
+   execution_id:"ex_auto_a".into(),plan_id:"sp_auto_a".into(),plan_digest:"sha256_fixture".into(),
+   mode:AutoMode::LocalFixture,review_target:90,max_improvements:2}
+ }
+ #[test]fn sw03m_auto_policy_never_overwrites_or_leaks_across_channels(){
+  let (service,root)=new_fixture();
+  let policy=fixture_policy();
+  service.save(&policy).unwrap();
+  let loaded=service.get("channel_a","su_auto_a").unwrap();
+  assert_eq!(loaded.review_target,90);
+  assert!(service.save(&policy).is_err());
+  assert!(service.get("channel_b","su_auto_a").is_err());
+  assert!(service.get("channel_a","su_other").is_err());
+  let original=fs::read(service.path("channel_a","su_auto_a").unwrap()).unwrap();
+  assert!(service.save(&policy).is_err());
+  assert_eq!(fs::read(service.path("channel_a","su_auto_a").unwrap()).unwrap(),original);
+  drop(service);fs::remove_dir_all(root).unwrap();
+ }
+ #[cfg(unix)]
+ #[test]fn sw03m_auto_policy_refuses_symlinked_storage(){
+  let (service,root)=new_fixture();
+  let base=root.join("script-writer").join("automatic");
+  let outside=root.join("outside");
+  fs::create_dir_all(&outside).unwrap();
+  std::os::unix::fs::symlink(&outside,&base).unwrap();
+  assert!(service.save(&fixture_policy()).is_err());
+  assert_eq!(fs::read_dir(&outside).unwrap().count(),0);
+  drop(service);fs::remove_dir_all(root).unwrap();
+ }
+ #[test]fn sw03m_auto_policy_requires_private_app_data_path(){
+  let service=AutoService{inner:Arc::new(Inner{root:None,..Inner::default()})};
+  assert!(service.save(&fixture_policy()).is_err());
+  assert!(service.get("channel_a","su_auto_a").is_err());
+ }
 }
