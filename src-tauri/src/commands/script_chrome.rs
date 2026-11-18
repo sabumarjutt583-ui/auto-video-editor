@@ -7,7 +7,7 @@ use tauri::{AppHandle,State};
 use crate::{
  commands::{chatgpt::ChatGptAccounts,script::ScriptAccounts,
   script_studio::{actual_seed},script_supervisor::SupervisorService},
- imagegen::{browser::{locator,signin::{PlainWindow,WindowState}},engine::ImageGen},
+ imagegen::{browser::{locator,signin::{PlainWindow,WindowState}},ops::ImageGen},
  script_studio::LegacyChannelSeed,script_supervisor::{TaskState,Transport,Stage},
 };
 
