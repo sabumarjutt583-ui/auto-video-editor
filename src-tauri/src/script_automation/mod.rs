@@ -27,13 +27,18 @@ pub fn capability(mode:&AutoMode)->AdapterCapability {
 pub struct AdapterRequest {
  pub provider:String,pub account_id:Option<String>,pub task_id:String,
  pub scope:String,pub prompt:String,pub prompt_sha256:String,
- pub original_words:u32,pub step:u32
+ pub original_words:u32,pub step:u32,
+ /// Optional immutable source for a version-bound improvement, never credentials.
+ pub source_text:Option<String>
 }
 #[derive(Clone,Debug)]
 pub struct AdapterReply {pub content:String,pub content_sha256:String,pub provenance:&'static str}
 pub trait ProviderAdapter:Send+Sync {
  fn check(&self)->AdapterCapability;
  fn execute(&self,request:&AdapterRequest)->Result<AdapterReply,String>;
+ fn review(&self,_request:&AdapterRequest,_state:&ReviewState,_improved:bool)->Result<AdapterReply,String>{
+  Err("This adapter does not support structured automatic review.".into())
+ }
 }
 pub struct FixtureProvider;
 impl ProviderAdapter for FixtureProvider {
@@ -60,8 +65,18 @@ impl ProviderAdapter for FixtureProvider {
   }else if r.scope=="review"{
    return Err("Review fixtures must be built from the saved rubric, not generated free-form.".into())
   }else if r.scope=="improve"{
-   format!("Revised mock narration. {}",r.prompt)
+   let source=r.source_text.as_ref().ok_or("Missing verified source script for improvement.")?;
+   if source.trim().is_empty()||source.len()>1_500_000{return Err("Invalid mock revision source.".into())}
+   format!("Improved MOCK narration. {source}")
   }else{return Err("Unsupported deterministic fixture operation.".into())};
+  Ok(AdapterReply{content_sha256:digest(content.as_bytes()),content,provenance:"deterministic_mock"})
+ }
+ fn review(&self,r:&AdapterRequest,state:&ReviewState,improved:bool)->Result<AdapterReply,String>{
+  if r.provider!="fixture_reviewer"||r.scope!="review"||r.prompt.trim().is_empty()||
+   digest(r.prompt.as_bytes())!=r.prompt_sha256{
+   return Err("Invalid saved reviewer prompt or fixture identity.".into())
+  }
+  let content=make_review_fixture(state,improved)?;
   Ok(AdapterReply{content_sha256:digest(content.as_bytes()),content,provenance:"deterministic_mock"})
  }
 }
@@ -202,7 +217,7 @@ impl Coordinator<'_>{
      let provider=if first{"write"}else{"continue"};
      let req=AdapterRequest{provider:"fixture_writer".into(),account_id:task.snapshot.writer_account_id.clone(),
       task_id:task_id.into(),scope:provider.into(),prompt_sha256:digest(prompt.as_bytes()),prompt,
-      original_words:p.target_words,step:if first{0}else{1}};
+      original_words:p.target_words,step:if first{0}else{1},source_text:None};
      let answer=self.adapter.execute(&req)?;
      if answer.provenance!="deterministic_mock"||answer.content_sha256!=digest(answer.content.as_bytes()){
       return Err("Provider returned unverified fixture provenance or corrupt digest.".into())
@@ -237,10 +252,12 @@ impl Coordinator<'_>{
     let prompt=self.review.read(channel,&rv.review_id,"prompt",section.index).map_err(|e|e.to_string())?;
     let req=AdapterRequest{provider:"fixture_reviewer".into(),account_id:task.snapshot.reviewer_account_id.clone(),
      task_id:task_id.into(),scope:"review".into(),prompt_sha256:digest(prompt.as_bytes()),prompt,
-     original_words:0,step:round.index};
-    if req.prompt.trim().is_empty(){return Err("Empty immutable review prompt.".into())}
-    let raw=make_review_fixture(&rv,rv.versions.len()>1)?;
-    rv=review_do(self.review,&rv,ReviewAction::ImportResponse{section_index:section.index,raw})?;
+     original_words:0,step:round.index,source_text:None};
+    let response=self.adapter.review(&req,&rv,rv.versions.len()>1)?;
+    if response.provenance!="deterministic_mock"||response.content_sha256!=digest(response.content.as_bytes()){
+     return Err("Review adapter response lacks verified deterministic fixture provenance.".into())
+    }
+    rv=review_do(self.review,&rv,ReviewAction::ImportResponse{section_index:section.index,raw:response.content})?;
     task=sync_review(self.supervisor,&task,&rv)?;continue
    }
    // A revised script has no current reviewer evidence until a NEW round exists.
@@ -269,10 +286,12 @@ impl Coordinator<'_>{
     let prior=self.review.read(channel,&rv.review_id,"script",v.index).map_err(|e|e.to_string())?;
     let req=AdapterRequest{provider:"fixture_writer".into(),account_id:task.snapshot.writer_account_id.clone(),
      task_id:task_id.into(),scope:"improve".into(),prompt_sha256:digest(prompt.as_bytes()),prompt,
-     original_words:0,step:improvements};
-    if req.prompt.trim().is_empty(){return Err("Improvement prompt is missing.".into())}
-    let candidate=format!("Improved MOCK introduction. {prior}");
-    rv=review_do(self.review,&rv,ReviewAction::ImportRevision{text:candidate})?;
+     original_words:0,step:improvements,source_text:Some(prior)};
+    let answer=self.adapter.execute(&req)?;
+    if answer.provenance!="deterministic_mock"||answer.content_sha256!=digest(answer.content.as_bytes()){
+     return Err("Revision adapter response lacks verified deterministic fixture provenance.".into())
+    }
+    rv=review_do(self.review,&rv,ReviewAction::ImportRevision{text:answer.content})?;
     task=sync_review(self.supervisor,&task,&rv)?;continue
    }
    return Err("Review improvement state is unexpected; immutable history preserved.".into())

@@ -170,7 +170,7 @@ fn sw03m_rejects_invalid_account_or_wrong_owner_and_preserves_sources(){
 fn sw03m_response_evidence_never_masquerades_as_real_ai(){
  let req=AdapterRequest{provider:"fixture_writer".into(),account_id:Some("cl_1".into()),
   task_id:"su_1".into(),scope:"write".into(),prompt:"prompt اردو 한국어 😀\r\n".into(),
-  prompt_sha256:digest("prompt اردو 한국어 😀\r\n".as_bytes()),original_words:120,step:0};
+  prompt_sha256:digest("prompt اردو 한국어 😀\r\n".as_bytes()),original_words:120,step:0,source_text:None};
  let reply=FixtureProvider.execute(&req).unwrap();
  assert!(reply.content.contains("[MOCK]"));
  assert_eq!(reply.provenance,"deterministic_mock");
@@ -193,4 +193,36 @@ fn sw03m_max_one_improvement_still_re_reviews_new_version(){
   r.rounds.last().unwrap().sections.len());
  assert!(r.approvals.is_empty());
  p.cleanup();
+}
+
+#[test]
+fn sw03m_review_adapter_validates_exact_saved_prompt_and_rubric(){
+ let p=Fixture::setup("channel_adapter_review",1);
+ let result=p.run(None).unwrap();
+ assert!(result.waiting_for_approval);
+ let current=p.review.get("channel_adapter_review","rv_auto_test").unwrap();
+ let prompt=p.review.read("channel_adapter_review",&current.review_id,"prompt",0).unwrap();
+ let mut req=AdapterRequest{provider:"fixture_reviewer".into(),account_id:Some("gp_2".into()),
+  task_id:p.task_id.clone(),scope:"review".into(),prompt_sha256:digest(prompt.as_bytes()),
+  prompt,original_words:0,step:0,source_text:None};
+ let response=FixtureProvider.review(&req,&current,true).unwrap();
+ assert_eq!(response.content_sha256,digest(response.content.as_bytes()));
+ assert!(response.content.contains("MOCK structured reviewer fixture"));
+ let report:Report=serde_json::from_str(&response.content).unwrap();
+ assert_eq!(report.scores.len(),current.policy.rubric.len());
+ req.prompt.push('x');
+ assert!(FixtureProvider.review(&req,&current,true).is_err());
+ p.cleanup();
+}
+#[test]
+fn sw03m_improvement_adapter_requires_version_bound_source(){
+ let prompt="Improve this exact mock version\r\n اردو 한국어 😀".to_string();
+ let mut req=AdapterRequest{provider:"fixture_writer".into(),account_id:Some("cl_1".into()),
+  task_id:"su_mock".into(),scope:"improve".into(),prompt_sha256:digest(prompt.as_bytes()),
+  prompt,original_words:0,step:1,source_text:Some("MOCK prior draft.\r\nاردو 😀.".into())};
+ let reply=FixtureProvider.execute(&req).unwrap();
+ assert!(reply.content.contains("MOCK prior draft.\r\nاردو 😀."));
+ assert_eq!(reply.content_sha256,digest(reply.content.as_bytes()));
+ req.source_text=None;
+ assert!(FixtureProvider.execute(&req).is_err());
 }
