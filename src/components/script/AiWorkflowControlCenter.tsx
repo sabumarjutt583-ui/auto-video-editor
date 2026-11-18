@@ -379,7 +379,7 @@ export function AiWorkflowControlCenter({seed}:Props){
       <span className="text-xs">Draft only: {responseStats(response).words} words · {responseStats(response).bytes} UTF-8 bytes · {responseStats(response).lines} lines</span>
      </label>
      {currentPart.prepared&&<div className="flex gap-2 flex-wrap"><Button disabled={busy} onClick={()=>void pasteResponse()}>Paste from clipboard (user-triggered)</Button><Button disabled={busy||!response} onClick={()=>setResponse("")}>Clear uncommitted draft</Button></div>}
-     {response&&currentPart.prepared&&<details className="border border-line p-2"><summary className="text-xs">Exact raw response preview (not yet committed)</summary><pre className="text-xs whitespace-pre-wrap break-words">{response}</pre></details>}}
+     {response&&currentPart.prepared&&<details className="border border-line p-2"><summary className="text-xs">Exact raw response preview (not yet committed)</summary><pre className="text-xs whitespace-pre-wrap break-words">{response}</pre></details>}
      <Button disabled={busy||!currentPart.prepared||!response.trim()} onClick={()=>void applyExecutionAction({kind:"import_fragment",partIndex:currentPart.index,text:response})}>Import response into Rust execution</Button>
      {currentPart.fragments.length>0&&<>
       <p className="text-xs">Saved immutable response fragments: {currentPart.fragments.map((f,i)=>"#"+(i+1)+" "+f.sha256.slice(0,14)).join(" · ")}. Original imports cannot be overwritten.</p>
