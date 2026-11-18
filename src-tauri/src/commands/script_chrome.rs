@@ -52,9 +52,19 @@ fn validate_profile(profile:&Path)->Cmd<()>{
  // unrelated OS-level symlinks (e.g. macOS /var). No path is created or modified.
  for segment in profile.ancestors().take(4){
   match std::fs::symlink_metadata(segment){
-   Ok(m) if m.file_type().is_symlink()||!m.is_dir()=>
-    return Err(error("Account profile directory is a symlink or non-directory; open blocked to preserve isolation.")),
-   Ok(_)=>{},
+   Ok(m)=>{
+    if m.file_type().is_symlink()||!m.is_dir(){
+     return Err(error("Account profile directory is a symlink or non-directory; open blocked to preserve isolation."));
+    }
+    // Windows directory junctions and mount points may be reparse points without
+    // being reported as ordinary symlinks. Do not follow them into another profile.
+    #[cfg(windows)]{
+     use std::os::windows::fs::MetadataExt;
+     if m.file_attributes() & 0x400 != 0{
+      return Err(error("Browser profile path contains a Windows reparse point; launch blocked to protect account isolation."));
+     }
+    }
+   },
    Err(e) if e.kind()==std::io::ErrorKind::NotFound=>{},
    Err(_)=>return Err(error("Cannot inspect account profile safely; no window launched.")),
   }

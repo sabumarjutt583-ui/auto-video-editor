@@ -63,6 +63,40 @@ responses back into the application remain manual.
 * Local mock remains available for deterministic automated acceptance, **not** a live
   Claude/ChatGPT interaction.
 
+## Reproducible native Windows 11 operator execution
+
+Use a local Windows 10/11 machine with a supported Chrome installation, WebView2,
+Node 22, Rust stable/MSVC build tools and a working existing account setup. Run in
+**PowerShell from the existing repository clone**, with no destructive profile reset.
+This is the development-only dashboard; do not use a release build to test it.
+
+```powershell
+git fetch origin feature/script-writer-visible-chrome-studio-v1
+git switch feature/script-writer-visible-chrome-studio-v1
+git pull --ff-only origin feature/script-writer-visible-chrome-studio-v1
+git rev-parse HEAD
+npm ci
+npm run tauri -- dev
+```
+
+The `pretauri` script may fetch the app's supported FFmpeg binary if missing.
+Do not install arbitrary FFmpeg 9 replacements for compatibility testing.
+
+In the running app, open **Channels → Script Studio**, select the existing saved
+channel, expand the development-only Studio panel and create or resume a saved
+execution with **Visible browser — user action**. Record the commit, Chrome
+version, exact account IDs, observed process status, human-visible window outcome,
+manual sign-in outcome and local draft/review checkpoint evidence. Never include
+cookies, passwords, session tokens, profile filesystem contents or private chats
+in screenshots or logs. Choose your own test accounts; the CorpCipher/Mr. Creepwake
+ID pairings below are illustrative, not an assertion about saved user accounts.
+
+The control labelled **Open** may return a `process_running_window_not_verified`
+or `ended_at_once` status. Visually inspect Chrome yourself. A reused tracked
+process does not imply a newly focused window. On app restart, the open session
+may be reported as `not_observed_after_app_restart`, even if Chrome remained
+open. Always use **Refresh process status** before repeating a launch.
+
 ## Required native installed Windows tests — NOT RUN in CI
 
 These tests must be performed on the user's Windows computer with actual Chrome
