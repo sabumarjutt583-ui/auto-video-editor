@@ -6,6 +6,7 @@ import {readReview} from "../../lib/script/review/api.ts";
 import {readExecution} from "../../lib/script/execution/api.ts";
 import {autoCapability,autoGenerate,autoList,autoStatus,autoControl,autoApprove,automaticProgress,
  type AutoMode,type AutoCapability,type AutoView} from "../../lib/script/automatic/api.ts";
+import {canApproveExact,currentVersionApproved} from "../../lib/script/automatic/approval.ts";
 const selectStyle="rounded border border-line bg-surface px-2 py-1 text-sm";
 const errorMessage=(error:unknown):string=>{
  if(error&&typeof error==="object"&&"message" in error)return String(error.message);
@@ -23,7 +24,7 @@ export function AutomaticScriptPanel({seed}:{seed:LegacyChannelSeed}){
  const [list,setList]=useState<{taskId:string;stage:string}[]>([]);
  const [selected,setSelected]=useState(""),[view,setView]=useState<AutoView|null>(null);
  const [working,setWorking]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
- const [script,setScript]=useState(""),[confirmation,setConfirmation]=useState("");
+ const [script,setScript]=useState(""),[previewedDigest,setPreviewedDigest]=useState(""),[confirmation,setConfirmation]=useState("");
  const [consent,setConsent]=useState(false);
  useEffect(()=>{
   let alive=true;setConfig(null);setList([]);setSelected("");setView(null);setError("");
@@ -66,7 +67,7 @@ export function AutomaticScriptPanel({seed}:{seed:LegacyChannelSeed}){
  const reviewerId=reviewerProvider==="chatgpt"?config?.accounts.chatgptReviewAccountId
   :reviewerProvider==="claude"?config?.accounts.claudeAccountId:null;
  async function generate(){
-  if(!valid||working)return;setWorking(true);setError("");setNotice("");setScript("");
+  if(!valid||working)return;setWorking(true);setError("");setNotice("");setScript("");setPreviewedDigest("");
   try{
    const result=await autoGenerate(seed,{title,topic,scriptMode,targetWords:words,partCount:scriptMode==="single"?1:parts,
     reviewTarget:target,maxImprovements:rounds,mode});
@@ -89,19 +90,22 @@ export function AutomaticScriptPanel({seed}:{seed:LegacyChannelSeed}){
    // The assembled source is still inspectable after a reviewer failure.
    const original=await readExecution(seed,view.execution.executionId,"assembled",0,0);
    setScript(latest&&view.review?await readReview(seed,view.review.reviewId,"script",latest.index):original);
+    setPreviewedDigest(latest?.text.sha256??"");
+    setConsent(false);setConfirmation("");
   }catch(e){setError(errorMessage(e))}
  }
  async function approve(){
-  if(!view||!consent||confirmation!=="APPROVE FINAL SCRIPT"||working)return;
+  if(!view||!consent||confirmation!=="APPROVE FINAL SCRIPT"||working||
+    !canApproveExact(view,previewedDigest))return;
   setWorking(true);setError("");
-  try{setView(await autoApprove(seed,view.task.taskId,confirmation));
+  try{setView(await autoApprove(seed,view.task.taskId,confirmation,previewedDigest));
    setNotice("Explicit Rust-saved user approval recorded. Mock output remains MOCK.");setConsent(false);setConfirmation("");
   }catch(e){setError(errorMessage(e))}finally{setWorking(false)}
  }
  const reviewRound=view?.review?.rounds.at(-1);
  const quality=reviewRound&&reviewRound.sections.every(x=>x.score!==null)
   ?Math.min(...reviewRound.sections.map(s=>s.score??0)):null;
- const approved=Boolean(view?.review?.approvals.length);
+ const approved=currentVersionApproved(view);
  if(!import.meta.env.DEV)return null;
  return <section className="border rounded border-line p-3 space-y-3" aria-label="Phase 03M automatic script engine">
   <h5 className="font-semibold">Automatic Script Production · Phase 03M</h5>
@@ -127,7 +131,7 @@ export function AutomaticScriptPanel({seed}:{seed:LegacyChannelSeed}){
   {error&&<p role="alert" className="text-xs text-danger">{error}</p>}
   {notice&&<p role="status" className="text-xs">{notice}</p>}
   <label className="text-xs block">Saved automatic jobs
-   <select className={selectStyle+" w-full"} value={selected} onChange={e=>{setSelected(e.target.value);setScript("");setConfirmation("");setConsent(false)}}>
+   <select className={selectStyle+" w-full"} value={selected} onChange={e=>{setSelected(e.target.value);setScript("");setPreviewedDigest("");setConfirmation("");setConsent(false)}}>
     <option value="">Select a saved automatic task</option>
     {list.map(item=><option value={item.taskId} key={item.taskId}>{item.taskId} · {item.stage}</option>)}
    </select>
@@ -154,9 +158,10 @@ export function AutomaticScriptPanel({seed}:{seed:LegacyChannelSeed}){
    </>}
    {view.task.stage==="awaiting_approval"&&!approved&&<div className="space-y-2 border-t border-line pt-2">
     <p className="text-xs font-semibold">Final human approval required — this is a MOCK test candidate, not a verified AI script.</p>
+     <p className="text-xs">Open and inspect the latest saved script first. Approval is bound to that exact SHA-256 and a later revision invalidates this consent.</p>
     <label className="text-xs flex gap-2 items-center"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>I inspected this exact saved script and its review evidence.</label>
     <label className="text-xs block">Type APPROVE FINAL SCRIPT<input className={selectStyle+" w-full"} value={confirmation} onChange={e=>setConfirmation(e.target.value)}/></label>
-    <Button disabled={working||!consent||confirmation!=="APPROVE FINAL SCRIPT"} onClick={()=>void approve()}>Record explicit final approval</Button>
+    <Button disabled={working||!consent||confirmation!=="APPROVE FINAL SCRIPT"||!canApproveExact(view,previewedDigest)} onClick={()=>void approve()}>Record explicit final approval</Button>
    </div>}
    {script&&<details open><summary className="text-xs">Saved immutable script preview (MOCK)</summary><textarea className={selectStyle+" w-full font-mono"} rows={12} value={script} readOnly/></details>}
    <details><summary className="text-xs">Rust supervisor history ({view.task.events.length})</summary>

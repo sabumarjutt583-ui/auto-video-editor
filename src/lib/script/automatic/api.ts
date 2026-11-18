@@ -17,8 +17,9 @@ export const autoStatus=(seed:LegacyChannelSeed,taskId:string):Promise<AutoView>
 export const autoList=(seed:LegacyChannelSeed):Promise<SupervisorTask[]>=>invoke("auto_list",{seed});
 export const autoControl=(seed:LegacyChannelSeed,taskId:string,action:"pause"|"resume"|"cancel"|"recover"):Promise<AutoView>=>
  invoke("auto_control",{seed,taskId,action});
-export const autoApprove=(seed:LegacyChannelSeed,taskId:string,confirmation:string):Promise<AutoView>=>
- invoke("auto_approve",{seed,taskId,confirmation});
+export const autoApprove=(seed:LegacyChannelSeed,taskId:string,confirmation:string,
+ expectedScriptDigest:string):Promise<AutoView>=>
+ invoke("auto_approve",{seed,taskId,confirmation,expectedScriptDigest});
 export function automaticProgress(view:AutoView):string{
  const parts=view.execution.completedParts+"/"+view.execution.totalParts+" parts";
  const round=view.review?.rounds.at(-1);
