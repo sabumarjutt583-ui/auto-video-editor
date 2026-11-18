@@ -228,3 +228,63 @@ fn sw03m_improvement_adapter_requires_version_bound_source(){
  req.source_text=None;
  assert!(FixtureProvider.execute(&req).is_err());
 }
+
+struct BadDigest;
+impl ProviderAdapter for BadDigest{
+ fn check(&self)->AdapterCapability{capability(&AutoMode::LocalFixture)}
+ fn execute(&self,_request:&AdapterRequest)->Result<AdapterReply,String>{
+  Ok(AdapterReply{content:"[MOCK] invalid digest fixture.".into(),
+   content_sha256:"not_the_response_sha256".into(),provenance:"deterministic_mock"})
+ }
+}
+#[test]
+fn sw03m_rejects_corrupt_adapter_response_before_import(){
+ let p=Fixture::setup("channel_bad_digest",1);
+ let error=Coordinator{plan:&p.plan,execution:&p.ex,review:&p.review,
+  supervisor:&p.supervisor,adapter:&BadDigest,review_target:90,max_improvements:2}
+  .run(&p.task_id,None).unwrap_err();
+ assert!(error.contains("digest"));
+ let state=p.source();
+ assert_eq!(state.completed_parts,0);
+ assert!(state.parts[0].fragments.is_empty());
+ assert!(state.parts[0].prepared.is_some());
+ p.cleanup();
+}
+#[test]
+fn sw03m_restart_after_first_saved_fragment_never_regenerates_it(){
+ let p=Fixture::setup("channel_fragment_recovery",1);
+ let state=p.source();
+ let state=execute(&p.ex,&p.plan,&state,ExecutionAction::SaveBible{
+  text:"[MOCK] Original immutable test Bible.".into()}).unwrap();
+ let state=execute(&p.ex,&p.plan,&state,ExecutionAction::PreparePart{
+  part_index:1,extra_instructions:"".into()}).unwrap();
+ let prompt=p.ex.read("channel_fragment_recovery","ex_auto","prompt",1,0).unwrap();
+ let reply=FixtureProvider.execute(&AdapterRequest{provider:"fixture_writer".into(),
+  account_id:Some("cl_1".into()),task_id:p.task_id.clone(),scope:"write".into(),
+  prompt_sha256:digest(prompt.as_bytes()),prompt,original_words:1800,step:0,source_text:None}).unwrap();
+ let state=execute(&p.ex,&p.plan,&state,ExecutionAction::ImportFragment{
+  part_index:1,text:reply.content}).unwrap();
+ let first=state.parts[0].fragments[0].sha256.clone();
+ let prior_revision=state.revision;
+ assert!(p.run(None).unwrap().waiting_for_approval);
+ let final_state=p.source();
+ assert!(final_state.revision>prior_revision);
+ assert_eq!(final_state.parts[0].fragments.len(),2);
+ assert_eq!(final_state.parts[0].fragments[0].sha256,first);
+ p.cleanup();
+}
+#[test]
+fn sw03m_independent_channel_runs_do_not_merge_script_history(){
+ let horror=Fixture::setup("channel_horror_isolated",3);
+ let business=Fixture::setup("channel_business_isolated",1);
+ assert_eq!(horror.run(Some(1)).unwrap().completed_parts,1);
+ assert!(business.run(None).unwrap().waiting_for_approval);
+ assert_eq!(business.source().completed_parts,1);
+ assert_eq!(horror.source().completed_parts,1);
+ assert!(horror.task().last_review_id.is_none());
+ assert!(business.task().last_review_id.is_some());
+ assert!(horror.run(None).unwrap().waiting_for_approval);
+ assert_eq!(horror.source().completed_parts,3);
+ assert_eq!(business.source().completed_parts,1);
+ horror.cleanup();business.cleanup();
+}
