@@ -32,6 +32,7 @@ pub mod script_execution;
 pub mod script_review;
 pub mod script_supervisor;
 pub mod script_chrome;
+pub mod script_auto;
 pub mod settings;
 pub mod sfx;
 pub mod styles;

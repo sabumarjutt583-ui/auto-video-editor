@@ -28,6 +28,7 @@ mod script_execution;
 mod script_review;
 mod script_studio;
 mod script_supervisor;
+mod script_automation;
 #[cfg(test)]
 mod smoke_test;
 mod sfx;
@@ -202,6 +203,11 @@ macro_rules! handler {
             commands::script_supervisor::supervisor_mock,
             commands::script_chrome::chrome_workspace_status,
             commands::script_chrome::chrome_workspace_open,
+            commands::script_auto::auto_generate,
+            commands::script_auto::auto_status,
+            commands::script_auto::auto_list,
+            commands::script_auto::auto_control,
+            commands::script_auto::auto_capability,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -406,6 +412,11 @@ macro_rules! handler {
             commands::script_supervisor::supervisor_mock,
             commands::script_chrome::chrome_workspace_status,
             commands::script_chrome::chrome_workspace_open,
+            commands::script_auto::auto_generate,
+            commands::script_auto::auto_status,
+            commands::script_auto::auto_list,
+            commands::script_auto::auto_control,
+            commands::script_auto::auto_capability,
             commands::chatgpt::chatgpt_accounts,
             commands::chatgpt::chatgpt_add_account,
             commands::chatgpt::chatgpt_delete_account,
@@ -482,6 +493,7 @@ fn main() {
         .manage(graphics::export::GraphicExports::default())
         .manage(commands::app_update::PendingUpdate::default())
         .manage(commands::script_chrome::ChromeWorkspace::default())
+        
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -509,6 +521,7 @@ fn main() {
             app.manage(commands::script_execution::ExecutionService::initialize(app.handle()));
             app.manage(commands::script_review::ReviewService::initialize(app.handle()));
             app.manage(commands::script_supervisor::SupervisorService::initialize(app.handle()));
+            app.manage(commands::script_auto::AutoService::initialize(app.handle()));
             match commands::script::create(app.handle()) {
                 Ok(script) => {
                     app.manage(script);
