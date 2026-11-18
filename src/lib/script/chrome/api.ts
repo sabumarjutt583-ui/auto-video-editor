@@ -10,6 +10,7 @@ export interface ChromeAccountReport {
 export interface WorkspaceReport {
  browserAvailable:boolean;browserName:string;browserDiagnostic:string;
  accounts:ChromeAccountReport[];warning:string;
+ lastLaunchOutcome:string|null;lastLaunchNotice:string|null;
 }
 export const chromeStatus=(seed:LegacyChannelSeed,taskId:string):Promise<WorkspaceReport>=>
  invoke("chrome_workspace_status",{seed,taskId});

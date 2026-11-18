@@ -84,6 +84,7 @@ pub struct WorkspaceReport{
  pub browser_available:bool,pub browser_name:String,
  pub browser_diagnostic:String,pub accounts:Vec<WindowReport>,
  pub warning:&'static str,
+ pub last_launch_outcome:Option<String>,pub last_launch_notice:Option<String>,
 }
 #[derive(Default)]
 pub struct ChromeWorkspace{
@@ -202,7 +203,8 @@ pub async fn chrome_workspace_status(app:AppHandle,seed:LegacyChannelSeed,task_i
   Err(e)=>(false,String::new(),e.message),
  };
  Ok(WorkspaceReport{browser_available,browser_name,browser_diagnostic,accounts,
-  warning:"A browser process is not a verified window or login. Manual site interaction, window closing, and any security check remain the user's responsibility."})
+  warning:"A browser process is not a verified window or login. Manual site interaction, window closing, and any security check remain the user's responsibility.",
+  last_launch_outcome:None,last_launch_notice:None})
 }
 #[tauri::command]
 pub async fn chrome_workspace_open(app:AppHandle,seed:LegacyChannelSeed,task_id:String,
@@ -228,8 +230,10 @@ pub async fn chrome_workspace_open(app:AppHandle,seed:LegacyChannelSeed,task_id:
   Provider::Chatgpt=>config.chatgpt.url.as_str(),
  };
  validate_site(provider,&url)?;
- chrome.open(provider,&account_id,&exe,&profile,&url).await?;
- chrome_workspace_status(app,seed,task_id,service,chrome,claude,chatgpt,ig).await
+ let (outcome,notice)=chrome.open(provider,&account_id,&exe,&profile,&url).await?;
+ let mut status=chrome_workspace_status(app,seed,task_id,service,chrome,claude,chatgpt,ig).await?;
+ status.last_launch_outcome=Some(outcome);status.last_launch_notice=Some(notice);
+ Ok(status)
 }
 #[cfg(test)]
 mod tests{

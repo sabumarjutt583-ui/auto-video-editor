@@ -266,7 +266,7 @@ export function AiWorkflowControlCenter({seed}:Props){
    setChromeReport(report);
    const latest=await applyTask(seed,taskRequest(starting,{kind:"mark_user_handoff"}));
    await load(latest);setTasks(await listTasks(seed));
-   setNotice("Chrome profile process requested. Window rendering and live sign-in are unverified. Switch to the browser manually; never close it by disconnecting the account.");
+   setNotice((report.lastLaunchNotice??"Browser request returned.")+" Process: "+(report.lastLaunchOutcome??"unknown")+". Manual website interaction and login remain unverified.");
   }catch(e){
    try{setChromeReport(await chromeStatus(seed,active.taskId));}catch{/* keep original launch error */}
    setError(supervisorError(e)+" Inspect Chrome manually if this profile is already open. No script data changed.");
@@ -403,6 +403,7 @@ export function AiWorkflowControlCenter({seed}:Props){
      {a.reportedAccountError&&<p className="text-xs text-danger">Account manager: {a.reportedAccountError}</p>}
     </div>)}
     {browserStatusError&&<p role="alert" className="text-xs text-danger">{browserStatusError}</p>}
+    {chromeReport?.lastLaunchOutcome&&<p className="text-xs">Last open request: {chromeReport.lastLaunchOutcome.replace(/_/g," ")} · {chromeReport.lastLaunchNotice}</p>}
     <p className="text-xs text-muted">{chromeReport?.warning??"Window status is not proof of website authentication."}</p>
     <div className="flex flex-wrap gap-2">
      <Button disabled={busy||!active.snapshot.writerAccountId||!chromeReport?.browserAvailable||active.stage==="paused"||active.stage==="cancelled"} onClick={()=>void openBrowser("claude","writer")}>Open writer Claude in Chrome</Button>
