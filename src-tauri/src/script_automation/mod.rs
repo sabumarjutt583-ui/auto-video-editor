@@ -251,6 +251,11 @@ impl Coordinator<'_>{
     return Ok(self.outcome(&task,&ex,last_score,improvements,true))
    }
    let v=rv.versions.last().ok_or("No review source version.")?;
+   // After a saved revision the older round is no longer eligible as evidence.
+   if rv.rounds.last().is_some_and(|r|r.version_index!=v.index){
+    rv=review_do(self.review,&rv,ReviewAction::PrepareReview{mode:"improvement".into()})?;
+    task=sync_review(self.supervisor,&task,&rv)?;continue
+   }
    if v.improvement_prompt.is_none(){
     rv=review_do(self.review,&rv,ReviewAction::PrepareImprovement{goals:vec![
      "Improve the opening and coherence using all review findings.".into()]})?;
@@ -268,8 +273,7 @@ impl Coordinator<'_>{
     rv=review_do(self.review,&rv,ReviewAction::ImportRevision{text:candidate})?;
     task=sync_review(self.supervisor,&task,&rv)?;continue
    }
-   rv=review_do(self.review,&rv,ReviewAction::PrepareReview{mode:"improvement".into()})?;
-   task=sync_review(self.supervisor,&task,&rv)?;
+   return Err("Review improvement state is unexpected; immutable history preserved.".into())
   }
  }
  fn outcome(&self,task:&TaskState,ex:&ExecutionState,score:Option<u32>,rounds:u32,done:bool)->AutoOutcome{
