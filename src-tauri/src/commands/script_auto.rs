@@ -22,6 +22,20 @@ pub struct AutoPolicy{
  pub schema_version:u32,pub channel_id:String,pub task_id:String,
  pub execution_id:String,pub plan_id:String,pub plan_digest:String,
  pub mode:AutoMode,pub review_target:u32,pub max_improvements:u32,
+ #[serde(default)]pub integrity_sha256:String,
+}
+impl AutoPolicy{
+ fn hash(&self)->Cmd<String>{
+  let mut unsigned=self.clone();unsigned.integrity_sha256.clear();
+  serde_json::to_vec(&unsigned).map(|bytes|digest(&bytes)).map_err(|_|err("Automatic policy could not be hashed."))
+ }
+ fn seal(&mut self)->Cmd<()>{self.integrity_sha256=self.hash()?;Ok(())}
+ fn verify(&self)->Cmd<()>{
+  if self.integrity_sha256.is_empty()||self.integrity_sha256!=self.hash()?{
+   return Err(err("Automatic policy integrity mismatch or unsigned legacy record; nothing changed."))
+  }
+  Ok(())
+ }
 }
 /// Policy storage must never follow account/channel redirects, including Windows junctions.
 fn safe_policy_dir(path:&std::path::Path,create:bool)->Cmd<()>{
@@ -100,6 +114,7 @@ impl AutoService{
   Ok(root.join("channels").join(channel).join(format!("{task}.json")))
  }
  fn save(&self,p:&AutoPolicy)->Result<(),AutoError>{
+  p.verify()?;
   let path=self.path(&p.channel_id,&p.task_id)?;
   let parent=path.parent().ok_or_else(||err("Automatic policy path missing."))?;
   let root=self.inner.root.as_ref().ok_or_else(||err("Automatic policy root unavailable."))?;
@@ -142,6 +157,7 @@ impl AutoService{
    ||p.mode!=AutoMode::LocalFixture||p.review_target>100||p.max_improvements>3{
    return Err(err("Automatic policy identity or capability invalid."))
   }
+  p.verify()?;
   Ok(p)
  }
  fn launch(&self,p:AutoPolicy,plan:crate::script_studio::ScriptStudioPlanV1,
@@ -314,10 +330,11 @@ pub async fn auto_generate(app:AppHandle,seed:LegacyChannelSeed,request:AutoStar
   operation_id:format!("op_auto_sup_{id}"),writer_account_id:plan.claude_account_id.clone(),
   reviewer_account_id:plan.reviewer_account_id.clone(),skill_status:skill_status.into(),
   transport:Transport::LocalMock}).map_err(|e|err(e.to_string()))?;
- let policy=AutoPolicy{schema_version:1,channel_id:saved.channel_id.clone(),
+ let mut policy=AutoPolicy{schema_version:1,channel_id:saved.channel_id.clone(),
   task_id:task.task_id.clone(),execution_id:state.execution_id.clone(),plan_id:plan.plan_id.clone(),
   plan_digest:task.snapshot.plan_sha256.clone(),mode:request.mode,
-  review_target:request.review_target,max_improvements:request.max_improvements};
+  review_target:request.review_target,max_improvements:request.max_improvements,integrity_sha256:String::new()};
+ policy.seal()?;
  service.save(&policy)?;
  service.launch(policy,plan,ex.clone(),rv.clone(),sup.clone())?;
  view(&service,&saved.channel_id,&task_id,&ex,&rv,&sup)
@@ -429,9 +446,10 @@ mod tests{
   (AutoService{inner:Arc::new(Inner{root:Some(path),..Inner::default()})},root)
  }
  fn fixture_policy()->AutoPolicy{
-  AutoPolicy{schema_version:1,channel_id:"channel_a".into(),task_id:"su_auto_a".into(),
+  let mut p=AutoPolicy{schema_version:1,channel_id:"channel_a".into(),task_id:"su_auto_a".into(),
    execution_id:"ex_auto_a".into(),plan_id:"sp_auto_a".into(),plan_digest:"sha256_fixture".into(),
-   mode:AutoMode::LocalFixture,review_target:90,max_improvements:2}
+   mode:AutoMode::LocalFixture,review_target:90,max_improvements:2,integrity_sha256:String::new()};
+  p.seal().unwrap();p
  }
  #[test]fn sw03m_auto_policy_never_overwrites_or_leaks_across_channels(){
   let (service,root)=new_fixture();
@@ -472,7 +490,17 @@ mod tests{
   assert!(inner.running.lock().unwrap().is_empty());
   assert!(inner.accounts.lock().unwrap().is_empty());
  }
- #[test]fn sw03m_auto_policy_requires_private_app_data_path(){
+ #[test]fn sw03m_auto_policy_rejects_tampered_review_target_after_restart(){
+  let (service,root)=new_fixture();
+  let p=fixture_policy();service.save(&p).unwrap();
+  let file=service.path("channel_a","su_auto_a").unwrap();
+  let mut value:serde_json::Value=serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+  value["reviewTarget"]=serde_json::json!(0);
+  fs::write(&file,serde_json::to_vec(&value).unwrap()).unwrap();
+  assert!(service.get("channel_a","su_auto_a").is_err());
+  drop(service);fs::remove_dir_all(root).unwrap();
+ }
+  #[test]fn sw03m_auto_policy_requires_private_app_data_path(){
   let service=AutoService{inner:Arc::new(Inner{root:None,..Inner::default()})};
   assert!(service.save(&fixture_policy()).is_err());
   assert!(service.get("channel_a","su_auto_a").is_err());

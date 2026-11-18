@@ -6,7 +6,7 @@ import type {ReviewState} from "../review/types.ts";
 export type AutoMode="local_fixture"|"authorized_browser";
 export interface AutoCapability{automatic:boolean;authorized:boolean;realAi:boolean;provenance:string;reason:string}
 export interface AutoPolicy{schemaVersion:number;channelId:string;taskId:string;executionId:string;planId:string;planDigest:string;
- mode:AutoMode;reviewTarget:number;maxImprovements:number}
+ mode:AutoMode;reviewTarget:number;maxImprovements:number;integritySha256:string}
 export interface AutoView{task:SupervisorTask;execution:ExecutionState;review:ReviewState|null;
  policy:AutoPolicy;capability:AutoCapability;workerRunning:boolean;workerError:string|null;realAiResultVerified:boolean}
 export interface AutoStart{title:string;topic:string;scriptMode:ScriptMode;targetWords:number;partCount:number;
