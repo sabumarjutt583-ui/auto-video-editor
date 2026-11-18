@@ -1,7 +1,8 @@
 import {useEffect,useRef,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import {Button} from "../ui";
-import {chromeOpen,chromeStatus,responseStats,type ChromeProvider,type WorkspaceReport} from "../../lib/script/chrome/api.ts";
+import {accountSummary,chromeOpen,chromeStatus,responseStats,type ChromeProvider,type WorkspaceReport} from "../../lib/script/chrome/api.ts";
+import {operatorCanEdit,selectReviewSection} from "../../lib/script/chrome/operator.ts";
 import {nextLocalPartToPrepare} from "../../lib/script/chrome/nextPart.ts";
 import type {LegacyChannelSeed,ScriptStudioPlanV1} from "../../lib/script/studio/types.ts";
 import {getStudioPlan} from "../../lib/script/studio/api.ts";
@@ -24,6 +25,7 @@ export function AiWorkflowControlCenter({seed}:Props){
  const [writerChoice,setWriterChoice]=useState("");
  const [reviewerChoice,setReviewerChoice]=useState("");
  const [transport,setTransport]=useState<SupervisorTransport>("visible_browser");
+ const [selectedPlan,setSelectedPlan]=useState<ScriptStudioPlanV1|null>(null);
  const [active,setActive]=useState<SupervisorTask|null>(null);
  const [execution,setExecution]=useState<ExecutionState|null>(null);
  const [review,setReview]=useState<ReviewState|null>(null);
@@ -42,8 +44,10 @@ export function AiWorkflowControlCenter({seed}:Props){
  const reviewRetry=useRef<{key:string;action:ReviewAction;operationId:string}|null>(null);
  const executionRetry=useRef<{key:string;request:ExecutionRequest}|null>(null);
  const sectionDrafts=useRef<Record<string,string>>({});
+ const reviewSelection=useRef<{reviewId:string;round:number;index:number}|null>(null);
  useEffect(()=>{
   let live=true;setActive(null);setExecution(null);setReview(null);setChromeReport(null);setError("");setNotice("");
+  setSelectedPlan(null);setWarningsAccepted(false);setConsent(false);setConfirmation("");reviewSelection.current=null;
   taskRetry.current=null;startRetry.current=null;reviewRetry.current=null;
   void Promise.allSettled([listExecutions(seed),listTasks(seed),invoke<Metadata[]>("script_accounts"),invoke<Metadata[]>("chatgpt_accounts")]).then(x=>{
    if(!live)return;
@@ -54,21 +58,39 @@ export function AiWorkflowControlCenter({seed}:Props){
    if(x[3].status==="fulfilled")setChatgpt(x[3].value);else setError("ChatGPT account list unavailable.");
   });return()=>{live=false};
  },[seed.channelId]);
+ useEffect(()=>{
+  let live=true;const e=executions.find(x=>x.executionId===chosenExecution);
+  setSelectedPlan(null);setWriterChoice("");setReviewerChoice("");
+  if(e)void getStudioPlan(seed.channelId,e.planId)
+   .then(plan=>{if(live)setSelectedPlan(plan)})
+   .catch(err=>{if(live)setError("Saved plan could not be loaded: "+supervisorError(err))});
+  return()=>{live=false};
+ },[seed.channelId,chosenExecution,executions]);
  const partIndex=execution?.completedParts===execution?.totalParts?0:(execution?.completedParts??0)+1;
  const currentPart=partIndex?execution?.parts[partIndex-1]:null;
  const lastRound=review?.rounds.at(-1),currentVersion=review?.versions.at(-1);
  const reviewedSections=lastRound?.sections.filter(s=>s.report&&s.score!==null).length??0;
  const availableAccounts=active?.snapshot.reviewerProvider==="chatgpt"?chatgpt:claude;
+ const reviewerOptions=selectedPlan?.reviewerProvider==="chatgpt"?chatgpt:selectedPlan?.reviewerProvider==="claude"?claude:[];
+ const canEdit=active?operatorCanEdit(active.stage):false;
  async function load(task:SupervisorTask){
   const e=await getExecution(seed,task.snapshot.executionId);
   let rv:ReviewState|null=null;
   if(task.lastReviewId)rv=await getReview(seed,task.lastReviewId);
   setActive(task);setExecution(e);setReview(rv);
-  setChromeReport(task.snapshot.transport==="visible_browser"?await chromeStatus(seed,task.taskId):null);
-  if(rv){setSection(0);setReportRaw(sectionDrafts.current[rv.reviewId+"/"+rv.rounds.at(-1)?.index+"/0"]??"");setPrompt(await readReview(seed,rv.reviewId,"prompt",0))}
-  else if(e.completedParts<e.totalParts&&e.parts[e.completedParts].prepared){
-   setPrompt(await readExecution(seed,e.executionId,"prompt",e.completedParts+1));
-  }else setPrompt("");
+  if(task.snapshot.transport==="visible_browser"){
+   try{setChromeReport(await chromeStatus(seed,task.taskId))}
+   catch(err){setChromeReport(null);setNotice("Chrome status unavailable; saved script data is still accessible: "+supervisorError(err))}
+  }else setChromeReport(null);
+  if(rv){
+   const round=rv.rounds.at(-1);
+   const selected=selectReviewSection(reviewSelection.current,rv.reviewId,round?.index??0,round?.sections.length??0);
+   reviewSelection.current={reviewId:rv.reviewId,round:round?.index??0,index:selected};
+   setSection(selected);setReportRaw(sectionDrafts.current[rv.reviewId+"/"+round?.index+"/"+selected]??"");
+   if(round?.sections.length)setPrompt(await readReview(seed,rv.reviewId,"prompt",selected));else setPrompt("");
+  }else if(e.completedParts<e.totalParts&&e.parts[e.completedParts].prepared){
+   reviewSelection.current=null;setPrompt(await readExecution(seed,e.executionId,"prompt",e.completedParts+1));
+  }else{reviewSelection.current=null;setPrompt("")}
  }
  async function reload(){
   if(busy)return;setBusy(true);setError("");
@@ -90,6 +112,7 @@ export function AiWorkflowControlCenter({seed}:Props){
   try{
    const execution=await getExecution(seed,chosenExecution);
    const plan:ScriptStudioPlanV1=await getStudioPlan(seed.channelId,execution.planId);
+   setSelectedPlan(plan);
    const key=JSON.stringify([chosenExecution,transport,writerChoice,reviewerChoice]);
    if(startRetry.current?.key!==key){
     const skill=plan.configSnapshot.skills.find(x=>x.skillId===plan.selectedSkillId);
@@ -119,6 +142,7 @@ export function AiWorkflowControlCenter({seed}:Props){
  }
  async function applyExecutionAction(action:ExecutionAction){
   if(!active||!execution||busy)return;
+  if(!operatorCanEdit(active.stage)){setError("Task is paused or terminal. Resume before editing saved script data.");return}
   setBusy(true);setError("");
   try{
    const key=JSON.stringify([execution.executionId,execution.revision,action]);
@@ -158,12 +182,14 @@ export function AiWorkflowControlCenter({seed}:Props){
    }
    if(action.kind==="import_fragment")setResponse("");
    if(action.kind==="save_continuity")setContinuity("");
+   setWarningsAccepted(false);
    setNotice("Verified saved execution checkpoint "+next.revision+". No provider submission."+followUp);
   }catch(e){setError(supervisorError(e)+" Refresh saved records before retrying.")}
   finally{setBusy(false)}
  }
  async function startReviewTask(){
   if(!execution?.assembled||!active||busy)return;
+  if(!operatorCanEdit(active.stage)){setError("Resume task before starting review.");return}
   setBusy(true);setError("");
   try{
    const found=(await listReviews(seed)).reviews.find(r=>r.executionId===execution.executionId&&r.partIndex===null);
@@ -177,6 +203,7 @@ export function AiWorkflowControlCenter({seed}:Props){
  }
  async function reviewAction(action:ReviewAction){
   if(!review||!active||busy)return;
+  if(!operatorCanEdit(active.stage)){setError("Resume task before importing, revising or approving.");return}
   const key=JSON.stringify([review.reviewId,review.revision,action]);
   if(reviewRetry.current?.key!==key)reviewRetry.current={key,action,operationId:newReviewOperation()};
   setBusy(true);setError("");
@@ -191,6 +218,7 @@ export function AiWorkflowControlCenter({seed}:Props){
     setReportRaw("");
    }
    if(action.kind==="import_revision")setRevisionText("");
+   setConsent(false);setConfirmation("");
    setNotice("Review checkpoint verified. Manual provenance, not verified Claude/ChatGPT output.");
   }catch(e){setError(supervisorError(e))}
   finally{setBusy(false)}
@@ -200,6 +228,7 @@ export function AiWorkflowControlCenter({seed}:Props){
   try{
    sectionDrafts.current[review.reviewId+"/"+review.rounds.at(-1)?.index+"/"+section]=reportRaw;
    setPrompt(await readReview(seed,review.reviewId,"prompt",index));
+   reviewSelection.current={reviewId:review.reviewId,round:review.rounds.at(-1)?.index??0,index};
    setSection(index);setReportRaw(sectionDrafts.current[review.reviewId+"/"+review.rounds.at(-1)?.index+"/"+index]??"");
   }catch(e){setError(supervisorError(e))}
   finally{setBusy(false)}
@@ -300,17 +329,17 @@ export function AiWorkflowControlCenter({seed}:Props){
      <option value="local_mock">Deterministic local mock</option>
     </select>
    </label>
-   <Button disabled={busy||!chosenExecution} onClick={()=>void create()}>Create supervised task</Button>
+   <Button disabled={busy||!chosenExecution||!selectedPlan} onClick={()=>void create()}>Create supervised task</Button>
    <label className="text-xs">Explicit writer fallback (must be allowed by saved plan)
     <select className={cn} value={writerChoice} onChange={e=>setWriterChoice(e.target.value)}>
      <option value="">Use saved plan's Claude account</option>
      {claude.map(a=><option value={a.id} key={a.id}>{a.name} ({a.id})</option>)}
     </select>
    </label>
-   <label className="text-xs">Explicit reviewer fallback (saved policy enforced in Rust)
+   <label className="text-xs">Explicit {selectedPlan?.reviewerProvider??"saved"} reviewer fallback (saved policy enforced in Rust)
     <select className={cn} value={reviewerChoice} onChange={e=>setReviewerChoice(e.target.value)}>
      <option value="">Use saved plan's reviewer account</option>
-     {[...claude,...chatgpt].map(a=><option value={a.id} key={a.id}>{a.name} ({a.id})</option>)}
+     {reviewerOptions.map(a=><option value={a.id} key={a.id}>{selectedPlan?.reviewerProvider}: {a.name} ({a.id})</option>)}
     </select>
    </label>
    <Button disabled={busy} onClick={()=>void reload()}>Reload all from disk</Button>
@@ -332,7 +361,8 @@ export function AiWorkflowControlCenter({seed}:Props){
     <summary className="text-sm font-semibold">Channel account, Skill and transport capabilities</summary>
     <p className="text-xs">Writer: Claude {active.snapshot.writerAccountId??"NOT SELECTED"} ({claude.find(x=>x.id===active.snapshot.writerAccountId)?.name??"missing account"}) ·
       reviewer: {active.snapshot.plan.reviewerProvider} {active.snapshot.reviewerAccountId??"NOT SELECTED"} ({availableAccounts.find(x=>x.id===active.snapshot.reviewerAccountId)?.name??"missing account"})</p>
-    <p className="text-xs">Writing mode {active.snapshot.plan.writingMode} · master prompt {active.snapshot.plan.selectedPromptVersionId??"none"} · Skill {active.snapshot.selectedSkillName??"none"} ({active.snapshot.skillStatus}). Skill activation has NOT been remotely verified.</p>
+    <p className="text-xs">Writing mode {active.snapshot.plan.writingMode} · immutable master prompt {active.snapshot.plan.selectedPromptVersionId??"none"} · Skill {active.snapshot.selectedSkillName??"none"} ({active.snapshot.skillStatus}). Skill activation has NOT been remotely verified.</p>
+    {active.snapshot.selectedSkillId&&<p className="text-xs">Skill's registered Claude account {active.snapshot.plan.configSnapshot.skills.find(x=>x.skillId===active.snapshot.selectedSkillId)?.claudeAccountId??"MISSING"} · selected writer {active.snapshot.writerAccountId??"MISSING"}</p>}
     <p className="text-xs">Rubric total {active.snapshot.plan.configSnapshot.rubric.reduce((n,c)=>n+c.points,0)} ·
      {active.snapshot.plan.configSnapshot.rubric.map(c=>c.label+" "+c.points).join(" · ")}</p>
     <p className="text-xs">Capabilities: {active.snapshot.capabilities.join(", ")}</p>
@@ -357,6 +387,7 @@ export function AiWorkflowControlCenter({seed}:Props){
     {chromeReport?.accounts.map(a=><div key={a.profileIdentity} className="rounded bg-surface border border-line p-2 space-y-1">
      <p className="text-xs font-semibold">{a.displayName} · {a.provider.toUpperCase()} · account {a.accountId} · profile {a.profileIdentity}</p>
      <p className="text-xs">Saved account {a.savedAccountPresent?"present":"MISSING"} · process {a.processState.replace(/_/g," ")} · previous connection report {a.lastReportedConnected?"connected":"not connected"} · sign-in {a.signingIn?"in progress":"unverified"}.</p>
+     <p className="text-xs text-muted">{accountSummary(a)}</p>
      {a.lastLaunchError&&<p className="text-xs text-danger">{a.lastLaunchError}</p>}
      {a.reportedAccountError&&<p className="text-xs text-danger">Account manager: {a.reportedAccountError}</p>}
     </div>)}
@@ -378,7 +409,7 @@ export function AiWorkflowControlCenter({seed}:Props){
     {currentPart&&<>
      <p className="text-xs">Part {currentPart.index}: {currentPart.title||"Untitled"} · {currentPart.objective||"No part objective"} · target {currentPart.targetWords} words · fragments {currentPart.fragments.length}</p>
      <div className="flex flex-wrap gap-2">
-      <Button disabled={busy||Boolean(currentPart.prepared)||active.stage==="paused"} onClick={()=>void applyExecutionAction({kind:"prepare_part",partIndex:currentPart.index,extraInstructions:""})}>Prepare exact part prompt</Button>
+      <Button disabled={busy||!canEdit||Boolean(currentPart.prepared)} onClick={()=>void applyExecutionAction({kind:"prepare_part",partIndex:currentPart.index,extraInstructions:""})}>Prepare exact part prompt</Button>
       {currentPart.fragments.length>0&&<Button disabled={busy} onClick={()=>void applyExecutionAction({kind:"prepare_continuation",partIndex:currentPart.index,extraInstructions:""})}>Prepare continuation</Button>}
      </div>
      {currentPart.prepared&&<Button disabled={busy} onClick={()=>void readExecution(seed,execution.executionId,"prompt",currentPart.index).then(setPrompt).catch(e=>setError(supervisorError(e)))}>Read saved part prompt</Button>}
@@ -397,7 +428,7 @@ export function AiWorkflowControlCenter({seed}:Props){
      </label>}
      {currentPart.prepared&&<div className="flex gap-2 flex-wrap"><Button disabled={busy} onClick={()=>void pasteResponse()}>Paste from clipboard (user-triggered)</Button><Button disabled={busy||!response} onClick={()=>setResponse("")}>Clear uncommitted draft</Button></div>}
      {response&&currentPart.prepared&&<details className="border border-line p-2"><summary className="text-xs">Exact raw response preview (not yet committed)</summary><pre className="text-xs whitespace-pre-wrap break-words">{response}</pre></details>}
-     <Button disabled={busy||!currentPart.prepared||!response.trim()} onClick={()=>void applyExecutionAction({kind:"import_fragment",partIndex:currentPart.index,text:response})}>Import response into Rust execution</Button>
+     <Button disabled={busy||!canEdit||!currentPart.prepared||!response.trim()} onClick={()=>void applyExecutionAction({kind:"import_fragment",partIndex:currentPart.index,text:response})}>Import response into Rust execution</Button>
      {currentPart.fragments.length>0&&<>
       <p className="text-xs">Saved immutable response fragments: {currentPart.fragments.map((f,i)=>"#"+(i+1)+" "+f.sha256.slice(0,14)).join(" · ")}. Original imports cannot be overwritten.</p>
       <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={warningsAccepted} onChange={e=>setWarningsAccepted(e.target.checked)}/> I inspected this candidate and explicitly accept technical warnings, if any.</label>
@@ -438,7 +469,7 @@ export function AiWorkflowControlCenter({seed}:Props){
        sectionDrafts.current[review.reviewId+"/"+lastRound.index+"/"+section]=e.target.value;
       }}/>
       <div className="flex gap-2 flex-wrap"><Button disabled={busy} onClick={()=>void pasteReview()}>Paste review from clipboard</Button>
-      <Button disabled={busy||!reportRaw.trim()} onClick={()=>void reviewAction({kind:"import_response",sectionIndex:section,raw:reportRaw})}>Import exact reviewer response</Button></div>
+      <Button disabled={busy||!canEdit||!reportRaw.trim()} onClick={()=>void reviewAction({kind:"import_response",sectionIndex:section,raw:reportRaw})}>Import exact reviewer response</Button></div>
      </label>}
      {lastRound.sections[section]?.validationIssues.length>0&&<div>
       <p className="text-xs text-danger">{lastRound.sections[section].validationIssues.join(" | ")}</p>
@@ -463,7 +494,7 @@ export function AiWorkflowControlCenter({seed}:Props){
      {currentVersion.improvementPrompt&&<Button disabled={busy} onClick={()=>void readReview(seed,review.reviewId,"improvement",0).then(setPrompt).catch(e=>setError(supervisorError(e)))}>View/copy saved improvement prompt</Button>}
      {currentVersion.improvementPrompt&&<label className="block text-xs">Paste manually improved script (new immutable version)
       <textarea className={cn} rows={5} value={revisionText} onChange={e=>setRevisionText(e.target.value)}/>
-      <Button disabled={busy||!revisionText.trim()} onClick={()=>void reviewAction({kind:"import_revision",text:revisionText})}>Save revised version</Button>
+      <Button disabled={busy||!canEdit||!revisionText.trim()} onClick={()=>void reviewAction({kind:"import_revision",text:revisionText})}>Save revised version</Button>
      </label>}
      <label className="text-xs">Re-review mode
       <select className={cn} value={reviewMode} onChange={e=>setReviewMode(e.target.value as typeof reviewMode)}>
@@ -475,7 +506,7 @@ export function AiWorkflowControlCenter({seed}:Props){
      <p className="text-xs">Approval: {active.approvalDigest?"Rust-verified current approval":"Not approved"}. Only Rust-owned final review may approve.</p>
      <label className="text-xs flex items-center gap-2"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/> I manually reviewed the exact current script and all required sections.</label>
      <label className="text-xs block">Type APPROVE FINAL SCRIPT<input className={cn} value={confirmation} onChange={e=>setConfirmation(e.target.value)}/></label>
-     <Button disabled={busy||active.stage==="completed"||!consent||confirmation!=="APPROVE FINAL SCRIPT"||lastRound.versionIndex!==currentVersion.index||reviewedSections!==lastRound.sections.length}
+     <Button disabled={busy||!canEdit||!consent||confirmation!=="APPROVE FINAL SCRIPT"||lastRound.versionIndex!==currentVersion.index||reviewedSections!==lastRound.sections.length}
       onClick={()=>void reviewAction({kind:"approve",confirmation})}>Request Rust-persisted final approval</Button>
     </>}
    </div>}
