@@ -4,6 +4,7 @@ import {Button} from "../ui";
 import {accountSummary,chromeOpen,chromeStatus,responseStats,type ChromeProvider,type WorkspaceReport} from "../../lib/script/chrome/api.ts";
 import {operatorCanEdit,selectReviewSection} from "../../lib/script/chrome/operator.ts";
 import {nextLocalPartToPrepare} from "../../lib/script/chrome/nextPart.ts";
+import {pendingPromptKind} from "../../lib/script/chrome/promptRecovery.ts";
 import type {LegacyChannelSeed,ScriptStudioPlanV1} from "../../lib/script/studio/types.ts";
 import {getStudioPlan} from "../../lib/script/studio/api.ts";
 import type {ExecutionState,ExecutionAction,ExecutionRequest,CandidateValidation} from "../../lib/script/execution/types.ts";
@@ -94,8 +95,11 @@ export function AiWorkflowControlCenter({seed}:Props){
    reviewSelection.current={reviewId:rv.reviewId,round:round?.index??0,index:selected};
    setSection(selected);setReportRaw(sectionDrafts.current[rv.reviewId+"/"+round?.index+"/"+selected]??"");
    if(round?.sections.length)setPrompt(await readReview(seed,rv.reviewId,"prompt",selected));else setPrompt("");
-  }else if(e.completedParts<e.totalParts&&e.parts[e.completedParts].prepared){
-   reviewSelection.current=null;setPrompt(await readExecution(seed,e.executionId,"prompt",e.completedParts+1));
+  }else if(e.completedParts<e.totalParts){
+   reviewSelection.current=null;
+   const part=e.parts[e.completedParts];
+   const kind=part?pendingPromptKind(part):null;
+   setPrompt(kind?await readExecution(seed,e.executionId,kind,e.completedParts+1):"");
   }else{reviewSelection.current=null;setPrompt("")}
  }
  async function reload(){
@@ -425,7 +429,8 @@ export function AiWorkflowControlCenter({seed}:Props){
       <Button disabled={busy||!canEdit||Boolean(currentPart.prepared)} onClick={()=>void applyExecutionAction({kind:"prepare_part",partIndex:currentPart.index,extraInstructions:""})}>Prepare exact part prompt</Button>
       {currentPart.fragments.length>0&&<Button disabled={busy} onClick={()=>void applyExecutionAction({kind:"prepare_continuation",partIndex:currentPart.index,extraInstructions:""})}>Prepare continuation</Button>}
      </div>
-     {currentPart.prepared&&<Button disabled={busy} onClick={()=>void readExecution(seed,execution.executionId,"prompt",currentPart.index).then(setPrompt).catch(e=>setError(supervisorError(e)))}>Read saved part prompt</Button>}
+     {currentPart.prepared&&<Button disabled={busy} onClick={()=>void readExecution(seed,execution.executionId,"prompt",currentPart.index).then(setPrompt).catch(e=>setError(supervisorError(e)))}>Read original part prompt (reference only)</Button>}
+     {currentPart.fragments.length>0&&!pendingPromptKind(currentPart)&&<p className="text-xs">Latest fragment is saved. Prepare a new continuation prompt if Claude has not completed this part. No old prompt will be automatically reused.</p>}
      {active.snapshot.transport==="local_mock"&&<div className="flex flex-wrap gap-2 items-end">
       <label className="text-xs">Mock response scenario
        <select className={cn} value={scenario} onChange={e=>setScenario(e.target.value as MockScenario)}>
