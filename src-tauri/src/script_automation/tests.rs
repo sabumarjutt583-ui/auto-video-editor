@@ -206,7 +206,7 @@ fn sw03m_review_adapter_validates_exact_saved_prompt_and_rubric(){
  let prompt=p.review.read("channel_adapter_review",&current.review_id,"prompt",0).unwrap();
  let mut req=AdapterRequest{provider:"fixture_reviewer".into(),account_id:Some("gp_2".into()),
   task_id:p.task_id.clone(),scope:"review".into(),prompt_sha256:digest(prompt.as_bytes()),
-  prompt,original_words:0,step:0,source_text:None};
+  prompt,original_words:0,step:current.rounds.last().unwrap().index,source_text:None};
  let response=FixtureProvider.review(&req,&current,true).unwrap();
  assert_eq!(response.content_sha256,digest(response.content.as_bytes()));
  assert!(response.content.contains("MOCK structured reviewer fixture"));
