@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {AutomaticScriptPanel} from "./AutomaticScriptPanel.tsx";
 import {invoke} from "@tauri-apps/api/core";
 import {Button} from "../ui";
 import {accountSummary,chromeOpen,chromeStatus,responseStats,type ChromeProvider,type WorkspaceReport} from "../../lib/script/chrome/api.ts";
@@ -323,7 +324,9 @@ export function AiWorkflowControlCenter({seed}:Props){
  }
  if(!import.meta.env.DEV)return null;
  return <section className="rounded border border-dashed border-line p-3 space-y-3" aria-label="AI Workflow Control Center">
-  <h4 className="font-semibold">Visible Chrome Script Production Workspace · Phase 03L · Development Only</h4>
+  <h4 className="font-semibold">Script Production Studio · Phase 03M Development Only</h4>
+  <AutomaticScriptPanel seed={seed}/>
+  <h5 className="font-semibold text-sm">Phase 03L manual visible Chrome fallback</h5>
   <p className="text-xs text-muted">One dashboard for user-assisted writing, local imports, review and approval. Consumer-site submission, extraction, live login verification and API generation are NOT supported. No media handoff.</p>
   <ol className="text-xs grid grid-cols-2 lg:grid-cols-5 gap-2 list-decimal list-inside">
    {["Select channel","Choose saved plan","Resolve accounts","Open visible Chrome","Prepare/copy prompt","Import actual response","Continue/assemble","Review sections","Improve/re-review","Explicit approval"].map((name,i)=>

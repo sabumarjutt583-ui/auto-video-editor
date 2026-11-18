@@ -1,0 +1,319 @@
+use super::*;
+use std::{path::PathBuf,fs};
+use rand::RngCore;
+use crate::script_studio::{ChannelStudioConfigV1,PlanInput,ScriptMode,ReviewerProvider,WritingMode,SkillRegistration,SkillInstallStatus,build_plan};
+use crate::script_execution::{StartExecution,ExecutionStore};
+use crate::script_review::ReviewStore;
+use crate::script_supervisor::{SupervisorStore,TaskStart};
+
+fn random()->String{
+ let mut bytes=[0u8;16];rand::rng().fill_bytes(&mut bytes);
+ bytes.iter().map(|x|format!("{x:02x}")).collect()
+}
+struct Fixture{
+ root:PathBuf,plan:ScriptStudioPlanV1,ex:ExecutionStore,review:ReviewStore,
+ supervisor:SupervisorStore,task_id:String
+}
+impl Fixture{
+ fn setup(channel:&str,parts:u32)->Self{
+  let root=std::env::temp_dir().join(format!("sw03m-{}",random()));
+  fs::create_dir(&root).unwrap();
+  let mut cfg=ChannelStudioConfigV1::seed(channel.into(),channel.into(),"English".into(),
+   "Create an original, fictional test script.".into(),Some("cl_1".into()));
+  cfg.accounts.chatgpt_review_account_id=Some("gp_2".into());
+  cfg.review.provider=ReviewerProvider::Chatgpt;
+  cfg.writing.instruction_mode=WritingMode::MasterPlusSkill;
+  cfg.skills.push(SkillRegistration{skill_id:"skill_mock".into(),channel_id:channel.into(),
+   display_name:"Mock storytelling reference".into(),exact_name:"MockSkill".into(),
+   claude_account_id:"cl_1".into(),description:"Local-only registered Skill reference".into(),
+   status:SkillInstallStatus::RegisteredLocally,user_confirmed_at:None,planning_override:None});
+  cfg.writing.selected_skill_id=Some("skill_mock".into());
+  let words=if parts==1{1800}else{parts*120};
+  let plan=build_plan(&cfg,&PlanInput{plan_id:"sp_auto_mock".into(),channel_id:channel.into(),
+   expected_config_revision:0,title:"Original psychological story".into(),
+   topic:"MOCK only: a fictional narrator experiences a mysterious event".into(),
+   language:Some("English".into()),mode:Some(if parts==1{ScriptMode::Single}else{ScriptMode::MultiPart}),
+   total_words:Some(words),part_count:Some(parts),outline_required:Some(parts>1),
+   continuity_required:Some(parts>1),parts:Vec::new()
+  },"2026-11-18T00:00:00.000Z").unwrap();
+  let ex=ExecutionStore::new(root.join("execution")).unwrap();
+  let state=ex.start(&plan,&StartExecution{channel_id:channel.into(),
+   plan_id:plan.plan_id.clone(),execution_id:"ex_auto".into(),operation_id:"op_start_ex".into()}).unwrap();
+  let supervisor=SupervisorStore::new(root.join("supervisor")).unwrap();
+  let task_id="su_auto_test".to_string();
+  supervisor.start(&plan,&state,&TaskStart{channel_id:channel.into(),task_id:task_id.clone(),
+   execution_id:state.execution_id.clone(),operation_id:"op_start_supervisor".into(),
+   writer_account_id:Some("cl_1".into()),reviewer_account_id:Some("gp_2".into()),
+   skill_status:"registered_locally".into(),transport:Transport::LocalMock}).unwrap();
+  let review=ReviewStore::new(root.join("review")).unwrap();
+  Self{root,plan,ex,review,supervisor,task_id}
+ }
+ fn run(&self,stop:Option<u32>)->Result<AutoOutcome,String>{
+  Coordinator{plan:&self.plan,execution:&self.ex,review:&self.review,
+   supervisor:&self.supervisor,adapter:&FixtureProvider,review_target:90,max_improvements:2}
+   .run(&self.task_id,stop)
+ }
+ fn source(&self)->ExecutionState{
+  self.ex.get(&self.plan.channel_id,"ex_auto").unwrap()
+ }
+ fn task(&self)->TaskState{
+  self.supervisor.get(&self.plan.channel_id,&self.task_id).unwrap()
+ }
+ fn cleanup(self){
+  let path=self.root.clone();drop(self);fs::remove_dir_all(path).unwrap();
+ }
+}
+#[test]
+fn sw03m_provider_capability_enforced_before_dispatch(){
+ let no=capability(&AutoMode::AuthorizedBrowser);
+ assert!(!no.authorized&&!no.automatic&&!no.real_ai);
+ let yes=capability(&AutoMode::LocalFixture);
+ assert!(yes.automatic&&yes.authorized&&!yes.real_ai);
+ let p=Fixture::setup("channel_c",1);
+ let mut task=p.task();
+ assert_eq!(task.snapshot.transport,Transport::LocalMock);
+ task.snapshot.transport=Transport::VisibleBrowser;
+ assert_ne!(task.snapshot.transport,Transport::LocalMock);
+ p.cleanup();
+}
+#[test]
+fn sw03m_ten_part_automatic_recovery_after_part_four(){
+ let p=Fixture::setup("channel_horror",10);
+ let result=p.run(Some(4)).unwrap();
+ assert_eq!(result.completed_parts,4);
+ assert!(!result.waiting_for_approval);
+ let old=p.source();
+ assert_eq!(old.completed_parts,4);
+ assert_eq!(old.parts[3].fragments.len(),2);
+ assert!(old.parts[3].committed.is_some());
+ let revision=old.revision;
+ let root=p.root.clone();let plan=p.plan.clone();let task=p.task_id.clone();
+ drop(p);
+ let ex=ExecutionStore::new(root.join("execution")).unwrap();
+ let review=ReviewStore::new(root.join("review")).unwrap();
+ let sup=SupervisorStore::new(root.join("supervisor")).unwrap();
+ let coordinator=Coordinator{plan:&plan,execution:&ex,review:&review,supervisor:&sup,
+  adapter:&FixtureProvider,review_target:90,max_improvements:2};
+ let result=coordinator.run(&task,None).unwrap();
+ assert_eq!(result.completed_parts,10);
+ assert!(result.waiting_for_approval);
+ assert!(result.review_score.unwrap()>=90);
+ assert_eq!(result.revision_rounds,1);
+ let source=ex.get("channel_horror","ex_auto").unwrap();
+ assert!(source.revision>revision);
+ assert!(source.parts.iter().all(|p|p.committed.is_some()&&p.fragments.len()==2));
+ assert_eq!(source.continuity_notes.len(),9);
+ let rv=review.get("channel_horror","rv_auto_test").unwrap();
+ assert_eq!(rv.versions.len(),2);
+  assert_eq!(rv.versions[0].source,"immutable_phase_03m_mock_fixture");
+  assert_eq!(rv.versions[1].source,"deterministic_mock_improved_revision");
+ assert_eq!(rv.rounds.len(),2);
+ assert!(rv.approvals.is_empty());
+ assert!(rv.rounds.last().unwrap().sections.iter().all(|s|s.report.is_some()));
+ assert_eq!(sup.get("channel_horror",&task).unwrap().stage,Stage::AwaitingApproval);
+ drop(ex);drop(review);drop(sup);fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn sw03m_single_documentary_automatic_writer_reviewer_improvement(){
+ let p=Fixture::setup("channel_documentary",1);
+ let result=p.run(None).unwrap();
+ assert_eq!(result.completed_parts,1);
+ assert_eq!(result.revision_rounds,1);
+ assert!(result.waiting_for_approval);
+ let e=p.source();
+ assert!(e.assembled.is_some());
+ assert_eq!(e.parts[0].fragments.len(),2);
+ assert!(e.parts[0].actual_words.unwrap()>1000);
+ let source=p.ex.read("channel_documentary","ex_auto","assembled",0,0).unwrap();
+ assert!(source.contains("[MOCK]"));
+ let rv=p.review.get("channel_documentary","rv_auto_test").unwrap();
+ assert!(rv.rounds.len()>=2);
+ assert!(rv.versions[0].text.sha256!=rv.versions[1].text.sha256);
+ assert!(rv.approvals.is_empty());
+ p.cleanup();
+}
+#[test]
+fn sw03m_pause_resume_cancel_and_source_preservation(){
+ let p=Fixture::setup("channel_pauses",3);
+ assert_eq!(p.run(Some(1)).unwrap().completed_parts,1);
+ let task=p.task();
+ let paused=p.supervisor.apply(&TaskRequest{channel_id:task.channel_id.clone(),
+  task_id:task.task_id.clone(),expected_revision:task.revision,
+  operation_id:"op_pause_auto".into(),action:TaskAction::Pause},None,None).unwrap();
+ assert_eq!(paused.stage,Stage::Paused);
+ assert!(p.run(None).is_err());
+ assert_eq!(p.source().completed_parts,1);
+ let resumed=p.supervisor.apply(&TaskRequest{channel_id:paused.channel_id.clone(),
+  task_id:paused.task_id.clone(),expected_revision:paused.revision,
+  operation_id:"op_resume_auto".into(),action:TaskAction::Resume},None,None).unwrap();
+ assert_ne!(resumed.stage,Stage::Paused);
+ assert!(p.run(None).unwrap().waiting_for_approval);
+ let task=p.task();
+ let cancel=p.supervisor.apply(&TaskRequest{channel_id:task.channel_id.clone(),
+  task_id:task.task_id.clone(),expected_revision:task.revision,
+  operation_id:"op_cancel_auto".into(),action:TaskAction::Cancel},None,None).unwrap();
+ assert_eq!(cancel.stage,Stage::Cancelled);
+ assert!(p.run(None).is_err());
+ assert_eq!(p.source().completed_parts,3);
+ p.cleanup();
+}
+#[test]
+fn sw03m_rejects_invalid_account_or_wrong_owner_and_preserves_sources(){
+ let p=Fixture::setup("channel_strict",1);
+ let mut plan=p.plan.clone();plan.claude_account_id=Some("cl_other".into());
+ assert!(Coordinator{plan:&plan,execution:&p.ex,review:&p.review,supervisor:&p.supervisor,
+  adapter:&FixtureProvider,review_target:90,max_improvements:2}
+  .run(&p.task_id,None).is_err());
+ assert!(p.supervisor.get("channel_other",&p.task_id).is_err());
+ assert_eq!(p.source().revision,0);
+ p.cleanup();
+}
+#[test]
+fn sw03m_response_evidence_never_masquerades_as_real_ai(){
+ let req=AdapterRequest{provider:"fixture_writer".into(),account_id:Some("cl_1".into()),
+  task_id:"su_1".into(),scope:"write".into(),prompt:"prompt اردو 한국어 😀\r\n".into(),
+  prompt_sha256:digest("prompt اردو 한국어 😀\r\n".as_bytes()),original_words:120,step:0,source_text:None};
+ let reply=FixtureProvider.execute(&req).unwrap();
+ assert!(reply.content.contains("[MOCK]"));
+ assert_eq!(reply.provenance,"deterministic_mock");
+ assert_eq!(reply.content_sha256,digest(reply.content.as_bytes()));
+ let mut altered=req;altered.prompt.push(' ');
+ assert!(FixtureProvider.execute(&altered).is_err());
+}
+
+#[test]
+fn sw03m_max_one_improvement_still_re_reviews_new_version(){
+ let p=Fixture::setup("channel_one_revision",1);
+ let outcome=Coordinator{plan:&p.plan,execution:&p.ex,review:&p.review,
+  supervisor:&p.supervisor,adapter:&FixtureProvider,review_target:100,max_improvements:1}
+  .run(&p.task_id,None).unwrap();
+ assert_eq!(outcome.revision_rounds,1);
+ let r=p.review.get("channel_one_revision","rv_auto_test").unwrap();
+ assert_eq!(r.rounds.last().unwrap().version_index,r.versions.last().unwrap().index);
+ assert_eq!(r.rounds.len(),2);
+ assert_eq!(r.rounds.last().unwrap().sections.iter().filter(|x|x.score.is_some()).count(),
+  r.rounds.last().unwrap().sections.len());
+ assert!(r.approvals.is_empty());
+ p.cleanup();
+}
+
+#[test]
+fn sw03m_review_adapter_validates_exact_saved_prompt_and_rubric(){
+ let p=Fixture::setup("channel_adapter_review",1);
+ let result=p.run(None).unwrap();
+ assert!(result.waiting_for_approval);
+ let current=p.review.get("channel_adapter_review","rv_auto_test").unwrap();
+ let prompt=p.review.read("channel_adapter_review",&current.review_id,"prompt",0).unwrap();
+ let mut req=AdapterRequest{provider:"fixture_reviewer".into(),account_id:Some("gp_2".into()),
+  task_id:p.task_id.clone(),scope:"review".into(),prompt_sha256:digest(prompt.as_bytes()),
+  prompt,original_words:0,step:current.rounds.last().unwrap().index,source_text:None};
+ let response=FixtureProvider.review(&req,&current,true).unwrap();
+ assert_eq!(response.content_sha256,digest(response.content.as_bytes()));
+ assert!(response.content.contains("MOCK structured reviewer fixture"));
+ let report:Report=serde_json::from_str(&response.content).unwrap();
+ assert_eq!(report.scores.len(),current.policy.rubric.len());
+ req.prompt.push('x');
+ assert!(FixtureProvider.review(&req,&current,true).is_err());
+ p.cleanup();
+}
+#[test]
+fn sw03m_improvement_adapter_requires_version_bound_source(){
+ let prompt="Improve this exact mock version\r\n اردو 한국어 😀".to_string();
+ let mut req=AdapterRequest{provider:"fixture_writer".into(),account_id:Some("cl_1".into()),
+  task_id:"su_mock".into(),scope:"improve".into(),prompt_sha256:digest(prompt.as_bytes()),
+  prompt,original_words:0,step:1,source_text:Some("MOCK prior draft.\r\nاردو 😀.".into())};
+ let reply=FixtureProvider.execute(&req).unwrap();
+ assert!(reply.content.contains("MOCK prior draft.\r\nاردو 😀."));
+ assert_eq!(reply.content_sha256,digest(reply.content.as_bytes()));
+ req.source_text=None;
+ assert!(FixtureProvider.execute(&req).is_err());
+}
+
+struct BadDigest;
+impl ProviderAdapter for BadDigest{
+ fn check(&self)->AdapterCapability{capability(&AutoMode::LocalFixture)}
+ fn execute(&self,_request:&AdapterRequest)->Result<AdapterReply,String>{
+  Ok(AdapterReply{content:"[MOCK] invalid digest fixture.".into(),
+   content_sha256:"not_the_response_sha256".into(),provenance:"deterministic_mock"})
+ }
+}
+#[test]
+fn sw03m_rejects_corrupt_adapter_response_before_import(){
+ let p=Fixture::setup("channel_bad_digest",1);
+ let error=Coordinator{plan:&p.plan,execution:&p.ex,review:&p.review,
+  supervisor:&p.supervisor,adapter:&BadDigest,review_target:90,max_improvements:2}
+  .run(&p.task_id,None).unwrap_err();
+ assert!(error.contains("digest"));
+ let state=p.source();
+ assert_eq!(state.completed_parts,0);
+ assert!(state.parts[0].fragments.is_empty());
+ assert!(state.parts[0].prepared.is_some());
+ p.cleanup();
+}
+#[test]
+fn sw03m_restart_after_first_saved_fragment_never_regenerates_it(){
+ let p=Fixture::setup("channel_fragment_recovery",1);
+ let state=p.source();
+ let state=execute(&p.ex,&p.plan,&state,ExecutionAction::SaveBible{
+  text:"[MOCK] Original immutable test Bible.".into()}).unwrap();
+ let state=execute(&p.ex,&p.plan,&state,ExecutionAction::PreparePart{
+  part_index:1,extra_instructions:"".into()}).unwrap();
+ let prompt=p.ex.read("channel_fragment_recovery","ex_auto","prompt",1,0).unwrap();
+ let reply=FixtureProvider.execute(&AdapterRequest{provider:"fixture_writer".into(),
+  account_id:Some("cl_1".into()),task_id:p.task_id.clone(),scope:"write".into(),
+  prompt_sha256:digest(prompt.as_bytes()),prompt,original_words:1800,step:0,source_text:None}).unwrap();
+ let state=execute(&p.ex,&p.plan,&state,ExecutionAction::ImportFragment{
+  part_index:1,text:reply.content}).unwrap();
+ let first=state.parts[0].fragments[0].sha256.clone();
+ let prior_revision=state.revision;
+ assert!(p.run(None).unwrap().waiting_for_approval);
+ let final_state=p.source();
+ assert!(final_state.revision>prior_revision);
+ assert_eq!(final_state.parts[0].fragments.len(),2);
+ assert_eq!(final_state.parts[0].fragments[0].sha256,first);
+ p.cleanup();
+}
+#[test]
+fn sw03m_independent_channel_runs_do_not_merge_script_history(){
+ let horror=Fixture::setup("channel_horror_isolated",3);
+ let business=Fixture::setup("channel_business_isolated",1);
+ assert_eq!(horror.run(Some(1)).unwrap().completed_parts,1);
+ assert!(business.run(None).unwrap().waiting_for_approval);
+ assert_eq!(business.source().completed_parts,1);
+ assert_eq!(horror.source().completed_parts,1);
+ assert!(horror.task().last_review_id.is_none());
+ assert!(business.task().last_review_id.is_some());
+ assert!(horror.run(None).unwrap().waiting_for_approval);
+ assert_eq!(horror.source().completed_parts,3);
+ assert_eq!(business.source().completed_parts,1);
+ horror.cleanup();business.cleanup();
+}
+
+#[test]
+fn sw03m_fixture_odd_word_targets_do_not_fail_due_to_synthetic_overlap(){
+ let p=Fixture::setup("channel_overlap",3);
+ // 3 x 120 words use repeated MOCK vocabulary; each boundary must still validate.
+ let result=p.run(None).unwrap();
+ assert_eq!(result.completed_parts,3);
+ assert!(p.source().parts.iter().all(|x|x.validation_findings.is_empty()));
+ p.cleanup();
+}
+
+#[test]
+fn sw03m_adapter_rejects_wrong_reviewer_account_and_provider(){
+ let p=Fixture::setup("channel_wrong_adapter",1);
+ assert!(p.run(None).unwrap().waiting_for_approval);
+ let rv=p.review.get("channel_wrong_adapter","rv_auto_test").unwrap();
+ let round=rv.rounds.last().unwrap();
+ let prompt=p.review.read("channel_wrong_adapter",&rv.review_id,"prompt",0).unwrap();
+ let original=AdapterRequest{provider:"fixture_reviewer".into(),account_id:Some("gp_2".into()),
+  task_id:p.task_id.clone(),scope:"review".into(),prompt_sha256:digest(prompt.as_bytes()),
+  prompt,original_words:0,step:round.index,source_text:None};
+ let mut wrong=original.clone();wrong.account_id=Some("gp_other".into());
+ assert!(FixtureProvider.review(&wrong,&rv,true).is_err());
+ wrong=original.clone();wrong.provider="fixture_writer".into();
+ assert!(FixtureProvider.review(&wrong,&rv,true).is_err());
+ let mut wrong_writer=original;wrong_writer.scope="write".into();
+ assert!(FixtureProvider.execute(&wrong_writer).is_err());
+ p.cleanup();
+}

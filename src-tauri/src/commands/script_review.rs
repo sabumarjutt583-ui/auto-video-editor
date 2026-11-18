@@ -128,5 +128,11 @@ pub async fn review_apply(app:AppHandle,state:State<'_,ReviewService>,
  if request.channel_id!=channel{return Err(CommandError{
   code:ReviewErrorCode::ChannelMismatch,message:"Review operation channel mismatch.".into()
  })}
+ // Fixture provenance is established by the private Rust coordinator, not by
+ // a caller selecting a special JSON action through a manual Tauri command.
+ if matches!(&request.action,ReviewAction::ImportFixtureResponse{..}|ReviewAction::ImportFixtureRevision{..}){
+  return Err(CommandError{code:ReviewErrorCode::InvalidInput,
+   message:"Fixture provenance cannot be asserted by a manual review import.".into()})
+ }
  let store=state.store()?;background(move||store.apply(&request)).await
 }
