@@ -24,27 +24,35 @@ pub struct AutoPolicy{
  pub mode:AutoMode,pub review_target:u32,pub max_improvements:u32,
 }
 #[derive(Default)]
-struct Inner {root:PathBuf,running:Mutex<HashSet<String>>,errors:Mutex<HashMap<String,String>>}
+struct Inner {root:Option<PathBuf>,running:Mutex<HashSet<String>>,errors:Mutex<HashMap<String,String>>}
 #[derive(Clone)]
 pub struct AutoService{inner:Arc<Inner>}
 impl AutoService{
  pub fn initialize(app:&AppHandle)->Self{
-  let root=app.path().app_data_dir().unwrap_or_else(|_|std::env::temp_dir().join("unavailable-app-data"))
-   .join("script-writer").join("automatic");
+  // Never silently write channel ownership metadata into a global temporary directory.
+  let root=app.path().app_data_dir().ok().map(|p|p.join("script-writer").join("automatic"));
   Self{inner:Arc::new(Inner{root,..Inner::default()})}
  }
  fn path(&self,channel:&str,task:&str)->Result<PathBuf,AutoError>{
   if !valid_id(channel)||!valid_id(task)||!task.starts_with("su_auto_"){return Err(err("Invalid automatic task identity."))}
-  Ok(self.inner.root.join("channels").join(channel).join(format!("{task}.json")))
+  let root=self.inner.root.as_ref().ok_or_else(||err("App data unavailable; automatic policy cannot be stored."))?;
+  Ok(root.join("channels").join(channel).join(format!("{task}.json")))
  }
  fn save(&self,p:&AutoPolicy)->Result<(),AutoError>{
   let path=self.path(&p.channel_id,&p.task_id)?;
   let parent=path.parent().ok_or_else(||err("Automatic policy path missing."))?;
-  fs::create_dir_all(parent).map_err(|_|err("Cannot create automatic policy directory."))?;
-  let channel_root=self.inner.root.join("channels");
-  for dir in [self.inner.root.as_path(),channel_root.as_path(),parent]{
-   let meta=fs::symlink_metadata(dir).map_err(|_|err("Cannot check policy storage directory."))?;
-   if !meta.is_dir()||meta.file_type().is_symlink(){return Err(err("Unsafe policy storage directory; nothing overwritten."))}
+  let root=self.inner.root.as_ref().ok_or_else(||err("Automatic policy root unavailable."))?;
+  let channel_root=root.join("channels");
+  // Never create paths through unchecked symlinks or junctions.
+  for dir in [root.as_path(),channel_root.as_path(),parent]{
+   match fs::symlink_metadata(dir){
+    Ok(meta) if meta.is_dir()&&!meta.file_type().is_symlink()=>{},
+    Ok(_)=>return Err(err("Unsafe policy storage directory; nothing overwritten.")),
+    Err(e) if e.kind()==std::io::ErrorKind::NotFound=>{
+     fs::create_dir(dir).map_err(|_|err("Could not safely create policy directory."))?;
+    },
+    Err(_)=>return Err(err("Cannot inspect policy directory.")),
+   }
   }
   if fs::symlink_metadata(&path).is_ok(){return Err(err("Automatic task policy already exists; no overwrite."))}
   let temp=parent.join(format!(".auto-{}.tmp",random()));
@@ -62,8 +70,9 @@ impl AutoService{
  fn get(&self,channel:&str,task:&str)->Result<AutoPolicy,AutoError>{
   let path=self.path(channel,task)?;
   let parent=path.parent().ok_or_else(||err("Invalid policy folder."))?;
-  let channel_root=self.inner.root.join("channels");
-  for folder in [self.inner.root.as_path(),channel_root.as_path(),parent]{
+  let root=self.inner.root.as_ref().ok_or_else(||err("Automatic policy root unavailable."))?;
+  let channel_root=root.join("channels");
+  for folder in [root.as_path(),channel_root.as_path(),parent]{
    let m=fs::symlink_metadata(folder).map_err(|_|err("Automatic policy folder unavailable."))?;
    if !m.is_dir()||m.file_type().is_symlink(){return Err(err("Unsafe automatic policy folder."))}
   }
@@ -337,6 +346,17 @@ pub async fn auto_approve(app:AppHandle,seed:LegacyChannelSeed,task_id:String,co
  }
  let review_id=task.last_review_id.ok_or_else(||err("Final review evidence missing."))?;
  let current=rv.get(&owner,&review_id).map_err(|e|err(e.to_string()))?;
+ let round=current.rounds.last().ok_or_else(||err("No saved review round."))?;
+ let latest=current.versions.last().ok_or_else(||err("No immutable script version."))?;
+ if round.version_index!=latest.index||
+  round.sections.is_empty()||round.sections.iter().any(|s|s.report.is_none()||s.score.is_none()){
+  return Err(err("The current script version requires a complete fresh review before approval."))
+ }
+ let min_score=round.sections.iter().filter_map(|s|s.score).min().unwrap_or(0);
+ let completed_improvements=current.versions.len().saturating_sub(1) as u32;
+ if min_score<policy.review_target&&completed_improvements<policy.max_improvements{
+  return Err(err("Review score below the configured target and improvement rounds remain; recover the automatic task first."))
+ }
  let approved=rv.apply(&ReviewRequest{channel_id:owner.clone(),review_id,
   expected_revision:current.revision,operation_id:format!("op_auto_user_approval_{}",random()),
   action:ReviewAction::Approve{confirmation}}).map_err(|e|err(e.to_string()))?;
