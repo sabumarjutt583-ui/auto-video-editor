@@ -46,7 +46,46 @@ fn safe_policy_dir(path:&std::path::Path,create:bool)->Cmd<()>{
  }
 }
 #[derive(Default)]
-struct Inner {root:Option<PathBuf>,running:Mutex<HashSet<String>>,errors:Mutex<HashMap<String,String>>}
+struct Inner {root:Option<PathBuf>,running:Mutex<HashSet<String>>,
+ accounts:Mutex<HashSet<String>>,errors:Mutex<HashMap<String,String>>}
+/// A worker's per-account reservation is released even when its closure panics.
+struct WorkerLease {inner:Arc<Inner>,task_id:String,accounts:Vec<String>}
+impl Drop for WorkerLease {
+ fn drop(&mut self){
+  let mut running=self.inner.running.lock().unwrap_or_else(|e|e.into_inner());
+  let mut accounts=self.inner.accounts.lock().unwrap_or_else(|e|e.into_inner());
+  running.remove(&self.task_id);
+  for account in &self.accounts{accounts.remove(account);}
+ }
+}
+impl Inner {
+ fn claim(self:&Arc<Self>,task_id:&str,mut keys:Vec<String>)->Cmd<WorkerLease>{
+  keys.sort();keys.dedup();
+  if keys.is_empty()||keys.iter().any(|k|k.trim().is_empty()){
+   return Err(err("No configured account identities available to reserve."))
+  }
+  let mut running=self.running.lock().unwrap_or_else(|e|e.into_inner());
+  let mut accounts=self.accounts.lock().unwrap_or_else(|e|e.into_inner());
+  if running.contains(task_id){return Err(err("This task already has a worker."))}
+  if keys.iter().any(|key|accounts.contains(key)){
+   return Err(err("A selected AI account is reserved by another automatic task. Retry after its worker stops; no account rotation."))
+  }
+  running.insert(task_id.to_string());
+  for key in &keys{accounts.insert(key.clone());}
+  Ok(WorkerLease{inner:self.clone(),task_id:task_id.to_string(),accounts:keys})
+ }
+}
+fn assigned_accounts(plan:&crate::script_studio::ScriptStudioPlanV1)->Cmd<Vec<String>>{
+ let id=plan.claude_account_id.as_deref().ok_or_else(||err("Writer account is missing."))?;
+ let mut accounts=vec![format!("claude:{id}")];
+ let reviewer=plan.reviewer_account_id.as_deref().ok_or_else(||err("Reviewer account is missing."))?;
+ match plan.reviewer_provider {
+  crate::script_studio::ReviewerProvider::Claude=>accounts.push(format!("claude:{reviewer}")),
+  crate::script_studio::ReviewerProvider::Chatgpt=>accounts.push(format!("chatgpt:{reviewer}")),
+  crate::script_studio::ReviewerProvider::None=>return Err(err("Automatic reviewer provider is not configured.")),
+ }
+ Ok(accounts)
+}
 #[derive(Clone)]
 pub struct AutoService{inner:Arc<Inner>}
 impl AutoService{
@@ -116,12 +155,10 @@ impl AutoService{
    ||task.snapshot.plan_sha256!=p.plan_digest{return Err(err("Automatic task binding mismatch."))}
   if matches!(task.stage,Stage::Cancelled|Stage::Paused|Stage::Completed|Stage::Failed){
    return Err(err("Paused/terminal task cannot be dispatched."))}
-  {
-   let mut active=self.inner.running.lock().unwrap_or_else(|e|e.into_inner());
-   if !active.insert(p.task_id.clone()){return Err(err("This task already has an automatic worker running."))}
-  }
+  let lease=self.inner.claim(&p.task_id,assigned_accounts(&plan)?)?;
   let state=self.inner.clone();
   tauri::async_runtime::spawn_blocking(move||{
+   let _lease=lease; // RAII: always releases the selected provider/account locks.
    let id=p.task_id.clone();
    let outcome=Coordinator{plan:&plan,execution:&ex,review:&review,supervisor:&sup,
      adapter:&FixtureProvider,review_target:p.review_target,max_improvements:p.max_improvements}
@@ -136,7 +173,6 @@ impl AutoService{
      }
     }
    }else{state.errors.lock().unwrap_or_else(|e|e.into_inner()).remove(&id);}
-   state.running.lock().unwrap_or_else(|e|e.into_inner()).remove(&id);
   });
   Ok(())
  }
@@ -421,6 +457,20 @@ mod tests{
   assert!(service.save(&fixture_policy()).is_err());
   assert_eq!(fs::read_dir(&outside).unwrap().count(),0);
   drop(service);fs::remove_dir_all(root).unwrap();
+ }
+
+ #[test]fn sw03m_account_leases_serialize_shared_provider_accounts_without_rotation(){
+  let inner=Arc::new(Inner::default());
+  let first=inner.claim("su_auto_first",vec!["claude:cl_1".into(),"chatgpt:gp_1".into()]).unwrap();
+  assert!(inner.claim("su_auto_first",vec!["claude:cl_1".into()]).is_err());
+  assert!(inner.claim("su_auto_second",vec!["claude:cl_1".into(),"chatgpt:gp_2".into()]).is_err());
+  assert!(inner.claim("su_auto_second",vec!["claude:cl_2".into(),"chatgpt:gp_1".into()]).is_err());
+  let unrelated=inner.claim("su_auto_third",vec!["claude:cl_2".into(),"chatgpt:gp_2".into()]).unwrap();
+  drop(first);
+  let second=inner.claim("su_auto_second",vec!["claude:cl_1".into(),"chatgpt:gp_1".into()]).unwrap();
+  drop(unrelated);drop(second);
+  assert!(inner.running.lock().unwrap().is_empty());
+  assert!(inner.accounts.lock().unwrap().is_empty());
  }
  #[test]fn sw03m_auto_policy_requires_private_app_data_path(){
   let service=AutoService{inner:Arc::new(Inner{root:None,..Inner::default()})};
