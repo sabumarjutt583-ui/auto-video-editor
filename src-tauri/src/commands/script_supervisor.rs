@@ -18,7 +18,7 @@ impl SupervisorService{
   match r{Ok(store)=>Self{store:Some(Arc::new(store)),error:None},
    Err(e)=>Self{store:None,error:Some(e)}}
  }
- fn store(&self)->Result<Arc<SupervisorStore>,CommandError>{
+ pub(crate) fn store(&self)->Result<Arc<SupervisorStore>,CommandError>{
   self.store.as_ref().cloned().ok_or_else(||CommandError{
    message:self.error.clone().unwrap_or("Supervisor unavailable".into())})
  }
