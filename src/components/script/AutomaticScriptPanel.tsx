@@ -3,6 +3,7 @@ import {Button} from "../ui";
 import type {LegacyChannelSeed,ChannelStudioConfigV1,ScriptMode} from "../../lib/script/studio/types.ts";
 import {getStudioConfig} from "../../lib/script/studio/api.ts";
 import {readReview} from "../../lib/script/review/api.ts";
+import {readExecution} from "../../lib/script/execution/api.ts";
 import {autoCapability,autoGenerate,autoList,autoStatus,autoControl,autoApprove,automaticProgress,
  type AutoMode,type AutoCapability,type AutoView} from "../../lib/script/automatic/api.ts";
 const selectStyle="rounded border border-line bg-surface px-2 py-1 text-sm";
@@ -82,11 +83,12 @@ export function AutomaticScriptPanel({seed}:{seed:LegacyChannelSeed}){
   }catch(e){setError(errorMessage(e))}finally{setWorking(false)}
  }
  async function openScript(){
-  if(!view?.review)return;
+  if(!view?.execution.assembled)return;
   try{
-   const latest=view.review.versions.at(-1);
-   if(!latest)return;
-   setScript(await readReview(seed,view.review.reviewId,"script",latest.index));
+   const latest=view.review?.versions.at(-1);
+   // The assembled source is still inspectable after a reviewer failure.
+   const original=await readExecution(seed,view.execution.executionId,"assembled",0,0);
+   setScript(latest&&view.review?await readReview(seed,view.review.reviewId,"script",latest.index):original);
   }catch(e){setError(errorMessage(e))}
  }
  async function approve(){
@@ -136,14 +138,17 @@ export function AutomaticScriptPanel({seed}:{seed:LegacyChannelSeed}){
    <p className="text-xs">Actual saved words: {view.execution.assembledWords??view.execution.parts.reduce((n,p)=>n+(p.actualWords??0),0)} / {view.task.snapshot.plan.totalWords} target · current part {view.execution.completedParts+1} · step {view.task.stage}</p>
    <p className="text-xs">Writing Skill: {view.task.snapshot.selectedSkillName??"none"} · Master Prompt: {view.task.snapshot.plan.selectedPromptVersionId??"none"}</p>
    {view.workerError&&<p role="alert" className="text-xs text-danger">Worker error (not a fabricated provider response): {view.workerError}</p>}
+   {view.task.warnings.map((w,i)=><p key={i} role="alert" className="text-xs text-danger">{w}</p>)}
    <div className="flex flex-wrap gap-2">
     <Button disabled={working||view.task.stage==="paused"||view.task.stage==="completed"||view.task.stage==="cancelled"} onClick={()=>void control("pause")}>Pause</Button>
     <Button disabled={working||view.task.stage!=="paused"} onClick={()=>void control("resume")}>Resume</Button>
     <Button disabled={working||view.workerRunning||["paused","completed","cancelled","failed","awaiting_approval"].includes(view.task.stage)} onClick={()=>void control("recover")}>Recover safe unfinished MOCK steps</Button>
     <Button disabled={working||view.task.stage==="cancelled"||view.task.stage==="completed"} onClick={()=>void control("cancel")}>Cancel (preserve sources)</Button>
-    <Button disabled={!view.review} onClick={()=>void openScript()}>Open saved script</Button>
+    <Button disabled={!view.execution.assembled} onClick={()=>void openScript()}>Open saved script</Button>
    </div>
    {view.review&&<>
+    {quality!==null&&quality<view.policy.reviewTarget&&!view.workerRunning&&
+     <p role="alert" className="text-xs text-danger">MOCK reviewer score {quality}/100 is below configured target {view.policy.reviewTarget}/100. Improvement cap may be exhausted; inspect findings before approval.</p>}
     <p className="text-xs">Saved review: {reviewRound?.sections.filter(s=>s.score!==null).length}/{reviewRound?.sections.length} sections · minimum rubric score: {quality??"not scored"}/100 · improvement revisions: {view.review.versions.length-1} · approved: {approved?"yes":"NO"}</p>
     {reviewRound?.sections.map(s=><p className="text-xs" key={s.index}>Section {s.index+1}: {s.score??"pending"} / 100. {s.report?.summary??"Not reviewed"}</p>)}
    </>}

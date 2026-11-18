@@ -23,7 +23,11 @@ export function automaticProgress(view:AutoView):string{
  const parts=view.execution.completedParts+"/"+view.execution.totalParts+" parts";
  const round=view.review?.rounds.at(-1);
  const completed=round?.sections.filter(s=>s.report&&s.score!==null).length??0;
+ const scores=round?.sections.map(s=>s.score).filter((x):x is number=>x!==null)??[];
+ const reviewComplete=Boolean(round&&completed===round.sections.length&&scores.length>0);
+ const targetUnmet=reviewComplete&&Boolean(view.policy&&Math.min(...scores)<view.policy.reviewTarget);
  return parts+(round?" · review "+completed+"/"+round.sections.length+" sections":"")+
+  (targetUnmet?" · MOCK review target unmet":"")+
   (view.workerRunning?" · active MOCK worker":" · stopped")+
   (view.task.stage==="awaiting_approval"?" · pending human approval":"");
 }
