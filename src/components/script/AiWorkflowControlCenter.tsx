@@ -6,7 +6,7 @@ import {operatorCanEdit,selectReviewSection} from "../../lib/script/chrome/opera
 import {nextLocalPartToPrepare} from "../../lib/script/chrome/nextPart.ts";
 import type {LegacyChannelSeed,ScriptStudioPlanV1} from "../../lib/script/studio/types.ts";
 import {getStudioPlan} from "../../lib/script/studio/api.ts";
-import type {ExecutionState,ExecutionAction,ExecutionRequest} from "../../lib/script/execution/types.ts";
+import type {ExecutionState,ExecutionAction,ExecutionRequest,CandidateValidation} from "../../lib/script/execution/types.ts";
 import {applyExecution,buildExecutionRequest,getExecution,listExecutions,readExecution,validateCandidate} from "../../lib/script/execution/api.ts";
 import type {ReviewAction,ReviewState,Report} from "../../lib/script/review/types.ts";
 import {applyReview,buildReviewRequest,getReview,listReviews,newReviewId,newReviewOperation,
@@ -39,6 +39,8 @@ export function AiWorkflowControlCenter({seed}:Props){
  const [goals,setGoals]=useState("Improve the opening hook"),[revisionText,setRevisionText]=useState("");
  const [reviewMode,setReviewMode]=useState<"final"|"single"|"improvement">("final");
  const [confirmation,setConfirmation]=useState(""),[consent,setConsent]=useState(false),[warningsAccepted,setWarningsAccepted]=useState(false);
+ const [validated,setValidated]=useState<{executionId:string;revision:number;partIndex:number;result:CandidateValidation}|null>(null);
+ const [browserStatusError,setBrowserStatusError]=useState("");
  const taskRetry=useRef<{key:string;request:TaskRequest}|null>(null);
  const startRetry=useRef<{key:string;input:TaskStart}|null>(null);
  const reviewRetry=useRef<{key:string;action:ReviewAction;operationId:string}|null>(null);
@@ -47,7 +49,7 @@ export function AiWorkflowControlCenter({seed}:Props){
  const reviewSelection=useRef<{reviewId:string;round:number;index:number}|null>(null);
  useEffect(()=>{
   let live=true;setActive(null);setExecution(null);setReview(null);setChromeReport(null);setError("");setNotice("");
-  setSelectedPlan(null);setWarningsAccepted(false);setConsent(false);setConfirmation("");reviewSelection.current=null;
+  setSelectedPlan(null);setValidated(null);setBrowserStatusError("");setWarningsAccepted(false);setConsent(false);setConfirmation("");reviewSelection.current=null;
   taskRetry.current=null;startRetry.current=null;reviewRetry.current=null;
   void Promise.allSettled([listExecutions(seed),listTasks(seed),invoke<Metadata[]>("script_accounts"),invoke<Metadata[]>("chatgpt_accounts")]).then(x=>{
    if(!live)return;
@@ -73,15 +75,19 @@ export function AiWorkflowControlCenter({seed}:Props){
  const availableAccounts=active?.snapshot.reviewerProvider==="chatgpt"?chatgpt:claude;
  const reviewerOptions=selectedPlan?.reviewerProvider==="chatgpt"?chatgpt:selectedPlan?.reviewerProvider==="claude"?claude:[];
  const canEdit=active?operatorCanEdit(active.stage):false;
+ const candidateCurrent=Boolean(validated&&execution&&currentPart&&validated.executionId===execution.executionId&&
+  validated.revision===execution.revision&&validated.partIndex===currentPart.index&&
+  validated.result.fragmentCount===currentPart.fragments.length);
  async function load(task:SupervisorTask){
   const e=await getExecution(seed,task.snapshot.executionId);
   let rv:ReviewState|null=null;
   if(task.lastReviewId)rv=await getReview(seed,task.lastReviewId);
+  if(active?.taskId!==task.taskId){setValidated(null);setWarningsAccepted(false);setConsent(false);setConfirmation("")}
   setActive(task);setExecution(e);setReview(rv);
   if(task.snapshot.transport==="visible_browser"){
-   try{setChromeReport(await chromeStatus(seed,task.taskId))}
-   catch(err){setChromeReport(null);setNotice("Chrome status unavailable; saved script data is still accessible: "+supervisorError(err))}
-  }else setChromeReport(null);
+   try{setChromeReport(await chromeStatus(seed,task.taskId));setBrowserStatusError("")}
+   catch(err){setChromeReport(null);setBrowserStatusError("Chrome status unavailable; script data remains accessible: "+supervisorError(err))}
+  }else{setChromeReport(null);setBrowserStatusError("")}
   if(rv){
    const round=rv.rounds.at(-1);
    const selected=selectReviewSection(reviewSelection.current,rv.reviewId,round?.index??0,round?.sections.length??0);
@@ -143,6 +149,11 @@ export function AiWorkflowControlCenter({seed}:Props){
  async function applyExecutionAction(action:ExecutionAction){
   if(!active||!execution||busy)return;
   if(!operatorCanEdit(active.stage)){setError("Task is paused or terminal. Resume before editing saved script data.");return}
+  if(action.kind==="commit_part"&&
+   !(validated&&validated.executionId===execution.executionId&&validated.partIndex===action.partIndex&&
+     validated.revision===execution.revision&&validated.result.fragmentCount===execution.parts[action.partIndex-1]?.fragments.length)){
+   setError("Revalidate the current part before committing. Old warning acknowledgments cannot be reused.");return;
+  }
   setBusy(true);setError("");
   try{
    const key=JSON.stringify([execution.executionId,execution.revision,action]);
@@ -182,7 +193,7 @@ export function AiWorkflowControlCenter({seed}:Props){
    }
    if(action.kind==="import_fragment")setResponse("");
    if(action.kind==="save_continuity")setContinuity("");
-   setWarningsAccepted(false);
+   setValidated(null);setWarningsAccepted(false);
    setNotice("Verified saved execution checkpoint "+next.revision+". No provider submission."+followUp);
   }catch(e){setError(supervisorError(e)+" Refresh saved records before retrying.")}
   finally{setBusy(false)}
@@ -391,6 +402,7 @@ export function AiWorkflowControlCenter({seed}:Props){
      {a.lastLaunchError&&<p className="text-xs text-danger">{a.lastLaunchError}</p>}
      {a.reportedAccountError&&<p className="text-xs text-danger">Account manager: {a.reportedAccountError}</p>}
     </div>)}
+    {browserStatusError&&<p role="alert" className="text-xs text-danger">{browserStatusError}</p>}
     <p className="text-xs text-muted">{chromeReport?.warning??"Window status is not proof of website authentication."}</p>
     <div className="flex flex-wrap gap-2">
      <Button disabled={busy||!active.snapshot.writerAccountId||!chromeReport?.browserAvailable||active.stage==="paused"||active.stage==="cancelled"} onClick={()=>void openBrowser("claude","writer")}>Open writer Claude in Chrome</Button>
@@ -431,20 +443,28 @@ export function AiWorkflowControlCenter({seed}:Props){
      <Button disabled={busy||!canEdit||!currentPart.prepared||!response.trim()} onClick={()=>void applyExecutionAction({kind:"import_fragment",partIndex:currentPart.index,text:response})}>Import response into Rust execution</Button>
      {currentPart.fragments.length>0&&<>
       <p className="text-xs">Saved immutable response fragments: {currentPart.fragments.map((f,i)=>"#"+(i+1)+" "+f.sha256.slice(0,14)).join(" · ")}. Original imports cannot be overwritten.</p>
-      <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={warningsAccepted} onChange={e=>setWarningsAccepted(e.target.checked)}/> I inspected this candidate and explicitly accept technical warnings, if any.</label>
-      <Button disabled={busy} onClick={()=>void (async()=>{
-       try{const result=await validateCandidate(seed,execution.executionId,currentPart.index);
-        if(result.findings.length)setNotice("Candidate warnings: "+result.findings.join(" | "))}
-       catch(e){setError(supervisorError(e))}
-      })()}>Inspect technical warnings</Button>
-      <Button disabled={busy||!warningsAccepted} onClick={()=>void applyExecutionAction({kind:"commit_part",partIndex:currentPart.index,acceptWarnings:true})}>Commit verified part</Button>
+      <label className="flex items-center gap-2 text-xs"><input type="checkbox" disabled={!canEdit||!candidateCurrent||!validated?.result.findings.length} checked={warningsAccepted} onChange={e=>setWarningsAccepted(e.target.checked)}/> I explicitly accept this exact candidate's technical warnings.</label>
+       {candidateCurrent&&validated&&<div className="text-xs space-y-1">
+        <p>Validated: {validated.result.actualWordEstimate} estimated words / {validated.result.targetWords} target · {validated.result.fragmentCount} fragments · SHA-256 {validated.result.contentSha256}</p>
+        {validated.result.findings.length===0?<p>No technical warnings; editorial review is still required.</p>:validated.result.findings.map((f,i)=><p key={i} role="alert">{f}</p>)}
+       </div>}
+       <Button disabled={busy||!canEdit} onClick={()=>void (async()=>{
+        setError("");setValidated(null);setWarningsAccepted(false);
+        try{
+         const result=await validateCandidate(seed,execution.executionId,currentPart.index);
+         setValidated({executionId:execution.executionId,revision:execution.revision,partIndex:currentPart.index,result});
+         setNotice(result.findings.length?"Review and accept the displayed warnings before committing.":"Candidate validated with no technical warnings.");
+        }catch(err){setError(supervisorError(err))}
+       })()}>Validate exact candidate</Button>
+       <Button disabled={busy||!canEdit||!candidateCurrent||Boolean(validated?.result.findings.length&&!warningsAccepted)}
+        onClick={()=>void applyExecutionAction({kind:"commit_part",partIndex:currentPart.index,acceptWarnings:warningsAccepted})}>Commit validated part</Button>
      </>}
     </>}
     {execution.status==="active"&&execution.completedParts>0&&<label className="block text-xs">User-authored note for latest completed part {execution.completedParts}
       <textarea className={cn} value={continuity} rows={2} onChange={e=>setContinuity(e.target.value)}/>
-      <Button disabled={busy||!continuity.trim()} onClick={()=>void applyExecutionAction({kind:"save_continuity",afterPart:execution.completedParts,text:continuity})}>Save immutable continuity note</Button>
+      <Button disabled={busy||!canEdit||!continuity.trim()} onClick={()=>void applyExecutionAction({kind:"save_continuity",afterPart:execution.completedParts,text:continuity})}>Save immutable continuity note</Button>
     </label>}
-    {execution.completedParts===execution.totalParts&&execution.status==="active"&&<Button disabled={busy} onClick={()=>void applyExecutionAction({kind:"assemble"})}>Assemble immutable final script</Button>}
+    {execution.completedParts===execution.totalParts&&execution.status==="active"&&<Button disabled={busy||!canEdit} onClick={()=>void applyExecutionAction({kind:"assemble"})}>Assemble immutable final script</Button>}
    </div>
    {prompt&&<div className="space-y-1">
     <p className="text-xs">Exact saved local prompt · NOT submitted</p>
