@@ -288,3 +288,13 @@ fn sw03m_independent_channel_runs_do_not_merge_script_history(){
  assert_eq!(business.source().completed_parts,1);
  horror.cleanup();business.cleanup();
 }
+
+#[test]
+fn sw03m_fixture_odd_word_targets_do_not_fail_due_to_synthetic_overlap(){
+ let p=Fixture::setup("channel_overlap",3);
+ // 3 x 120 words use repeated MOCK vocabulary; each boundary must still validate.
+ let result=p.run(None).unwrap();
+ assert_eq!(result.completed_parts,3);
+ assert!(p.source().parts.iter().all(|x|x.validation_findings.is_empty()));
+ p.cleanup();
+}

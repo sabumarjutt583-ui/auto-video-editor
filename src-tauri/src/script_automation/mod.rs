@@ -59,8 +59,12 @@ impl ProviderAdapter for FixtureProvider {
      7=>"chosen",8=>"scene",9=>"and",10=>"continues",11=>"without",_=>"external claims."
     });
    }
-   // Ensure the end of each fragment is a complete sentence; count is only a test estimate.
-   let mut output=terms.join(" ");output.push('.');
+   // Distinct deterministic suffixes prevent synthetic recurring vocabulary from
+   // creating a false 30-byte overlap at part boundaries (for example 117 words).
+   // Complete sentence endings are maintained. This is MOCK text only.
+   let mut output=terms.join(" ");
+   if r.scope=="write"{output.push_str(" [MOCK-FIRST-FRAGMENT-END].")}
+   else{output.push_str(" [MOCK-CONTINUATION-FRAGMENT-END].")}
    output
   }else if r.scope=="review"{
    return Err("Review fixtures must be built from the saved rubric, not generated free-form.".into())
