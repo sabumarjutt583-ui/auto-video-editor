@@ -267,10 +267,10 @@ pub async fn auto_status(app:AppHandle,seed:LegacyChannelSeed,task_id:String,
  review:State<'_,ReviewService>,supervisor:State<'_,SupervisorService>)->Cmd<AutoView>{
  enabled()?;
  let seed=actual_seed(&app,&seed).map_err(|_|err("Saved channel missing."))?;
- view(&service,&seed.channel_id,&task_id,
-  &execution.store().map_err(|_|err("Execution store unavailable."))?,
-  &review.store().map_err(|_|err("Review store unavailable."))?,
-  &supervisor.store().map_err(|_|err("Supervisor store unavailable."))?)
+ let ex=execution.store().map_err(|_|err("Execution store unavailable."))?;
+ let rv=review.store().map_err(|_|err("Review store unavailable."))?;
+ let sup=supervisor.store().map_err(|_|err("Supervisor store unavailable."))?;
+ view(&service,&seed.channel_id,&task_id,&ex,&rv,&sup)
 }
 #[tauri::command]
 pub async fn auto_list(app:AppHandle,seed:LegacyChannelSeed,service:State<'_,AutoService>,
