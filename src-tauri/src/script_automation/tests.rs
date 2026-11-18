@@ -298,3 +298,22 @@ fn sw03m_fixture_odd_word_targets_do_not_fail_due_to_synthetic_overlap(){
  assert!(p.source().parts.iter().all(|x|x.validation_findings.is_empty()));
  p.cleanup();
 }
+
+#[test]
+fn sw03m_adapter_rejects_wrong_reviewer_account_and_provider(){
+ let p=Fixture::setup("channel_wrong_adapter",1);
+ assert!(p.run(None).unwrap().waiting_for_approval);
+ let rv=p.review.get("channel_wrong_adapter","rv_auto_test").unwrap();
+ let round=rv.rounds.last().unwrap();
+ let prompt=p.review.read("channel_wrong_adapter",&rv.review_id,"prompt",0).unwrap();
+ let original=AdapterRequest{provider:"fixture_reviewer".into(),account_id:Some("gp_2".into()),
+  task_id:p.task_id.clone(),scope:"review".into(),prompt_sha256:digest(prompt.as_bytes()),
+  prompt,original_words:0,step:round.index,source_text:None};
+ let mut wrong=original.clone();wrong.account_id=Some("gp_other".into());
+ assert!(FixtureProvider.review(&wrong,&rv,true).is_err());
+ wrong=original.clone();wrong.provider="fixture_writer".into();
+ assert!(FixtureProvider.review(&wrong,&rv,true).is_err());
+ let mut wrong_writer=original;wrong_writer.scope="write".into();
+ assert!(FixtureProvider.execute(&wrong_writer).is_err());
+ p.cleanup();
+}

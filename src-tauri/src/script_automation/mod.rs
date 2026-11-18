@@ -44,6 +44,9 @@ pub struct FixtureProvider;
 impl ProviderAdapter for FixtureProvider {
  fn check(&self)->AdapterCapability{capability(&AutoMode::LocalFixture)}
  fn execute(&self,r:&AdapterRequest)->Result<AdapterReply,String>{
+  if r.provider!="fixture_writer"||r.task_id.trim().is_empty(){
+   return Err("Wrong deterministic writer adapter or missing task ownership.".into())
+  }
   if r.prompt.trim().is_empty()||digest(r.prompt.as_bytes())!=r.prompt_sha256 {
    return Err("Immutable prompt digest mismatch. No fixture output produced.".into())
   }
@@ -76,8 +79,10 @@ impl ProviderAdapter for FixtureProvider {
   Ok(AdapterReply{content_sha256:digest(content.as_bytes()),content,provenance:"deterministic_mock"})
  }
  fn review(&self,r:&AdapterRequest,state:&ReviewState,improved:bool)->Result<AdapterReply,String>{
-  if r.provider!="fixture_reviewer"||r.scope!="review"||r.prompt.trim().is_empty()||
-   digest(r.prompt.as_bytes())!=r.prompt_sha256{
+  if r.provider!="fixture_reviewer"||r.scope!="review"||
+   r.account_id!=state.policy.account_ref||r.task_id.trim().is_empty()||
+   state.rounds.last().map(|x|x.index)!=Some(r.step)||
+   r.prompt.trim().is_empty()||digest(r.prompt.as_bytes())!=r.prompt_sha256{
    return Err("Invalid saved reviewer prompt or fixture identity.".into())
   }
   let content=make_review_fixture(state,improved)?;
