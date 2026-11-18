@@ -267,9 +267,8 @@ export function AiWorkflowControlCenter({seed}:Props){
    setActive(starting);
    // Rust verifies saved channel, task, provider and selected account before any process launch.
    const report=await chromeOpen(seed,starting.taskId,provider,id);
-   setChromeReport(report);
    const latest=await applyTask(seed,taskRequest(starting,{kind:"mark_user_handoff"}));
-   await load(latest);setTasks(await listTasks(seed));
+   await load(latest);setChromeReport(report);setTasks(await listTasks(seed));
    setNotice((report.lastLaunchNotice??"Browser request returned.")+" Process: "+(report.lastLaunchOutcome??"unknown")+". Manual website interaction and login remain unverified.");
   }catch(e){
    try{setChromeReport(await chromeStatus(seed,active.taskId));}catch{/* keep original launch error */}

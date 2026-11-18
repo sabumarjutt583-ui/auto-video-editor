@@ -37,6 +37,9 @@ fn assigned(task:&TaskState,provider:Provider,id:&str)->bool{
  account_matches(task.snapshot.writer_account_id.as_deref(),
  task.snapshot.reviewer_account_id.as_deref(),&task.snapshot.reviewer_provider,provider,id)
 }
+fn spawn_needed(existing:Option<WindowState>)->bool{
+ !matches!(existing,Some(WindowState::Open))
+}
 fn task_can_open(stage:&Stage)->bool{
  !matches!(stage,Stage::Paused|Stage::Cancelled|Stage::Completed|Stage::Failed)
 }
@@ -120,7 +123,7 @@ impl ChromeWorkspace{
   let key=(provider,id.to_owned());
   let mut windows=self.windows.lock().await;
   if let Some(ManagedWindow::Running(window))=windows.get_mut(&key){
-   if window.state()==WindowState::Open{
+   if !spawn_needed(Some(window.state())){
     return Ok(("already_running".into(),"Existing tracked process; focus control is unsupported. Switch to the browser manually.".into()));
    }
   }
@@ -288,6 +291,30 @@ mod tests{
   std::os::unix::fs::symlink(dir.join("original"),dir.join("profile")).unwrap();
   assert!(validate_profile(&dir.join("profile")).is_err());
   assert!(dir.join("original").is_dir());
+  let _=std::fs::remove_dir_all(&dir);
+ }
+ #[test]fn chrome_workspace_duplicate_process_decision(){
+  assert!(!spawn_needed(Some(WindowState::Open)));
+  assert!(spawn_needed(None));
+  assert!(spawn_needed(Some(WindowState::Closed)));
+  assert!(spawn_needed(Some(WindowState::EndedAtOnce)));
+ }
+ #[tokio::test]async fn chrome_workspace_spawn_error_preserves_profile(){
+  let dir=std::env::temp_dir().join("ave-chrome-invalid-binary-fixture");
+  let _=std::fs::remove_dir_all(&dir);
+  std::fs::create_dir_all(dir.join("profile")).unwrap();
+  std::fs::write(dir.join("profile").join("cookie-sentinel"),b"preserve").unwrap();
+  let executable=dir.join(if cfg!(windows){"invalid-browser.exe"}else{"invalid-browser"});
+  std::fs::write(&executable,b"this is not a browser executable").unwrap();
+  #[cfg(unix)]{
+   use std::os::unix::fs::PermissionsExt;
+   std::fs::set_permissions(&executable,std::fs::Permissions::from_mode(0o755)).unwrap();
+  }
+  let workspace=ChromeWorkspace::default();
+  let r=workspace.open(Provider::Claude,"1",&executable,&dir.join("profile"),"https://claude.ai/new").await;
+  assert!(r.is_err(),"invalid executable must fail to spawn");
+  assert_eq!(workspace.reported(Provider::Claude,"1").await.0,"launch_failed");
+  assert_eq!(std::fs::read(dir.join("profile").join("cookie-sentinel")).unwrap(),b"preserve");
   let _=std::fs::remove_dir_all(&dir);
  }
  #[tokio::test]async fn chrome_workspace_launch_failure_keeps_profile_intact(){
