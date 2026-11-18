@@ -290,9 +290,12 @@ pub struct ReviewRequest{pub channel_id:String,pub review_id:String,pub expected
 #[serde(tag="kind",rename_all="snake_case",rename_all_fields="camelCase")]
 pub enum ReviewAction{
  ImportResponse{section_index:u32,raw:String},
+ /// Internal fixture-only variants; manual Tauri boundary denies them.
+ ImportFixtureResponse{section_index:u32,raw:String},
  CorrectResponse{section_index:u32,report:Report},
  PrepareImprovement{goals:Vec<String>},
  ImportRevision{text:String},
+ ImportFixtureRevision{text:String},
  PrepareReview{mode:String},
  Approve{confirmation:String},
 }
@@ -588,6 +591,14 @@ impl ReviewStore{
  }
  pub fn start_with_context(&self,plan:&ScriptStudioPlanV1,execution:&crate::script_execution::ExecutionState,
   source:&str,input:&StartReview,context_sources:&[ContextSource])->Result<ReviewState,ReviewError>{
+  self.start_with_context_as(plan,execution,source,input,context_sources,false)
+ }
+ pub fn start_with_context_fixture(&self,plan:&ScriptStudioPlanV1,execution:&crate::script_execution::ExecutionState,
+  source:&str,input:&StartReview,context_sources:&[ContextSource])->Result<ReviewState,ReviewError>{
+  self.start_with_context_as(plan,execution,source,input,context_sources,true)
+ }
+ fn start_with_context_as(&self,plan:&ScriptStudioPlanV1,execution:&crate::script_execution::ExecutionState,
+  source:&str,input:&StartReview,context_sources:&[ContextSource],fixture:bool)->Result<ReviewState,ReviewError>{
   if !valid_review_id(&input.review_id)||!valid_id(&input.operation_id)
    ||!valid_id(&input.channel_id)||!valid_id(&input.execution_id)
    ||execution.channel_id!=input.channel_id||execution.execution_id!=input.execution_id
@@ -625,7 +636,7 @@ impl ReviewStore{
   }
   directory(&channel,true)?;directory(&dir,true)?;directory(&dir.join("objects"),true)?;
   let original=self.object(&dir,0,"script-v0",source,MAX_SCRIPT)?;
-  let version=ScriptVersion{index:0,text:original,source:"immutable_phase_03i_manual_execution".into(),
+  let version=ScriptVersion{index:0,text:original,source:if fixture{"immutable_phase_03m_mock_fixture"}else{"immutable_phase_03i_manual_execution"}.into(),
    parent_digest:None,improvement_prompt:None,validation_findings:validate_script(source)};
   let round=self.make_round(&dir,0,mode,&version,&policy,0)?;
   let s=ReviewState{schema_version:1,review_id:input.review_id.clone(),channel_id:input.channel_id.clone(),
@@ -707,7 +718,7 @@ impl ReviewStore{
   next.revision+=1;next.previous_digest=Some(digest(&serde_json::to_vec(&current).map_err(|_|storage())?));
   next.operation_id=input.operation_id.clone();next.operation_digest=op;
   match &input.action{
-   ReviewAction::ImportResponse{section_index,raw}=>{
+   ReviewAction::ImportResponse{section_index,raw}|ReviewAction::ImportFixtureResponse{section_index,raw}=>{
     if raw.trim().is_empty()||raw.len()>MAX_RAW||raw.contains('\0'){return Err(invalid())}
     let round=next.rounds.last_mut().ok_or_else(corrupt)?;
     let item=round.sections.get_mut(*section_index as usize).ok_or_else(invalid)?;
@@ -743,7 +754,7 @@ impl ReviewStore{
     let o=self.object(&dir,next.revision,"improvement",&prompt,MAX_PROMPT)?;
     next.versions.last_mut().ok_or_else(corrupt)?.improvement_prompt=Some(o);
    },
-   ReviewAction::ImportRevision{text}=>{
+   ReviewAction::ImportRevision{text}|ReviewAction::ImportFixtureRevision{text}=>{
     if text.trim().is_empty()||text.len()>MAX_SCRIPT||text.contains('\0'){return Err(invalid())}
     let last=next.versions.last().ok_or_else(corrupt)?;
     if last.improvement_prompt.is_none(){return Err(invalid())}
@@ -751,7 +762,7 @@ impl ReviewStore{
     let parent=last.text.sha256.clone();
     let n=next.versions.len() as u32;
     let r=self.object(&dir,next.revision,&format!("script-v{n}"),text,MAX_SCRIPT)?;
-    next.versions.push(ScriptVersion{index:n,text:r,source:"manual_improved_revision".into(),
+    next.versions.push(ScriptVersion{index:n,text:r,source:if matches!(&input.action,ReviewAction::ImportFixtureRevision{..}){"deterministic_mock_improved_revision"}else{"manual_improved_revision"}.into(),
      parent_digest:Some(parent),improvement_prompt:None,validation_findings:validate_script(text)});
    },
    ReviewAction::PrepareReview{mode}=>{

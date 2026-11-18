@@ -242,7 +242,7 @@ impl Coordinator<'_>{
     let input=StartReview{channel_id:channel.clone(),execution_id:ex.execution_id.clone(),
       review_id:format!("rv_{}",task.task_id.trim_start_matches("su_")),part_index:None,
       operation_id:format!("op_auto_review_start_{}",task.task_id)};
-    let v=self.review.start_with_context(self.plan,&ex,&script,&input,&sources(self.execution,&ex)?)
+    let v=self.review.start_with_context_fixture(self.plan,&ex,&script,&input,&sources(self.execution,&ex)?)
      .map_err(|e|e.to_string())?;
     task=sync_review(self.supervisor,&task,&v)?;continue
    };
@@ -257,7 +257,7 @@ impl Coordinator<'_>{
     if response.provenance!="deterministic_mock"||response.content_sha256!=digest(response.content.as_bytes()){
      return Err("Review adapter response lacks verified deterministic fixture provenance.".into())
     }
-    rv=review_do(self.review,&rv,ReviewAction::ImportResponse{section_index:section.index,raw:response.content})?;
+    rv=review_do(self.review,&rv,ReviewAction::ImportFixtureResponse{section_index:section.index,raw:response.content})?;
     task=sync_review(self.supervisor,&task,&rv)?;continue
    }
    // A revised script has no current reviewer evidence until a NEW round exists.
@@ -291,7 +291,7 @@ impl Coordinator<'_>{
     if answer.provenance!="deterministic_mock"||answer.content_sha256!=digest(answer.content.as_bytes()){
      return Err("Revision adapter response lacks verified deterministic fixture provenance.".into())
     }
-    rv=review_do(self.review,&rv,ReviewAction::ImportRevision{text:answer.content})?;
+    rv=review_do(self.review,&rv,ReviewAction::ImportFixtureRevision{text:answer.content})?;
     task=sync_review(self.supervisor,&task,&rv)?;continue
    }
    return Err("Review improvement state is unexpected; immutable history preserved.".into())

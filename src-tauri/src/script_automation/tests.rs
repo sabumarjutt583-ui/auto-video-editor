@@ -105,6 +105,8 @@ fn sw03m_ten_part_automatic_recovery_after_part_four(){
  assert_eq!(source.continuity_notes.len(),9);
  let rv=review.get("channel_horror","rv_auto_test").unwrap();
  assert_eq!(rv.versions.len(),2);
+  assert_eq!(rv.versions[0].source,"immutable_phase_03m_mock_fixture");
+  assert_eq!(rv.versions[1].source,"deterministic_mock_improved_revision");
  assert_eq!(rv.rounds.len(),2);
  assert!(rv.approvals.is_empty());
  assert!(rv.rounds.last().unwrap().sections.iter().all(|s|s.report.is_some()));
