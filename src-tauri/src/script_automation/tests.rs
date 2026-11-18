@@ -178,3 +178,19 @@ fn sw03m_response_evidence_never_masquerades_as_real_ai(){
  let mut altered=req;altered.prompt.push(' ');
  assert!(FixtureProvider.execute(&altered).is_err());
 }
+
+#[test]
+fn sw03m_max_one_improvement_still_re_reviews_new_version(){
+ let p=Fixture::setup("channel_one_revision",1);
+ let outcome=Coordinator{plan:&p.plan,execution:&p.ex,review:&p.review,
+  supervisor:&p.supervisor,adapter:&FixtureProvider,review_target:100,max_improvements:1}
+  .run(&p.task_id,None).unwrap();
+ assert_eq!(outcome.revision_rounds,1);
+ let r=p.review.get("channel_one_revision","rv_auto_test").unwrap();
+ assert_eq!(r.rounds.last().unwrap().version_index,r.versions.last().unwrap().index);
+ assert_eq!(r.rounds.len(),2);
+ assert_eq!(r.rounds.last().unwrap().sections.iter().filter(|x|x.score.is_some()).count(),
+  r.rounds.last().unwrap().sections.len());
+ assert!(r.approvals.is_empty());
+ p.cleanup();
+}

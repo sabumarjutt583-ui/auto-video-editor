@@ -243,18 +243,20 @@ impl Coordinator<'_>{
     rv=review_do(self.review,&rv,ReviewAction::ImportResponse{section_index:section.index,raw})?;
     task=sync_review(self.supervisor,&task,&rv)?;continue
    }
+   // A revised script has no current reviewer evidence until a NEW round exists.
+   // This check MUST precede the threshold/max-round gate, or a crashed worker
+   // could reuse the previous version's score and falsely finish after a revision.
+   let v=rv.versions.last().ok_or("No review source version.")?;
+   if rv.rounds.last().is_some_and(|r|r.version_index!=v.index){
+    rv=review_do(self.review,&rv,ReviewAction::PrepareReview{mode:"improvement".into()})?;
+    task=sync_review(self.supervisor,&task,&rv)?;continue
+   }
    if !completed_review(&rv){return Err("Reviewer fixture invalid or incomplete; saved raw evidence preserved.".into())}
    last_score=Some(review_min(&rv));
    let improvements=(rv.versions.len()-1) as u32;
    if review_min(&rv)>=self.review_target||improvements>=self.max_improvements {
     task=sync_review(self.supervisor,&task,&rv)?;
     return Ok(self.outcome(&task,&ex,last_score,improvements,true))
-   }
-   let v=rv.versions.last().ok_or("No review source version.")?;
-   // After a saved revision the older round is no longer eligible as evidence.
-   if rv.rounds.last().is_some_and(|r|r.version_index!=v.index){
-    rv=review_do(self.review,&rv,ReviewAction::PrepareReview{mode:"improvement".into()})?;
-    task=sync_review(self.supervisor,&task,&rv)?;continue
    }
    if v.improvement_prompt.is_none(){
     rv=review_do(self.review,&rv,ReviewAction::PrepareImprovement{goals:vec![
