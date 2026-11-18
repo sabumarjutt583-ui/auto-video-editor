@@ -255,6 +255,26 @@ fn account_gate(plan:&crate::script_studio::ScriptStudioPlanV1,claude:&ScriptAcc
  }
  Ok(())
 }
+/// Persist an explicit reason when automatic MOCK startup recovery cannot continue.
+fn record_recovery_blocked(auto:&AutoService,sup:&SupervisorStore,task:&TaskState,message:&str){
+ let reason=format!("Automatic MOCK startup recovery blocked: {message}");
+ auto.inner.errors.lock().unwrap_or_else(|e|e.into_inner())
+  .insert(task.task_id.clone(),reason.clone());
+ if task.snapshot.transport==Transport::LocalMock &&
+  !matches!(task.stage,Stage::Paused|Stage::Cancelled|Stage::Completed|Stage::Failed){
+  let _=sup.apply(&TaskRequest{
+   channel_id:task.channel_id.clone(),task_id:task.task_id.clone(),
+   expected_revision:task.revision,operation_id:format!("op_auto_recovery_block_{}",task.revision),
+   action:TaskAction::MarkAutomaticBlocked{reason:reason.chars().take(300).collect()}
+  },None,None);
+ }
+}
+fn require_approval_digest(expected:&str,actual:&str)->Cmd<()>{
+ if expected.len()!=64||expected!=actual{
+  return Err(err("Script changed or was not previewed. Open and review the exact current version before approval."))
+ }
+ Ok(())
+}
 /// Restart only safe local fixture jobs. Never reattach or dispatch to consumer sites.
 pub fn recover_at_startup(app:&AppHandle){
  if !cfg!(debug_assertions){return}
@@ -275,10 +295,18 @@ pub fn recover_at_startup(app:&AppHandle){
     matches!(task.stage,Stage::Paused|Stage::Cancelled|Stage::Failed|Stage::Completed|Stage::AwaitingApproval){
     continue;
    }
-   let Ok(policy)=auto.get(channel,&task.task_id)else{continue};
-   let Ok(plan)=plans.get_plan(channel,&policy.plan_id)else{continue};
-   if account_gate(&plan,&claude,&chatgpt).is_err(){continue}
-   let _=auto.launch(policy,plan,ex.clone(),rv.clone(),sup.clone());
+   let policy=match auto.get(channel,&task.task_id){
+    Ok(p)=>p,Err(e)=>{record_recovery_blocked(&auto,&sup,&task,&e.message);continue}
+   };
+   let plan=match plans.get_plan(channel,&policy.plan_id){
+    Ok(p)=>p,Err(e)=>{record_recovery_blocked(&auto,&sup,&task,&e.to_string());continue}
+   };
+   if let Err(e)=account_gate(&plan,&claude,&chatgpt){
+    record_recovery_blocked(&auto,&sup,&task,&e.message);continue
+   }
+   if let Err(e)=auto.launch(policy,plan,ex.clone(),rv.clone(),sup.clone()){
+    record_recovery_blocked(&auto,&sup,&task,&e.message);
+   }
   }
  }
 }
@@ -399,7 +427,7 @@ pub async fn auto_control(app:AppHandle,seed:LegacyChannelSeed,task_id:String,ac
 
 #[tauri::command]
 pub async fn auto_approve(app:AppHandle,seed:LegacyChannelSeed,task_id:String,confirmation:String,
- service:State<'_,AutoService>,review:State<'_,ReviewService>,
+ expected_script_digest:String,service:State<'_,AutoService>,review:State<'_,ReviewService>,
  execution:State<'_,ExecutionService>,supervisor:State<'_,SupervisorService>)->Cmd<AutoView>{
  enabled()?;
  if confirmation!="APPROVE FINAL SCRIPT"{return Err(err("Exact user confirmation required."))}
@@ -417,6 +445,7 @@ pub async fn auto_approve(app:AppHandle,seed:LegacyChannelSeed,task_id:String,co
  let current=rv.get(&owner,&review_id).map_err(|e|err(e.to_string()))?;
  let round=current.rounds.last().ok_or_else(||err("No saved review round."))?;
  let latest=current.versions.last().ok_or_else(||err("No immutable script version."))?;
+ require_approval_digest(&expected_script_digest,&latest.text.sha256)?;
  if round.version_index!=latest.index||
   round.sections.is_empty()||round.sections.iter().any(|s|s.report.is_none()||s.score.is_none()){
   return Err(err("The current script version requires a complete fresh review before approval."))
@@ -450,6 +479,13 @@ mod tests{
    execution_id:"ex_auto_a".into(),plan_id:"sp_auto_a".into(),plan_digest:"sha256_fixture".into(),
    mode:AutoMode::LocalFixture,review_target:90,max_improvements:2,integrity_sha256:String::new()};
   p.seal().unwrap();p
+ }
+ #[test]fn sw03m_approval_requires_exact_current_script_digest(){
+  let sha="a".repeat(64);
+  assert!(require_approval_digest(&sha,&sha).is_ok());
+  assert!(require_approval_digest("",&sha).is_err());
+  assert!(require_approval_digest(&"b".repeat(64),&sha).is_err());
+  assert!(require_approval_digest("a",&sha).is_err());
  }
  #[test]fn sw03m_auto_policy_never_overwrites_or_leaks_across_channels(){
   let (service,root)=new_fixture();
