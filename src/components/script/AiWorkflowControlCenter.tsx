@@ -377,7 +377,7 @@ export function AiWorkflowControlCenter({seed}:Props){
      {currentPart.prepared&&<label className="text-xs block">Paste actual AI response (preserve Unicode, whitespace and CRLF; never auto-submitted)
       <textarea className={cn} rows={5} value={response} onChange={e=>setResponse(e.target.value)}/>
       <span className="text-xs">Draft only: {responseStats(response).words} words · {responseStats(response).bytes} UTF-8 bytes · {responseStats(response).lines} lines</span>
-     </label>
+     </label>}
      {currentPart.prepared&&<div className="flex gap-2 flex-wrap"><Button disabled={busy} onClick={()=>void pasteResponse()}>Paste from clipboard (user-triggered)</Button><Button disabled={busy||!response} onClick={()=>setResponse("")}>Clear uncommitted draft</Button></div>}
      {response&&currentPart.prepared&&<details className="border border-line p-2"><summary className="text-xs">Exact raw response preview (not yet committed)</summary><pre className="text-xs whitespace-pre-wrap break-words">{response}</pre></details>}
      <Button disabled={busy||!currentPart.prepared||!response.trim()} onClick={()=>void applyExecutionAction({kind:"import_fragment",partIndex:currentPart.index,text:response})}>Import response into Rust execution</Button>
