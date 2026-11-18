@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
 import {Button} from "../ui";
 import {chromeOpen,chromeStatus,responseStats,type ChromeProvider,type WorkspaceReport} from "../../lib/script/chrome/api.ts";
+import {nextLocalPartToPrepare} from "../../lib/script/chrome/nextPart.ts";
 import type {LegacyChannelSeed,ScriptStudioPlanV1} from "../../lib/script/studio/types.ts";
 import {getStudioPlan} from "../../lib/script/studio/api.ts";
 import type {ExecutionState,ExecutionAction,ExecutionRequest} from "../../lib/script/execution/types.ts";
@@ -132,8 +133,24 @@ export function AiWorkflowControlCenter({seed}:Props){
      }
     }
    }
-   const next=await applyExecution(seed,executionRetry.current.request);
+   let next=await applyExecution(seed,executionRetry.current.request);
    executionRetry.current=null;
+   let followUp="";
+   // Only create the NEXT LOCAL prompt once the prior checkpoint is safely saved.
+   // A required continuity note is never fabricated. This never sends any browser message.
+   if(action.kind==="commit_part"||action.kind==="save_continuity"){
+    const nextPart=nextLocalPartToPrepare(next,active.snapshot.plan);
+    if(nextPart!==null){
+     try{
+      next=await applyExecution(seed,buildExecutionRequest(next,{kind:"prepare_part",partIndex:nextPart,extraInstructions:""}));
+      followUp=" Part "+nextPart+" prompt prepared locally, not sent.";
+     }catch(e){
+      followUp=" Prior checkpoint saved; next part requires manual attention: "+supervisorError(e);
+     }
+    }else if(next.completedParts<next.totalParts){
+     followUp=" Save required continuity notes or prepare the next local prompt manually.";
+    }
+   }
    const t=await applyTask(seed,taskRequest(active,{kind:"sync_execution"}));
    setExecution(next);await load(t);setTasks(await listTasks(seed));
    if(action.kind==="prepare_part"||action.kind==="prepare_continuation"){
@@ -141,7 +158,7 @@ export function AiWorkflowControlCenter({seed}:Props){
    }
    if(action.kind==="import_fragment")setResponse("");
    if(action.kind==="save_continuity")setContinuity("");
-   setNotice("Verified saved execution checkpoint "+next.revision+". No provider submission.");
+   setNotice("Verified saved execution checkpoint "+next.revision+". No provider submission."+followUp);
   }catch(e){setError(supervisorError(e)+" Refresh saved records before retrying.")}
   finally{setBusy(false)}
  }
