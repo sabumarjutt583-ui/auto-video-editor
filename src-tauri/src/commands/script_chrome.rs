@@ -189,8 +189,8 @@ pub async fn chrome_workspace_open(app:AppHandle,seed:LegacyChannelSeed,task_id:
  let (exe,_,_)=browser(&ig)?;
  let config=ig.engine.config();
  let url=match provider{
-  Provider::Claude=>config.script.url,
-  Provider::Chatgpt=>config.chatgpt.url,
+  Provider::Claude=>config.script.url.as_str(),
+  Provider::Chatgpt=>config.chatgpt.url.as_str(),
  };
  validate_site(provider,&url)?;
  chrome.open(provider,&account_id,&exe,&profile,&url).await?;
