@@ -537,6 +537,9 @@ fn main() {
                 }
                 Err(error) => logging::error("imagegen", &error.details),
             }
+            // After all account and source stores are managed, recover only safely
+            // restartable LOCAL MOCK jobs. A paused/uncertain consumer job is never retried.
+            commands::script_auto::recover_at_startup(app.handle());
             Ok(())
         })
         .invoke_handler(handler!())

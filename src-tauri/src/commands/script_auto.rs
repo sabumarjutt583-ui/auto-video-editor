@@ -178,6 +178,33 @@ fn account_gate(plan:&crate::script_studio::ScriptStudioPlanV1,claude:&ScriptAcc
  }
  Ok(())
 }
+/// Restart only safe local fixture jobs. Never reattach or dispatch to consumer sites.
+pub fn recover_at_startup(app:&AppHandle){
+ if !cfg!(debug_assertions){return}
+ let (Some(auto),Some(studio),Some(execution),Some(review),Some(supervisor),
+      Some(claude),Some(chatgpt))=(
+  app.try_state::<AutoService>(),app.try_state::<StudioService>(),
+  app.try_state::<ExecutionService>(),app.try_state::<ReviewService>(),
+  app.try_state::<SupervisorService>(),app.try_state::<Arc<ScriptAccounts>>(),
+  app.try_state::<Arc<ChatGptAccounts>>())else{return};
+ let (Ok(plans),Ok(ex),Ok(rv),Ok(sup))=(
+  studio.store(),execution.store(),review.store(),supervisor.store())else{return};
+ let Ok(settings)=crate::settings::load(app)else{return};
+ for item in &settings.channel_profiles{
+  let Some(channel)=item.get("id").and_then(|x|x.as_str())else{continue};
+  let Ok(tasks)=sup.list(channel)else{continue};
+  for task in tasks{
+   if !task.task_id.starts_with("su_auto_")||
+    matches!(task.stage,Stage::Paused|Stage::Cancelled|Stage::Failed|Stage::Completed|Stage::AwaitingApproval){
+    continue;
+   }
+   let Ok(policy)=auto.get(channel,&task.task_id)else{continue};
+   let Ok(plan)=plans.get_plan(channel,&policy.plan_id)else{continue};
+   if account_gate(&plan,&claude,&chatgpt).is_err(){continue}
+   let _=auto.launch(policy,plan,ex.clone(),rv.clone(),sup.clone());
+  }
+ }
+}
 #[tauri::command]
 pub async fn auto_capability(mode:AutoMode)->Cmd<AdapterCapability>{
  enabled()?;Ok(capability(&mode))
