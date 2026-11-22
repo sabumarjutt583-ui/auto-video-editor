@@ -13,6 +13,11 @@ export function invalidateProject(project: Project, patch: ProjectPatch): Projec
   const voice = script || changed("voicePath") || changed("voiceDuration") || changed("voiceOriginalPath");
   const timing = voice || changed("words");
   const structure = timing || changed("sceneSettings");
+  // Standalone Studio extends the timeline by appending scenes and timing anchors.
+  // Do not erase the existing user's scene overrides or motion graphics.
+  const studioAppend = project.scriptSource === "video_studio"
+    && "scenes" in patch && "words" in patch && "voiceDuration" in patch
+    && project.scenes.every((scene, index) => patch.scenes?.[index]?.id === scene.id);
   const style = changed("styleId") || changed("promptSettings") || changed("characterBible") || changed("locationBible");
   const defaults: ProjectPatch = {};
   if (script) Object.assign(defaults, { voiceOriginalPath: null, voiceOriginalDuration: 0, voicePath: null, voiceDuration: 0, voiceLocked: false, cutMap: [], bibleLocked: false });
@@ -43,7 +48,7 @@ export function invalidateProject(project: Project, patch: ProjectPatch): Projec
   if (audioChanged || structure) {
     next.editor = { ...after, audio: { ...after.audio, mix: null },
       ...(timing ? { captions: { ...after.captions, lines: null } } : {}),
-      ...(structure ? { overrides: {}, motion: [] } : {}),
+      ...(structure && !studioAppend ? { overrides: {}, motion: [] } : {}),
     };
   }
   next.renderedAt = null;
