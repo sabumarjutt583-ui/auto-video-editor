@@ -29,11 +29,11 @@ test("NAV_ITEMS lists the main pages in sidebar order, without Admin in a user b
   // absent — exactly as in a user build, where VITE_ADMIN is not "true".
   assert.deepEqual(
     NAV_ITEMS.map((item) => item.path),
-    ["/dashboard", "/projects", "/channels", "/prompt-generator", "/image-generator", "/auto-editor", "/project-images", "/project-subtitles", "/sfx-library", "/settings"],
+    ["/dashboard", "/projects", "/channels", "/prompt-generator", "/image-generator", "/auto-editor", "/video-studio", "/project-images", "/project-subtitles", "/sfx-library", "/settings"],
   );
   assert.deepEqual(
     NAV_ITEMS.map((item) => item.label),
-    ["Dashboard", "Projects", "Channels & Prompts", "Channel Pipelines", "Image Generator", "Auto Editor", "Project images", "Project subtitles", "SFX Library", "Settings"],
+    ["Dashboard", "Projects", "Channels & Prompts", "Channel Pipelines", "Image Generator", "Auto Editor", "Video Studio", "Project images", "Project subtitles", "SFX Library", "Settings"],
   );
   assert.ok(NAV_ITEMS.every((item) => item.path.startsWith("/")));
   assert.equal(new Set(NAV_ITEMS.map((item) => item.path)).size, NAV_ITEMS.length, "no duplicate nav paths");
