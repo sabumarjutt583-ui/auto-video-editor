@@ -33,7 +33,9 @@
 - [x] Add backend silent WAV generation for voice-free renders and use existing FFmpeg mix/render path.
 - [x] Preserve existing timeline motion/scene overrides on Studio media append.
 - [x] Add unit test cases for scene timing, mapping and edit preservation.
-- [ ] Typecheck and unit tests verified on CI.
+- [ ] Typecheck and unit tests verified on CI (latest workflow pending; do not mark complete until green).
+- [x] Media-first clip move, trim, split, duplicate and delete with undo history; preserve manual split styling and source in-points.
+- [x] Regression coverage for original legacy render source shape and Studio-specific trimmed video sources.
 - [ ] Render a complete media-only project on real Windows with FFmpeg.
 - [ ] Implement actual independent freeform multitrack timeline and all remaining features.
 
