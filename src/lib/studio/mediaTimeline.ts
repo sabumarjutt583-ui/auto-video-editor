@@ -82,6 +82,8 @@ export function appendStudioMedia(project: Project, imageSeconds = DEFAULT_IMAGE
       media,
       // Filename/placeholder anchors must never appear as subtitles.
       captions: { ...editor.captions, style: { ...editor.captions.style, preset: "none" }, lines: null },
+      // A media-only edit has no narration beats from which to plan automatic SFX.
+      audio: { ...editor.audio, autoSfx: false, graphicSfx: false },
     },
   };
 }
