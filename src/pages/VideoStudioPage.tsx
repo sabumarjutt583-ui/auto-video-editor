@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { EditorStep } from "../components/editor/EditorStep";
 import { ScriptDraftPanel } from "../components/editor/ScriptDraftPanel";
+import { StudioQualityPanel } from "../components/editor/StudioQualityPanel";
 import { MediaStep } from "../components/media";
 import { NameDialog } from "../components/projects/NameDialog";
 import { Button, SegmentedControl } from "../components/ui";
@@ -124,7 +125,10 @@ export function VideoStudioPage() {
               <Button onClick={() => setTab("media")}>Import Media</Button>
             </section>
           ) : (
-            <EditorStep project={project} />
+            <div className="flex flex-col gap-4">
+              {project.scriptSource === "video_studio" && <StudioQualityPanel key={`${project.id}:${project.updatedAt}`} project={project} />}
+              <EditorStep project={project} />
+            </div>
           )}
         </>
       )}
