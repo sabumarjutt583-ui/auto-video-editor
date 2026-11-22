@@ -131,9 +131,19 @@ pub async fn render(job: &Job, env: &RenderEnv, request: &RenderRequest) -> Resu
             .map(|component| component.to_string_lossy().into_owned())
             .collect::<Vec<_>>().join("/");
     }
-    let mix_inputs = prepare_mix(&env.project_dir, &env.sfx_dir, &mix_request)?;
     let audio = tmp.join("audio.wav");
-    mix::render_mix(job, &mix_request, &mix_inputs.voice, &mix_inputs.music, &mix_inputs.cues, tmp, &audio).await?;
+    if request.mix.voice_path.trim().is_empty()
+        && (request.mix.music.tracks.is_empty() || request.mix.music.volume <= 0.0)
+        && request.mix.sfx.is_empty()
+    {
+        // Loudness analysis of completely silent samples reports -infinity.
+        // A silent-only movie needs a valid AAC track, not loudness normalization.
+        std::fs::copy(tmp.join("studio_silent_voice.wav"), &audio)
+            .map_err(|e| io("Silent audio could not be prepared for the render.", e, &audio))?;
+    } else {
+        let mix_inputs = prepare_mix(&env.project_dir, &env.sfx_dir, &mix_request)?;
+        mix::render_mix(job, &mix_request, &mix_inputs.voice, &mix_inputs.music, &mix_inputs.cues, tmp, &audio).await?;
+    }
 
     // 2. One clip per scene
     let clip_name = |position: usize| format!("clip_{position:05}.mp4");
