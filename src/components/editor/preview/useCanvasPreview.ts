@@ -34,7 +34,7 @@ function syncVideo(layer: Layer, time: number, playing: boolean): void {
   const video = layer.element;
   if (!(video instanceof HTMLVideoElement) || video.readyState < 1) return;
   const speed = layer.override.speed;
-  const wanted = Math.max(0, layer.sourceIn + (time - layer.start) * speed);
+  const wanted = Math.max(0, (layer.sourceIn ?? 0) + (time - layer.start) * speed);
   const end = Math.max(0, video.duration - 0.05);
   if (wanted >= end) {
     // A clip shorter than its scene holds its last picture.
