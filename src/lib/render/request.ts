@@ -94,7 +94,7 @@ export function aspectLabel(aspect: AspectRatio): string {
 
 function sourceOf(file: MediaFile, sourceIn = 0): RenderSource {
   const start = file.kind === "video" ? Math.max(0, sourceIn) : 0;
-  return { kind: file.kind, path: file.path, duration: file.kind === "video" ? Math.max(0, file.duration - start) : 0, lastFrame: false, blurAll: false, sourceIn: start };
+  return { kind: file.kind, path: file.path, duration: file.kind === "video" ? Math.max(0, file.duration - start) : 0, lastFrame: false, blurAll: false, ...(start > 0 ? { sourceIn: start } : {}) };
 }
 
 /** What a scene without media shows: the scene before it held or blurred, or black. */
