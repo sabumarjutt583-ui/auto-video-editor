@@ -193,6 +193,10 @@ pub fn clip_args(scene: &RenderScene, source: &Path, frames: i64, width: u32, he
                 // The clip is too short: play it again from the start (the output is cut at `frames`).
                 args.extend([s("-stream_loop"), s("-1")]);
             }
+            // Seek before decoding, retaining the original file untouched.
+            if !scene.source.last_frame && scene.source.source_in.is_finite() && scene.source.source_in > 0.0 {
+                args.extend([s("-ss"), format!("{:.3}", scene.source.source_in)]);
+            }
             args.extend([s("-i"), path_arg(source)]);
             let pace = format!("setpts=PTS/{speed:.4},fps={fps}");
             // Hold the last picture for as long as the clip is too short (the output is cut at `frames`).
