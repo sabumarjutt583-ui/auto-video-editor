@@ -35,6 +35,9 @@ pub struct Source {
     /// Show it as a blurred background only (a "blurred previous" scene).
     #[serde(default)]
     pub blur_all: bool,
+    /// Non-destructive trim start for a source video; old projects default to zero.
+    #[serde(default)]
+    pub source_in: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
