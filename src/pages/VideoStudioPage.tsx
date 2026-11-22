@@ -43,12 +43,12 @@ export function VideoStudioPage() {
       // A non-studio production project may still be opened here for manual editing,
       // but we do not rewrite its scene plan with synthetic media anchors.
       if (current.scriptSource !== "video_studio") {
-        setProblem({ message: "To create a media-first timeline, start a New Studio Edit. Existing production project scenes remain protected." });
+        setProblem({ message: "To create a media-first timeline, start a New Studio Edit. Existing production project scenes remain protected.", details: "The open project belongs to the existing production pipeline." });
         return;
       }
       const patch = appendStudioMedia(current, imageSeconds);
       if (!patch) {
-        setProblem({ message: "No unassigned media found. Import pictures or video clips first." });
+        setProblem({ message: "No unassigned media found. Import pictures or video clips first.", details: "Every imported file is already assigned, or there are no imported files." });
         return;
       }
       applyEdit(patch);
