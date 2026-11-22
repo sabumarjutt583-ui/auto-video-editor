@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { EditorStep } from "../components/editor/EditorStep";
+import { ScriptDraftPanel } from "../components/editor/ScriptDraftPanel";
 import { MediaStep } from "../components/media";
 import { NameDialog } from "../components/projects/NameDialog";
 import { Button, SegmentedControl } from "../components/ui";
@@ -98,6 +99,7 @@ export function VideoStudioPage() {
           </div>
           {tab === "media" ? (
             <div className="flex flex-col gap-4">
+              <ScriptDraftPanel key={project.id} project={project} onBuilt={() => setTab("timeline")} />
               <section className="flex flex-wrap items-end gap-4 rounded-2xl border border-line bg-surface p-4">
                 <label className="flex flex-col gap-1 text-sm">
                   <span className="font-medium">Image length (seconds)</span>
