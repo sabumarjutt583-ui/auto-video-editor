@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Scissors, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Copy, Scissors, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { editStudioTimeline, type StudioOperation } from "../../lib/studio/edit";
 import { readEditor } from "../../lib/editor/model";
@@ -34,7 +34,7 @@ export function StudioClipTools({ project, scene, onSelect }: Props) {
       if (operation.kind === "delete") {
         const next = patch.scenes?.[Math.min(index, patch.scenes.length - 1)];
         if (next) onSelect(next.id);
-      } else if (operation.kind === "split") {
+      } else if ((operation.kind === "split" || operation.kind === "duplicate")) {
         const next = patch.scenes?.[index + 1];
         if (next) onSelect(next.id);
       }
@@ -81,6 +81,7 @@ export function StudioClipTools({ project, scene, onSelect }: Props) {
         <Button icon={ArrowLeft} disabled={index <= 0} onClick={() => run({ kind: "move", id: scene.id, index: index - 1 })}>Move left</Button>
         <Button icon={ArrowRight} disabled={index >= project.scenes.length - 1} onClick={() => run({ kind: "move", id: scene.id, index: index + 1 })}>Move right</Button>
         <Button icon={Scissors} onClick={splitAt}>Split at playhead</Button>
+        <Button icon={Copy} onClick={() => run({ kind: "duplicate", id: scene.id })}>Duplicate clip</Button>
         <Button icon={Trash2} onClick={() => run({ kind: "delete", id: scene.id })}>Remove from timeline</Button>
       </div>
     </section>
