@@ -21,6 +21,8 @@ import { RenderModal, useRender } from "../render";
 import { useMediaActions } from "../media/useMediaActions";
 import { SegmentedControl } from "../ui";
 import { EditorTopBar } from "./EditorTopBar";
+import { StudioClipTools } from "./StudioClipTools";
+import { editStudioTimeline } from "../../lib/studio/edit";
 import { OverridesPanel } from "./OverridesPanel";
 import { PreviewPlayer } from "./PreviewPlayer";
 import { Storyboard } from "./Storyboard";
@@ -101,10 +103,30 @@ export function EditorStep({ project }: { project: Project }) {
   };
 
   const changeBoundary = (scenes: Scene[]) => applyEdit({ scenes });
+  const studioMode = project.scriptSource === "video_studio" && project.voicePath === null;
+  const studioBoundary = (index: number, time: number) => {
+    const current = useProjectStore.getState().project;
+    if (!current || !studioMode) return;
+    const scene = current.scenes[index];
+    if (!scene) return;
+    try {
+      const patch = editStudioTimeline(current, { kind: "duration", id: scene.id, seconds: time - scene.start });
+      if (patch) applyEdit(patch);
+    } catch {
+      // Invalid very-short boundaries are ignored; use Clip editing for precise entry.
+    }
+  };
   const swap = (from: number, to: number) => {
     const a = project.scenes[from];
     const b = project.scenes[to];
     if (!a || !b) return;
+    if (studioMode) {
+      const current = useProjectStore.getState().project;
+      if (!current) return;
+      const patch = editStudioTimeline(current, { kind: "move", id: a.id, index: to });
+      if (patch) applyEdit(patch);
+      return;
+    }
     const next = swapMedia(editor.media, project.mediaMap, a.id, b.id);
     applyEdit({ editor: { ...editor, media: next.media }, mediaMap: next.mediaMap });
   };
@@ -117,6 +139,7 @@ export function EditorStep({ project }: { project: Project }) {
     <PlaybackContext.Provider value={controls}>
       <div className="flex min-h-0 flex-col gap-4" data-testid="editor-step">
         <EditorTopBar project={project} onRender={() => setRenderOpen(true)} rendering={render.job !== null} />
+        {studioMode && selected && <StudioClipTools project={project} scene={selected} onSelect={setSelectedId} />}
         {renderOpen && <RenderModal project={project} editor={editor} view={render} onClose={() => setRenderOpen(false)} />}
         {actions.error && <ErrorNotice error={actions.error} />}
         {actions.notice && <p className="text-sm text-muted" role="status">{actions.notice}</p>}
@@ -153,7 +176,7 @@ export function EditorStep({ project }: { project: Project }) {
           </div>
           <div className="flex min-h-0 min-w-0 flex-col gap-4">
             <PreviewPlayer project={project} editor={editor} dir={dir} overlay={captions.overlay} />
-            <Timeline scenes={project.scenes} context={context} files={files} captionLines={captions.style.preset === "none" ? [] : captions.lines} audio={editor.audio} cues={audio.cues} selectedCue={audio.selectedCue} onSelectCue={(id) => { audio.selectCue(id); setTab("audio"); }} onMoveCue={(id, time) => audio.editCue(id, { time })} onDeleteCue={audio.deleteCue} selectedId={selected?.id ?? null} onSelect={setSelectedId} onBoundary={changeBoundary} onSwap={swap} graphics={editor.motion.filter((g) => g.kind === "spec")} selectedGraphic={selectedGraphic} limitsFor={graphicEditing.limitsFor} onSelectGraphic={(g) => { selectGraphic(g.id); setSelectedId(g.sceneId); setTab("motion"); }} onRetimeGraphic={(id, to) => void graphicEditing.retime(id, to)} />
+            <Timeline scenes={project.scenes} context={context} files={files} captionLines={captions.style.preset === "none" ? [] : captions.lines} audio={editor.audio} cues={audio.cues} selectedCue={audio.selectedCue} onSelectCue={(id) => { audio.selectCue(id); setTab("audio"); }} onMoveCue={(id, time) => audio.editCue(id, { time })} onDeleteCue={audio.deleteCue} selectedId={selected?.id ?? null} onSelect={setSelectedId} onBoundary={changeBoundary} onStudioBoundary={studioMode ? studioBoundary : undefined} onSwap={swap} graphics={editor.motion.filter((g) => g.kind === "spec")} selectedGraphic={selectedGraphic} limitsFor={graphicEditing.limitsFor} onSelectGraphic={(g) => { selectGraphic(g.id); setSelectedId(g.sceneId); setTab("motion"); }} onRetimeGraphic={(id, to) => void graphicEditing.retime(id, to)} />
           </div>
         </div>
       </div>
