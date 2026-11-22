@@ -175,10 +175,15 @@ export function selectBestEncoder(encoders: readonly EncoderChoice[] | null, for
 }
 
 /** What stops a render before it starts, in plain words (empty when it can start). */
-export function renderProblems(project: Pick<Project, "voicePath" | "voiceDuration" | "scenes">): string[] {
+export function renderProblems(project: Pick<Project, "voicePath" | "voiceDuration" | "scenes"> & { scriptSource?: string }): string[] {
   const problems: string[] = [];
-  if (!project.voicePath || project.voiceDuration <= 0) problems.push("Add a voice-over first (Prompt Generator, step 1).");
-  if (project.scenes.length === 0) problems.push("There are no scenes yet. Build them in the Prompt Generator.");
+  const mediaOnly = project.scriptSource === "video_studio";
+  if (project.voiceDuration <= 0 || (!project.voicePath && !mediaOnly)) {
+    problems.push(mediaOnly ? "Import footage and build the timeline before rendering." : "Add a voice-over first (Prompt Generator, step 1).");
+  }
+  if (project.scenes.length === 0) {
+    problems.push(mediaOnly ? "There are no clips in the timeline yet. Import media first." : "There are no scenes yet. Build them in the Prompt Generator.");
+  }
   return problems;
 }
 
