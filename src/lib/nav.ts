@@ -13,6 +13,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: "/prompt-generator", label: "Channel Pipelines", icon: Sparkles },
   { path: "/image-generator", label: "Image Generator", icon: ImagePlus },
   { path: "/auto-editor", label: "Auto Editor", icon: Clapperboard },
+  { path: "/video-studio", label: "Video Studio", icon: Clapperboard },
   { path: "/project-images", label: "Project images", icon: Image },
   { path: "/project-subtitles", label: "Project subtitles", icon: Subtitles },
   { path: "/sfx-library", label: "SFX Library", icon: AudioLines },

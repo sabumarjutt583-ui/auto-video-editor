@@ -41,6 +41,20 @@ test("scenes get their media, motion and a transition that never starts the vide
   assert.equal(scenes[0]?.motion, "zoom_in");
 });
 
+test("Studio video source in-points are serialized without changing legacy clips", () => {
+  const editor = editorWith({
+    media: [file("media/a.mp4", "video", 12)],
+    studioSourceIn: { S01: 3.5 },
+  });
+  const map = { S01: "media/a.mp4" };
+  const studio = buildRenderScenes(SCENES, editor, { mediaMap: map, scriptSource: "video_studio" }, {});
+  assert.equal(studio[0]?.source.sourceIn, 3.5);
+  assert.equal(studio[0]?.source.duration, 8.5);
+  const legacy = buildRenderScenes(SCENES, editor, { mediaMap: map, scriptSource: "claude" }, {});
+  assert.equal(legacy[0]?.source.sourceIn, undefined);
+  assert.equal(legacy[0]?.source.duration, 12);
+});
+
 test("Ken Burns off means no motion, and render mode cut means no transitions", () => {
   const editor = editorWith({ media: [file("media/a.png", "image")], render: { kenBurns: false, transitions: "cut" } });
   const scenes = buildRenderScenes(SCENES, editor, { mediaMap: { S01: "media/a.png", S02: "media/a.png" } }, {});

@@ -97,7 +97,6 @@ pub async fn render(job: &Job, env: &RenderEnv, request: &RenderRequest) -> Resu
     }
     let total_frames: i64 = plan.iter().map(|p| p.frames).sum();
     let sources = find_sources(env, request, &plan)?;
-    let mix_inputs = prepare_mix(&env.project_dir, &env.sfx_dir, &request.mix)?;
 
     let exports = env.project_dir.join("exports");
     std::fs::create_dir_all(&exports).map_err(|e| io("The exports folder could not be created.", e, &exports))?;
@@ -108,10 +107,43 @@ pub async fn render(job: &Job, env: &RenderEnv, request: &RenderRequest) -> Resu
     let temp = TempDir::create(exports.join(format!(".render-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0))))?;
     let tmp = &temp.0;
 
-    // 1. Audio
+    // 1. Audio. Media-first Studio edits may intentionally have no narration.
+    // In that case generate a real silent WAV inside the temporary render folder,
+    // then pass it through the normal audio mixer (music and SFX still work).
     job.set_range(0.0, 10.0);
+    let mut mix_request = request.mix.clone();
+    if mix_request.voice_path.trim().is_empty() {
+        let silent_voice = tmp.join("studio_silent_voice.wav");
+        let args = vec![
+            "-f".to_string(), "lavfi".to_string(),
+            "-i".to_string(), "anullsrc=r=48000:cl=stereo".to_string(),
+            "-t".to_string(), format!("{:.3}", request.duration),
+            "-c:a".to_string(), "pcm_s16le".to_string(),
+            arg(&silent_voice),
+        ];
+        let mut options = RunOptions::new("Preparing silent audio for the Studio edit", Some(request.duration), 0.0, 100.0);
+        options.failure_message = "Silent audio for the Studio edit could not be generated.".to_string();
+        run(job, &args, &options).await?;
+        // resolve() accepts only paths relative to the project's own folder.
+        let relative = silent_voice.strip_prefix(&env.project_dir)
+            .map_err(|e| AppError::new("The temporary audio path is invalid.", e.to_string()))?;
+        mix_request.voice_path = relative.iter()
+            .map(|component| component.to_string_lossy().into_owned())
+            .collect::<Vec<_>>().join("/");
+    }
     let audio = tmp.join("audio.wav");
-    mix::render_mix(job, &request.mix, &mix_inputs.voice, &mix_inputs.music, &mix_inputs.cues, tmp, &audio).await?;
+    if request.mix.voice_path.trim().is_empty()
+        && (request.mix.music.tracks.is_empty() || request.mix.music.volume <= 0.0)
+        && request.mix.sfx.is_empty()
+    {
+        // Loudness analysis of completely silent samples reports -infinity.
+        // A silent-only movie needs a valid AAC track, not loudness normalization.
+        std::fs::copy(tmp.join("studio_silent_voice.wav"), &audio)
+            .map_err(|e| io("Silent audio could not be prepared for the render.", e, &audio))?;
+    } else {
+        let mix_inputs = prepare_mix(&env.project_dir, &env.sfx_dir, &mix_request)?;
+        mix::render_mix(job, &mix_request, &mix_inputs.voice, &mix_inputs.music, &mix_inputs.cues, tmp, &audio).await?;
+    }
 
     // 2. One clip per scene
     let clip_name = |position: usize| format!("clip_{position:05}.mp4");

@@ -16,7 +16,7 @@ export type Overlay = (ctx: CanvasRenderingContext2D, width: number, height: num
 function buildLayers(project: Project, editor: EditorData, dir: string | null, cache: MediaCache): Layer[] {
   return project.scenes.map((scene) => {
     const path = project.mediaMap[scene.id];
-    const file = path === undefined ? undefined : editor.media.find((m) => m.path === path && m.sceneId === scene.id);
+    const file = path === undefined ? undefined : editor.media.find((m) => m.path === path);
     return {
       element: file && dir ? cache.get(projectFileUrl(dir, file.path), file.kind) : null,
       kind: file?.kind ?? "image",
@@ -24,6 +24,7 @@ function buildLayers(project: Project, editor: EditorData, dir: string | null, c
       number: scene.index,
       start: scene.start,
       duration: scene.duration,
+      sourceIn: project.scriptSource === "video_studio" ? (editor.studioSourceIn[scene.id] ?? 0) : 0,
     };
   });
 }
@@ -33,7 +34,7 @@ function syncVideo(layer: Layer, time: number, playing: boolean): void {
   const video = layer.element;
   if (!(video instanceof HTMLVideoElement) || video.readyState < 1) return;
   const speed = layer.override.speed;
-  const wanted = Math.max(0, (time - layer.start) * speed);
+  const wanted = Math.max(0, (layer.sourceIn ?? 0) + (time - layer.start) * speed);
   const end = Math.max(0, video.duration - 0.05);
   if (wanted >= end) {
     // A clip shorter than its scene holds its last picture.

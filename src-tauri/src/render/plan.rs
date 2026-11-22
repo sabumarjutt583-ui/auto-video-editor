@@ -193,6 +193,10 @@ pub fn clip_args(scene: &RenderScene, source: &Path, frames: i64, width: u32, he
                 // The clip is too short: play it again from the start (the output is cut at `frames`).
                 args.extend([s("-stream_loop"), s("-1")]);
             }
+            // Seek before decoding, retaining the original file untouched.
+            if !scene.source.last_frame && scene.source.source_in.is_finite() && scene.source.source_in > 0.0 {
+                args.extend([s("-ss"), format!("{:.3}", scene.source.source_in)]);
+            }
             args.extend([s("-i"), path_arg(source)]);
             let pace = format!("setpts=PTS/{speed:.4},fps={fps}");
             // Hold the last picture for as long as the clip is too short (the output is cut at `frames`).
@@ -378,7 +382,7 @@ mod tests {
             id: "S".into(),
             start,
             end,
-            source: Source { kind: SourceKind::Image, path: "media/a.png".into(), duration: 0.0, last_frame: false, blur_all: false },
+            source: Source { kind: SourceKind::Image, path: "media/a.png".into(), duration: 0.0, last_frame: false, blur_all: false, source_in: 0.0 },
             motion: Motion::ZoomIn,
             fit: Fit::Crop,
             speed: 1.0,
@@ -469,7 +473,11 @@ mod tests {
         assert!(still.contains("-loop 1"), "{still}");
 
         let mut video = scene(0.0, 5.0, TransitionKind::Cut, 0.0);
-        video.source = Source { kind: SourceKind::Video, path: "media/a.mp4".into(), duration: 4.0, last_frame: false, blur_all: false };
+        video.source = Source { kind: SourceKind::Video, path: "media/a.mp4".into(), duration: 4.0, last_frame: false, blur_all: false, source_in: 0.0 };
+        video.source.source_in = 2.5;
+        let trimmed = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");
+        assert!(trimmed.contains("-ss 2.500 -i /p/a.mp4"), "{trimmed}");
+        video.source.source_in = 0.0;
         let args = clip_args(&video, Path::new("/p/a.mp4"), 150, 1080, 1920, 30, true, out).join(" ");
         assert!(args.contains("setpts=PTS/0.8000"), "{args}");
         assert!(args.contains("tpad=stop_mode=clone"), "{args}");
@@ -512,7 +520,7 @@ mod tests {
         assert!(args.contains("-filter_complex"), "{args}");
 
         let mut black = scene(0.0, 5.0, TransitionKind::Cut, 0.0);
-        black.source = Source { kind: SourceKind::Black, path: String::new(), duration: 0.0, last_frame: false, blur_all: false };
+        black.source = Source { kind: SourceKind::Black, path: String::new(), duration: 0.0, last_frame: false, blur_all: false, source_in: 0.0 };
         assert!(clip_args(&black, Path::new(""), 30, 640, 360, 30, true, out).join(" ").contains("color=c=black:s=640x360:r=30"));
     }
 

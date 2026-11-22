@@ -226,6 +226,8 @@ export interface EditorData {
   render: RenderData;
   /** The brand kit of this project's graphics: a kit id, `match-style`, or empty = the app's kit (Settings). */
   brandKitId: string;
+  /** Source in-point for each Studio scene, in seconds, without modifying original files. */
+  studioSourceIn: Record<string, number>;
 }
 
 /** What `scan_media` returns for one file (nothing is copied yet). */

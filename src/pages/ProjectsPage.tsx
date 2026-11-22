@@ -56,7 +56,8 @@ export function ProjectsPage() {
   const openProject = (id: string) =>
     attempt(async () => {
       await useProjectStore.getState().open(id);
-      navigate("/prompt-generator");
+      const opened = useProjectStore.getState().project;
+      navigate(opened?.scriptSource === "video_studio" ? "/video-studio" : "/prompt-generator");
     }, "The project could not be opened.");
 
   const duplicate = (id: string) =>

@@ -6,7 +6,7 @@ concurrency:
 
 on:
   pull_request:
-    branches: [main, feature/script-writer-core-v1, feature/script-writer-integration-v1, feature/script-writer-comparison-v1, feature/script-writer-desktop-readiness-v1, feature/script-writer-durable-store-v1, feature/script-writer-state-machine-v1, feature/script-writer-manual-import-v1, feature/script-writer-review-approval-v1, feature/script-writer-revisions-v1, feature/script-writer-recovery-v1, feature/script-writer-channel-studio-v1, feature/script-writer-multipart-execution-v1, feature/script-writer-review-workflow-v1, feature/script-writer-provider-supervisor-v1, feature/script-writer-visible-chrome-studio-v1]
+    branches: [main, feature/script-writer-core-v1, feature/script-writer-integration-v1, feature/script-writer-comparison-v1, feature/script-writer-desktop-readiness-v1, feature/script-writer-durable-store-v1, feature/script-writer-state-machine-v1, feature/script-writer-manual-import-v1, feature/script-writer-review-approval-v1, feature/script-writer-revisions-v1, feature/script-writer-recovery-v1, feature/script-writer-channel-studio-v1, feature/script-writer-multipart-execution-v1, feature/script-writer-review-workflow-v1, feature/script-writer-provider-supervisor-v1, feature/script-writer-visible-chrome-studio-v1, feature/script-writer-automated-executor-v1]
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:

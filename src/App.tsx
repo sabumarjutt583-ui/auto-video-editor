@@ -16,6 +16,7 @@ import {
   PromptGeneratorPage,
   SettingsPage,
   SfxLibraryPage,
+  VideoStudioPage,
 } from "./pages";
 import { shouldAutoCheck, STARTUP_DELAY_MS } from "./lib/appUpdate/schedule";
 import { useAppUpdateStore } from "./store/appUpdateStore";
@@ -95,6 +96,7 @@ export function App() {
           <Route path="/prompt-generator" element={<PromptGeneratorPage />} />
           <Route path="/image-generator" element={<ImageGeneratorPage />} />
           <Route path="/auto-editor" element={<AutoEditorPage />} />
+          <Route path="/video-studio" element={<VideoStudioPage />} />
           <Route path="/project-images" element={<ProjectImagesPage />} />
           <Route path="/project-subtitles" element={<ProjectSubtitlesPage />} />
           <Route path="/sfx-library" element={<SfxLibraryPage />} />

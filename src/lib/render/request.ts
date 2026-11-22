@@ -19,6 +19,8 @@ export interface RenderSource {
   duration: number;
   lastFrame: boolean;
   blurAll: boolean;
+  /** Non-destructive source in-point (seconds), zero on all legacy projects. */
+  sourceIn?: number;
 }
 
 export interface RenderScene {
@@ -90,8 +92,9 @@ export function aspectLabel(aspect: AspectRatio): string {
   return aspect.replace(":", "x");
 }
 
-function sourceOf(file: MediaFile): RenderSource {
-  return { kind: file.kind, path: file.path, duration: file.kind === "video" ? file.duration : 0, lastFrame: false, blurAll: false };
+function sourceOf(file: MediaFile, sourceIn = 0): RenderSource {
+  const start = file.kind === "video" ? Math.max(0, sourceIn) : 0;
+  return { kind: file.kind, path: file.path, duration: file.kind === "video" ? Math.max(0, file.duration - start) : 0, lastFrame: false, blurAll: false, ...(start > 0 ? { sourceIn: start } : {}) };
 }
 
 /** What a scene without media shows: the scene before it held or blurred, or black. */
@@ -100,14 +103,14 @@ function placeholderFor(kind: EditorData["placeholder"], before: RenderSource | 
   return { ...before, lastFrame: before.kind === "video", blurAll: kind === "blur" };
 }
 
-export function buildRenderScenes(scenes: readonly Scene[], editor: EditorData, project: Pick<Project, "mediaMap">, exists: Readonly<Record<string, boolean>>): RenderScene[] {
+export function buildRenderScenes(scenes: readonly Scene[], editor: EditorData, project: Pick<Project, "mediaMap"> & { scriptSource?: string }, exists: Readonly<Record<string, boolean>>): RenderScene[] {
   const result: RenderScene[] = [];
   let lastReal: RenderSource | null = null;
   scenes.forEach((scene, i) => {
     const override: SceneOverride = overrideOf(editor, scene.id);
     const file = fileOf(scene, editor.media, project.mediaMap);
     const real = file !== undefined && exists[file.path] !== false;
-    const source = real && file ? sourceOf(file) : placeholderFor(editor.placeholder, lastReal);
+    const source = real && file ? sourceOf(file, project.scriptSource === "video_studio" ? (editor.studioSourceIn?.[scene.id] ?? 0) : 0) : placeholderFor(editor.placeholder, lastReal);
     if (real) lastReal = source;
     const previous = scenes[i - 1];
     const kind = previous ? effectiveTransition(override.transition, scene.index, editor.render.transitions) : "cut";
@@ -140,7 +143,10 @@ export function buildRenderRequest(input: RenderInput): RenderRequest {
     scenes: buildRenderScenes(project.scenes, editor, project, input.exists),
     kenBurns: editor.render.kenBurns,
     captions: captionsOn ? buildAssRequest(aspect, quality, input.captionStyle, input.font, input.captionLines) : null,
-    srt: input.captionLines.length > 0 ? toSrt(input.captionLines) : null,
+    // Studio's synthetic scene anchors are not spoken words or real subtitles.
+    srt: project.scriptSource === "video_studio" && !project.voicePath && !captionsOn
+      ? null
+      : input.captionLines.length > 0 ? toSrt(input.captionLines) : null,
     mix: buildMixRequest(editor.audio, project.voicePath ?? "", project.voiceDuration, input.cues),
     overlays: buildOverlays(editor.motion, width, height, project.voiceDuration),
     aspectLabel: aspectLabel(aspect),
@@ -175,10 +181,15 @@ export function selectBestEncoder(encoders: readonly EncoderChoice[] | null, for
 }
 
 /** What stops a render before it starts, in plain words (empty when it can start). */
-export function renderProblems(project: Pick<Project, "voicePath" | "voiceDuration" | "scenes">): string[] {
+export function renderProblems(project: Pick<Project, "voicePath" | "voiceDuration" | "scenes"> & { scriptSource?: string }): string[] {
   const problems: string[] = [];
-  if (!project.voicePath || project.voiceDuration <= 0) problems.push("Add a voice-over first (Prompt Generator, step 1).");
-  if (project.scenes.length === 0) problems.push("There are no scenes yet. Build them in the Prompt Generator.");
+  const mediaOnly = project.scriptSource === "video_studio";
+  if (project.voiceDuration <= 0 || (!project.voicePath && !mediaOnly)) {
+    problems.push(mediaOnly ? "Import footage and build the timeline before rendering." : "Add a voice-over first (Prompt Generator, step 1).");
+  }
+  if (project.scenes.length === 0) {
+    problems.push(mediaOnly ? "There are no clips in the timeline yet. Import media first." : "There are no scenes yet. Build them in the Prompt Generator.");
+  }
   return problems;
 }
 
