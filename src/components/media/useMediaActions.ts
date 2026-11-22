@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { preserveStudioMediaMap } from "../../lib/studio/edit";
 
 import { pickFolder, pickMediaFiles } from "../../lib/dialog";
 import { followFileTime } from "../../lib/editor/boundaries";
@@ -116,7 +117,19 @@ export function useMediaActions(project: Project): MediaActions {
           return;
         }
         const result = await runJob("media", "Copying into the project", (id) => importMedia(projectId, scan.files.map((f) => ({ source: f.path })), id));
-        commit((current, data) => place(addFiles(data, current.mediaMap, current.scenes, result.imported.map(fromImported))));
+        commit((current, data) => {
+          const incoming = result.imported.map(fromImported);
+          const placed = addFiles(data, current.mediaMap, current.scenes, incoming);
+          if (current.scriptSource !== "video_studio") return place(placed);
+          // Standalone imports enter the unassigned bin; scene-number filenames
+          // must not overwrite an edited timeline or its split/reused clips.
+          const incomingPaths = new Set(incoming.map((file) => file.path));
+          const attached = new Set(Object.values(current.mediaMap));
+          const media = placed.media.map((item) => incomingPaths.has(item.path) && !attached.has(item.path)
+            ? { ...item, sceneId: null, how: null, confidence: null }
+            : item);
+          return { media, mediaMap: preserveStudioMediaMap(current, media, placed.mediaMap) };
+        });
         const failed = [...scan.skipped, ...result.failed];
         const matched = (() => {
           const current = useProjectStore.getState().project;
