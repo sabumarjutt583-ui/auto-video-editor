@@ -11,6 +11,7 @@ export type StudioOperation =
   | { kind: "move"; id: string; index: number }
   | { kind: "delete"; id: string }
   | { kind: "split"; id: string; at: number }
+  | { kind: "duplicate"; id: string }
   | { kind: "source-in"; id: string; seconds: number };
 
 function finiteLength(value: number, label: string): number {
@@ -59,6 +60,7 @@ export function editStudioTimeline(project: Project, operation: StudioOperation)
   const scenes = [...project.scenes];
   const mediaMap = { ...project.mediaMap };
   const sourceIn = { ...editor.studioSourceIn };
+  const copiedOverrides = { ...editor.overrides };
   const file = availableMedia(project, current, editor.media);
 
   if (operation.kind === "duration") {
@@ -79,6 +81,13 @@ export function editStudioTimeline(project: Project, operation: StudioOperation)
       throw new Error("The source start must be inside the original video.");
     }
     sourceIn[current.id] = input;
+  } else if (operation.kind === "duplicate") {
+    if (scenes.length >= 5000) throw new Error("The timeline already contains the maximum number of clips.");
+    const newId = nextSceneId(scenes);
+    scenes.splice(atIndex + 1, 0, { ...current, id: newId });
+    mediaMap[newId] = mediaMap[current.id]!;
+    if (sourceIn[current.id] !== undefined) sourceIn[newId] = sourceIn[current.id];
+    if (editor.overrides[current.id]) copiedOverrides[newId] = { ...editor.overrides[current.id] };
   } else if (operation.kind === "split") {
     const at = operation.at;
     if (!Number.isFinite(at) || at < STUDIO_MIN_CLIP_SECONDS || at > current.duration - STUDIO_MIN_CLIP_SECONDS) {
@@ -88,7 +97,9 @@ export function editStudioTimeline(project: Project, operation: StudioOperation)
     if (file.kind === "video" && start + current.duration > file.duration + 0.01) {
       throw new Error("This video is shorter than the scene. Shorten the clip before splitting.");
     }
+    if (scenes.length >= 5000) throw new Error("The timeline already contains the maximum number of clips.");
     const newId = nextSceneId(scenes);
+    if (editor.overrides[current.id]) copiedOverrides[newId] = { ...editor.overrides[current.id] };
     const second: Scene = {
       ...emptyScene(),
       ...current,
@@ -119,7 +130,7 @@ export function editStudioTimeline(project: Project, operation: StudioOperation)
     };
   });
   const active = new Set(nextScenes.map((scene) => scene.id));
-  const overrides = Object.fromEntries(Object.entries(editor.overrides).filter(([id]) => active.has(id)));
+  const overrides = Object.fromEntries(Object.entries(copiedOverrides).filter(([id]) => active.has(id)));
   const media = editor.media.map((item) => {
     if (item.sceneId === null || active.has(item.sceneId)) return item;
     const replacement = nextScenes.find((scene) => mediaMap[scene.id] === item.path);
