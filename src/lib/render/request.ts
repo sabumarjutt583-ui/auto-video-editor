@@ -140,7 +140,10 @@ export function buildRenderRequest(input: RenderInput): RenderRequest {
     scenes: buildRenderScenes(project.scenes, editor, project, input.exists),
     kenBurns: editor.render.kenBurns,
     captions: captionsOn ? buildAssRequest(aspect, quality, input.captionStyle, input.font, input.captionLines) : null,
-    srt: input.captionLines.length > 0 ? toSrt(input.captionLines) : null,
+    // Studio's synthetic scene anchors are not spoken words or real subtitles.
+    srt: project.scriptSource === "video_studio" && !project.voicePath && !captionsOn
+      ? null
+      : input.captionLines.length > 0 ? toSrt(input.captionLines) : null,
     mix: buildMixRequest(editor.audio, project.voicePath ?? "", project.voiceDuration, input.cues),
     overlays: buildOverlays(editor.motion, width, height, project.voiceDuration),
     aspectLabel: aspectLabel(aspect),
