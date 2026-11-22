@@ -58,6 +58,36 @@ test("split video keeps two independently addressable scenes pointing to one ori
   assert.equal(b.words.length, 4);
 });
 
+test("duplicate clip preserves its source, trim and manual styling without modifying the original", () => {
+  const original = studio();
+  const editor = readEditor(original);
+  const modified = { ...original, editor: {
+    ...editor,
+    studioSourceIn: { S01: 2 },
+    overrides: { ...editor.overrides, S01: { kenBurns: "zoom_in", transition: "cut" } },
+  } } as Project;
+  const duplicated = apply(modified, { kind: "duplicate", id: "S01" });
+  assert.equal(duplicated.scenes.length, 4);
+  assert.equal(duplicated.scenes[1]?.id, "S04");
+  assert.equal(duplicated.mediaMap.S04, duplicated.mediaMap.S01);
+  assert.equal(readEditor(duplicated).studioSourceIn.S04, 2);
+  assert.equal(readEditor(duplicated).studioSourceIn.S01, 2);
+  assert.equal(readEditor(duplicated).overrides.S04?.kenBurns, "zoom_in");
+  assert.equal(duplicated.voiceDuration, 36);
+  assert.equal(original.scenes.length, 3);
+});
+
+test("splitting a styled clip keeps the manual scene override on both halves", () => {
+  const original = studio();
+  const editor = readEditor(original);
+  const modified = { ...original, editor: { ...editor,
+    overrides: { ...editor.overrides, S01: { kenBurns: "pan_left", transition: "cut" } },
+  } } as Project;
+  const result = apply(modified, { kind: "split", id: "S01", at: 5 });
+  assert.equal(readEditor(result).overrides.S01?.kenBurns, "pan_left");
+  assert.equal(readEditor(result).overrides.S04?.kenBurns, "pan_left");
+});
+
 test("source-in trim survives save-model normalization and does not rewrite source paths", () => {
   const b = apply(studio(), { kind: "source-in", id: "S01", seconds: 3.25 });
   assert.equal(readEditor(b).studioSourceIn.S01, 3.25);
