@@ -36,6 +36,8 @@ interface TimelineProps {
   selectedId: string | null;
   onSelect: (sceneId: string) => void;
   onBoundary: (scenes: Scene[]) => void;
+  /** Standalone mode uses a free clip boundary instead of narration word snapping. */
+  onStudioBoundary?: (index: number, time: number) => void;
   onSwap: (fromIndex: number, toIndex: number) => void;
   graphics: readonly MotionGraphic[];
   selectedGraphic: string | null;
@@ -45,7 +47,7 @@ interface TimelineProps {
 }
 
 /** Zoomable tracks: Video, Graphics, Captions, Music and SFX, with the playhead and draggable clip edges. */
-export function Timeline({ scenes, context, files, captionLines, audio, cues, selectedCue, onSelectCue, onMoveCue, onDeleteCue, selectedId, onSelect, onBoundary, onSwap, graphics, selectedGraphic, limitsFor, onSelectGraphic, onRetimeGraphic }: TimelineProps) {
+export function Timeline({ scenes, context, files, captionLines, audio, cues, selectedCue, onSelectCue, onMoveCue, onDeleteCue, selectedId, onSelect, onBoundary, onStudioBoundary, onSwap, graphics, selectedGraphic, limitsFor, onSelectGraphic, onRetimeGraphic }: TimelineProps) {
   const controls = usePlaybackControls();
   const scroller = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLDivElement>(null);
@@ -79,10 +81,13 @@ export function Timeline({ scenes, context, files, captionLines, audio, cues, se
 
   const handleDrop = useCallback(
     (drag: DragState) => {
-      if (drag.kind === "boundary") onBoundary(moveBoundaryToTime(scenes, drag.index, drag.time, context));
+      if (drag.kind === "boundary") {
+        if (onStudioBoundary) onStudioBoundary(drag.index, drag.time);
+        else onBoundary(moveBoundaryToTime(scenes, drag.index, drag.time, context));
+      }
       else if (drag.over >= 0 && drag.over !== drag.index) onSwap(drag.index, drag.over);
     },
-    [scenes, context, onBoundary, onSwap],
+    [scenes, context, onBoundary, onStudioBoundary, onSwap],
   );
   const handleClick = useCallback(
     (drag: DragState) => {
@@ -96,7 +101,7 @@ export function Timeline({ scenes, context, files, captionLines, audio, cues, se
   const { drag, begin, move, end, cancel } = useTimelineDrag({ timeAt, sceneAt, onDrop: handleDrop, onClick: handleClick });
 
   // While an edge is dragged, show the scenes as they would be.
-  const shown = useMemo(() => (drag?.kind === "boundary" ? moveBoundaryToTime(scenes, drag.index, drag.time, context) : scenes), [drag, scenes, context]);
+  const shown = useMemo(() => (drag?.kind === "boundary" && !onStudioBoundary ? moveBoundaryToTime(scenes, drag.index, drag.time, context) : scenes), [drag, scenes, context, onStudioBoundary]);
 
   // Keep the playhead in view while playing.
   useEffect(() => {
@@ -140,7 +145,7 @@ export function Timeline({ scenes, context, files, captionLines, audio, cues, se
             touched.current = false;
             setPixelsPerSecond(fitZoom(duration, Math.max(300, (scroller.current?.clientWidth ?? 800) - 24)));
           }} />
-        <span className="ml-2 text-xs text-muted">Drag the edge between two clips to change the scene times. Drag a clip onto another to swap them.</span>
+        <span className="ml-2 text-xs text-muted">Drag clip edges to adjust duration. Drag a clip onto another to change its order in Studio.</span>
       </div>
       <div className="flex min-h-0">
         <div className="w-16 shrink-0 pt-6 text-[11px] text-muted" aria-hidden>
