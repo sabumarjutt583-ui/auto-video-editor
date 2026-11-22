@@ -110,7 +110,13 @@ export function readEditor(project: Pick<Project, "editor">): EditorData {
     for (const [id, value] of Object.entries(raw.overrides)) overrides[id] = readOverride(value);
   }
   const motion = Array.isArray(raw.motion) ? raw.motion.map(readMotion).filter((g): g is MotionGraphic => g !== null) : [];
-  return { media, motion, timeChoices, placeholder: pick(raw.placeholder, PLACEHOLDERS, "hold"), overrides, captions: readCaptions(raw.captions), audio: readAudio(raw.audio), render: readRender(raw.render), brandKitId: typeof raw.brandKitId === "string" && raw.brandKitId.length <= 60 ? raw.brandKitId : "" };
+  const studioSourceIn: Record<string, number> = {};
+  if (isObject(raw.studioSourceIn)) {
+    for (const [sceneId, seconds] of Object.entries(raw.studioSourceIn)) {
+      if (typeof seconds === "number" && Number.isFinite(seconds) && seconds >= 0) studioSourceIn[sceneId] = seconds;
+    }
+  }
+  return { media, motion, timeChoices, placeholder: pick(raw.placeholder, PLACEHOLDERS, "hold"), overrides, captions: readCaptions(raw.captions), audio: readAudio(raw.audio), render: readRender(raw.render), brandKitId: typeof raw.brandKitId === "string" && raw.brandKitId.length <= 60 ? raw.brandKitId : "", studioSourceIn };
 }
 
 /** The override of a scene (the defaults when it has none). */
