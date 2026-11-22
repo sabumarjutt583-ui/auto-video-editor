@@ -12,6 +12,8 @@ export interface Layer {
   number: number;
   start: number;
   duration: number;
+  /** Non-destructive in-point in the original footage. */
+  sourceIn?: number;
 }
 
 export interface Placement {
