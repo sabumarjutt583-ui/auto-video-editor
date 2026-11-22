@@ -5,7 +5,7 @@ import { planScriptDraft, patchFromScriptDraft } from "./scriptDraft.ts";
 test("script draft preserves content and generates contiguous estimated scenes", () => {
   const draft = planScriptDraft("Markets crashed overnight. Investors rushed to sell everything.", 150);
   assert.equal(draft.estimated, true);
-  assert.equal(draft.words.length, 9);
+  assert.equal(draft.words.length, 8);
   assert.equal(draft.scenes.length, 2);
   assert.equal(draft.scenes[0]?.start, 0);
   assert.equal(draft.scenes[0]?.end, draft.scenes[1]?.start);
