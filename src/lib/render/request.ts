@@ -19,6 +19,8 @@ export interface RenderSource {
   duration: number;
   lastFrame: boolean;
   blurAll: boolean;
+  /** Non-destructive source in-point (seconds), zero on all legacy projects. */
+  sourceIn?: number;
 }
 
 export interface RenderScene {
@@ -90,8 +92,9 @@ export function aspectLabel(aspect: AspectRatio): string {
   return aspect.replace(":", "x");
 }
 
-function sourceOf(file: MediaFile): RenderSource {
-  return { kind: file.kind, path: file.path, duration: file.kind === "video" ? file.duration : 0, lastFrame: false, blurAll: false };
+function sourceOf(file: MediaFile, sourceIn = 0): RenderSource {
+  const start = file.kind === "video" ? Math.max(0, sourceIn) : 0;
+  return { kind: file.kind, path: file.path, duration: file.kind === "video" ? Math.max(0, file.duration - start) : 0, lastFrame: false, blurAll: false, sourceIn: start };
 }
 
 /** What a scene without media shows: the scene before it held or blurred, or black. */
@@ -100,14 +103,14 @@ function placeholderFor(kind: EditorData["placeholder"], before: RenderSource | 
   return { ...before, lastFrame: before.kind === "video", blurAll: kind === "blur" };
 }
 
-export function buildRenderScenes(scenes: readonly Scene[], editor: EditorData, project: Pick<Project, "mediaMap">, exists: Readonly<Record<string, boolean>>): RenderScene[] {
+export function buildRenderScenes(scenes: readonly Scene[], editor: EditorData, project: Pick<Project, "mediaMap"> & { scriptSource?: string }, exists: Readonly<Record<string, boolean>>): RenderScene[] {
   const result: RenderScene[] = [];
   let lastReal: RenderSource | null = null;
   scenes.forEach((scene, i) => {
     const override: SceneOverride = overrideOf(editor, scene.id);
     const file = fileOf(scene, editor.media, project.mediaMap);
     const real = file !== undefined && exists[file.path] !== false;
-    const source = real && file ? sourceOf(file) : placeholderFor(editor.placeholder, lastReal);
+    const source = real && file ? sourceOf(file, project.scriptSource === "video_studio" ? (editor.studioSourceIn?.[scene.id] ?? 0) : 0) : placeholderFor(editor.placeholder, lastReal);
     if (real) lastReal = source;
     const previous = scenes[i - 1];
     const kind = previous ? effectiveTransition(override.transition, scene.index, editor.render.transitions) : "cut";
