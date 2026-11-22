@@ -9,3 +9,5 @@ export { DashboardPage } from "./DashboardPage";
 export { ChannelsPage } from "./ChannelsPage";
 export { ProjectImagesPage } from "./ProjectImagesPage";
 export { ProjectSubtitlesPage } from "./ProjectSubtitlesPage";
+
+export { VideoStudioPage } from "./VideoStudioPage";
