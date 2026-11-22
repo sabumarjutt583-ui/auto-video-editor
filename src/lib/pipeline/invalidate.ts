@@ -17,7 +17,7 @@ export function invalidateProject(project: Project, patch: ProjectPatch): Projec
   // Do not erase the existing user's scene overrides or motion graphics.
   const studioAppend = project.scriptSource === "video_studio"
     && "scenes" in patch && "words" in patch && "voiceDuration" in patch
-    && project.scenes.every((scene, index) => patch.scenes?.[index]?.id === scene.id);
+    && patch.editor !== undefined;
   const style = changed("styleId") || changed("promptSettings") || changed("characterBible") || changed("locationBible");
   const defaults: ProjectPatch = {};
   if (script) Object.assign(defaults, { voiceOriginalPath: null, voiceOriginalDuration: 0, voicePath: null, voiceDuration: 0, voiceLocked: false, cutMap: [], bibleLocked: false });
